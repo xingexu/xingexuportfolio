@@ -5,25 +5,41 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LINKS, SITE } from "@/app/data";
 
-const NAME = "Xinge Xu";
+const NAME = "xinge xu";
 
 /**
- * Hero section.
+ * Hero. Minimal by design: name, one role line, one context line, links.
  *
- * SSR-safe: `typed` initializes to the full name, so the server-rendered HTML
- * (and the no-JS / crawler view) always contains "Xinge Xu" in the <h1>. On the
- * client we re-run the typing animation as progressive enhancement. The rest of
- * the content is always present in the DOM — no JS-gated visibility — so it is
- * fully indexable.
+ * SSR-safe: `typed` initializes to the full name so crawlers and no-JS
+ * visitors always get "xinge xu" in the <h1>. The typing animation re-runs
+ * client-side as progressive enhancement, stepped like a terminal.
  */
+type Particle = { id: number; left: string; top: string; color: string; delay: string };
+
+const PARTICLE_COLORS = ["var(--accent)", "#9fc4f0", "#ffffff", "var(--accent)"];
+
 export default function Hero() {
   const [typed, setTyped] = useState(NAME);
   const [typing, setTyping] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const pid = useRef(0);
+
+  const burst = () => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const next: Particle[] = Array.from({ length: 16 }, () => ({
+      id: pid.current++,
+      left: `${Math.random() * 100}%`,
+      top: `${20 + Math.random() * 70}%`,
+      color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
+      delay: `${Math.random() * 0.25}s`,
+    }));
+    setParticles((p) => [...p.slice(-32), ...next]);
+  };
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) return; // leave the full name in place
+    if (reduced) return;
 
     setTyped("");
     setTyping(true);
@@ -35,7 +51,7 @@ export default function Hero() {
         clearInterval(timer.current!);
         setTyping(false);
       }
-    }, 140);
+    }, 110);
 
     return () => {
       if (timer.current) clearInterval(timer.current);
@@ -51,122 +67,88 @@ export default function Hero() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "96px 32px 120px",
+        padding: "96px 28px 96px",
       }}
     >
-      <div className="hero-layout" style={{ width: "100%", maxWidth: 1100 }}>
+      <div className="hero-layout" style={{ width: "100%", maxWidth: 1040 }}>
         <div className="hero-copy">
           <h1
-            className="name-glow"
+            className="font-pixel name-hover"
+            onMouseEnter={burst}
             style={{
-              fontSize: "clamp(68px, 12vw, 148px)",
+              fontSize: "clamp(40px, 8vw, 88px)",
               fontWeight: 700,
-              lineHeight: 0.88,
-              letterSpacing: "-0.055em",
+              lineHeight: 1.05,
               color: "var(--text)",
+              position: "relative",
             }}
           >
             <span>{typed}</span>
-            {typing && (
-              <span
-                className="type-cursor"
-                aria-hidden
-                style={{
-                  display: "inline-block",
-                  width: "0.045em",
-                  height: "0.82em",
-                  background: "var(--blue-btn)",
-                  marginLeft: "0.04em",
-                  verticalAlign: "-0.05em",
-                  borderRadius: 2,
-                }}
-              />
-            )}
+            <span className="type-cursor" aria-hidden style={{ visibility: typing ? "visible" : "hidden" }} />
+            <span aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}>
+              {particles.map((p) => (
+                <span
+                  key={p.id}
+                  className="name-particle"
+                  style={{ left: p.left, top: p.top, background: p.color, animationDelay: p.delay }}
+                  onAnimationEnd={() => setParticles((ps) => ps.filter((q) => q.id !== p.id))}
+                />
+              ))}
+            </span>
           </h1>
 
-          <p
-            style={{
-              fontSize: "clamp(18px, 2.5vw, 26px)",
-              fontWeight: 400,
-              color: "var(--text-2)",
-              letterSpacing: "-0.022em",
-              marginTop: 28,
-              maxWidth: 640,
-            }}
-          >
-            {SITE.role}
+          <p className="step-in-2" style={{ fontSize: 15, color: "var(--text-2)", marginTop: 20 }}>
+            {SITE.role.toLowerCase()}
           </p>
 
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 14, marginTop: 40 }}>
-            <span className="pill" style={{ animationDelay: "280ms" }}>
-              <span className="dot" />
-              Current Grade 12 Bayview Secondary IB Student
-            </span>
-            <span className="pill" style={{ animationDelay: "420ms" }}>
-              <span className="dot" />
-              Incoming Western CS + Ivey AEO Student
-            </span>
-          </div>
+          <p className="step-in-2" style={{ fontSize: 13, color: "var(--text-3)", marginTop: 8 }}>
+            western cs + ivey aeo &apos;30
+          </p>
 
-          <div style={{ width: 48, height: 3, borderRadius: 999, background: "var(--blue-btn)", marginTop: 48, opacity: 0.85 }} />
-
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "14px 44px", marginTop: 36 }}>
-            <Link href="/projects" className="hero-cta">
-              View projects
-              <span className="hero-cta-arrow" aria-hidden>
-                ↗
-              </span>
+          <div
+            className="step-in-3"
+            style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "16px 28px", marginTop: 40 }}
+          >
+            <Link href="/projects" className="px-btn">
+              projects <span aria-hidden>→</span>
             </Link>
 
-            <div style={{ display: "flex", gap: 28 }}>
-              {[
-                { label: "GitHub", href: LINKS.github },
-                { label: "LinkedIn", href: LINKS.linkedin },
-                { label: "Email", href: LINKS.email },
-              ].map((l) => (
-                <a
-                  key={l.label}
-                  href={l.href}
-                  target={l.href.startsWith("http") ? "_blank" : undefined}
-                  rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                  className="link-grow"
-                  style={{ fontSize: 14, color: "var(--text-2)", letterSpacing: "-0.01em" }}
-                >
-                  {l.label}
-                </a>
-              ))}
-            </div>
+            {[
+              { label: "github", href: LINKS.github },
+              { label: "linkedin", href: LINKS.linkedin },
+              { label: "email", href: LINKS.email },
+            ].map((l) => (
+              <a
+                key={l.label}
+                href={l.href}
+                target={l.href.startsWith("http") ? "_blank" : undefined}
+                rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                className="px-link"
+              >
+                {l.label}
+              </a>
+            ))}
           </div>
         </div>
 
-        <div
-          className="hero-photo"
-          style={{
-            animation: "photoIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.15s both, photoFloat 6s ease-in-out 1.1s infinite",
-            width: "clamp(240px, 34vw, 360px)",
-            aspectRatio: "1",
-            borderRadius: "50%",
-            overflow: "hidden",
-            flexShrink: 0,
-            border: "4px solid rgba(147, 197, 253, 0.55)",
-            boxShadow: "0 0 0 10px rgba(147,197,253,0.12), 0 16px 60px rgba(147,197,253,0.32), 0 4px 20px rgba(0,0,0,0.07)",
-          }}
-        >
-          <Image
-            src="/photo.png"
-            alt="Portrait of Xinge Xu"
-            width={600}
-            height={600}
-            priority
-            sizes="360px"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "center top",
-              display: "block",
-            }}
-          />
+        <div className="hero-photo step-in">
+          <div className="pixel-frame">
+            <Image
+              src="/photo.png"
+              alt="Portrait of Xinge Xu"
+              width={600}
+              height={600}
+              priority
+              sizes="(max-width: 900px) 208px, 288px"
+              className="pixel-photo"
+              style={{
+                width: "clamp(208px, 26vw, 288px)",
+                height: "clamp(208px, 26vw, 288px)",
+                objectFit: "cover",
+                objectPosition: "center top",
+              }}
+            />
+          </div>
         </div>
       </div>
     </section>

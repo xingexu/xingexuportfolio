@@ -1,23 +1,29 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
 import { SITE, LINKS } from "./data";
 import Nav from "@/components/Nav";
 import Background from "@/components/Background";
 import Footer from "@/components/Footer";
 
-const plexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  variable: "--font-plex",
-  weight: ["400", "500", "600", "700"],
-});
-
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-je",
-  weight: ["400", "500"],
+  weight: ["400", "500", "700"],
 });
+
+const silkscreen = Silkscreen({
+  subsets: ["latin"],
+  variable: "--font-silk",
+  weight: ["400", "700"],
+});
+
+/**
+ * Runs before hydration so the correct theme is set before first paint —
+ * no flash of the wrong theme. Dark (night) is the default.
+ */
+const themeInit = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="dark"}})();`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -70,7 +76,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f7f9fc",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#04070f" },
+    { media: "(prefers-color-scheme: light)", color: "#cfe8fa" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
@@ -89,8 +98,9 @@ const personJsonLd = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${jetbrainsMono.variable}`}>
-      <body className="min-h-screen antialiased font-sans" style={{ background: "var(--bg)", color: "var(--text)" }}>
+    <html lang="en" className={`${jetbrainsMono.variable} ${silkscreen.variable}`} suppressHydrationWarning>
+      <body className="min-h-screen antialiased" style={{ background: "var(--bg)", color: "var(--text)" }}>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}

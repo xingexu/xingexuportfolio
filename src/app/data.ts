@@ -26,14 +26,14 @@ export const PROJECTS: Project[] = [
   {
     num: "01",
     name: "Drift",
-    desc: "AI system that filters and prioritizes business communication. Reduces cold outreach noise and surfaces real inquiries in real time.",
+    desc: "AI filter for business communication — cuts outreach noise, surfaces real inquiries in real time.",
     stack: ["Next.js", "Supabase", "NLP"],
     year: "2024",
   },
   {
     num: "02",
     name: "NFASS Journal",
-    desc: "Full-stack platform for structured, persistent publishing with clean content workflows and robust database-backed storage.",
+    desc: "Full-stack publishing platform with clean content workflows and database-backed storage.",
     stack: ["PostgreSQL", "Backend Systems", "Database Design"],
     year: "2024",
     url: "https://nfast.vercel.app/",

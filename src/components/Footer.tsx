@@ -2,29 +2,36 @@ import { LINKS } from "@/app/data";
 import { GitHubIcon, LinkedInIcon, MailIcon } from "./PixelIcons";
 
 /**
- * Footer. Transparent — floats over the skyline/water so the scene is
- * uninterrupted. Crawlable contact links as pixel icons.
+ * Footer. A clear pixel bar: solid panel, hard top border, and the social
+ * icons as bordered pixel buttons so they're unmissable in both themes.
  */
 export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer style={{ position: "relative", zIndex: 10 }}>
+    <footer
+      style={{
+        position: "relative",
+        zIndex: 10,
+        background: "var(--panel-solid)",
+        borderTop: "2px solid var(--border)",
+      }}
+    >
       <div
         style={{
           maxWidth: 1040,
           margin: "0 auto",
-          padding: "18px 28px",
+          padding: "16px 28px",
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 12,
+          gap: 14,
         }}
       >
-        <span style={{ fontSize: 12, color: "var(--text-3)" }}>© {year} xinge xu</span>
+        <span style={{ fontSize: 12, color: "var(--text-2)" }}>© {year} xinge xu</span>
 
-        <nav aria-label="Social and contact" style={{ display: "flex", gap: 18 }}>
+        <nav aria-label="Social and contact" style={{ display: "flex", gap: 14 }}>
           {[
             { label: "GitHub", href: LINKS.github, Icon: GitHubIcon },
             { label: "LinkedIn", href: LINKS.linkedin, Icon: LinkedInIcon },
@@ -34,12 +41,12 @@ export default function Footer() {
               key={label}
               href={href}
               target="_blank"
-              rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-              className="icon-link"
+              rel="noopener noreferrer"
+              className="icon-btn"
               aria-label={label}
               title={label}
             >
-              <Icon size={16} />
+              <Icon size={18} />
             </a>
           ))}
         </nav>

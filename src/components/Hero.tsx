@@ -3,8 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { LINKS, SITE } from "@/app/data";
-import { GitHubIcon, LinkedInIcon, MailIcon } from "./PixelIcons";
+import { SITE } from "@/app/data";
 
 const NAME = "xinge xu";
 
@@ -111,26 +110,8 @@ export default function Hero() {
             style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "16px 28px", marginTop: 40 }}
           >
             <Link href="/projects" className="px-btn">
-              projects <span aria-hidden>→</span>
+              see what i built! <span aria-hidden>→</span>
             </Link>
-
-            {[
-              { label: "GitHub", href: LINKS.github, Icon: GitHubIcon },
-              { label: "LinkedIn", href: LINKS.linkedin, Icon: LinkedInIcon },
-              { label: "Email xxu767@uwo.ca", href: LINKS.email, Icon: MailIcon },
-            ].map(({ label, href, Icon }) => (
-              <a
-                key={label}
-                href={href}
-                target="_blank"
-                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="icon-link"
-                aria-label={label}
-                title={label}
-              >
-                <Icon size={20} />
-              </a>
-            ))}
           </div>
         </div>
 

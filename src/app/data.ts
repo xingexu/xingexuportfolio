@@ -43,5 +43,6 @@ export const PROJECTS: Project[] = [
 export const LINKS = {
   github: "https://github.com/xingexu",
   linkedin: "https://www.linkedin.com/in/xinge-xu-5b4191306/",
-  email: "mailto:xxu767@uwo.ca",
+  // Gmail compose in a new tab (mailto: silently fails without a mail app)
+  email: "https://mail.google.com/mail/?view=cm&fs=1&to=xxu767@uwo.ca",
 } as const;

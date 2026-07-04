@@ -147,14 +147,25 @@ body {
   padding: 3px 8px;
 }
 
-.icon-link {
+.icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-2);
+  width: 38px;
+  height: 38px;
+  color: var(--text);
+  background: var(--panel);
+  border: 2px solid var(--border);
+  box-shadow: 3px 3px 0 var(--shadow);
 }
-.icon-link:hover { color: var(--accent); transform: translateY(-2px); }
-.icon-link:active { transform: translateY(0); }
+.icon-btn:hover {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.icon-btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--shadow); }
 
 .px-link {
   font-size: 13px;

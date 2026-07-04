@@ -239,12 +239,12 @@ a.project-card:hover .project-title { color: var(--accent); }
 .pixel-frame {
   position: relative;
   display: inline-block;
-  padding: 8px;
+  padding: 10px;
   background: var(--panel);
   border: 2px solid var(--border);
   box-shadow: 8px 8px 0 var(--shadow);
 }
-/* accent corner blocks, echoing the project-card hover corners */
+/* four accent corner blocks: two on the outer frame, two on the inner mat */
 .pixel-frame::before,
 .pixel-frame::after {
   content: "";
@@ -256,8 +256,25 @@ a.project-card:hover .project-title { color: var(--accent); }
 .pixel-frame::before { top: -2px; left: -2px; }
 .pixel-frame::after { bottom: -2px; right: -2px; }
 
-.pixel-photo {
+.pixel-frame-inner {
+  position: relative;
   border: 2px solid var(--border);
+  padding: 4px;
+  background: var(--panel-solid);
+}
+.pixel-frame-inner::before,
+.pixel-frame-inner::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  z-index: 1;
+}
+.pixel-frame-inner::before { top: -2px; right: -2px; }
+.pixel-frame-inner::after { bottom: -2px; left: -2px; }
+
+.pixel-photo {
   display: block;
 }
 

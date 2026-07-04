@@ -108,14 +108,14 @@ function makeMoonMap(): number[][] {
 
 /** Sun disc at 1× cell scale, no rays: 1 body / 3 hot core / 4 deep-gold rim. */
 function makeSunMap(): number[][] {
-  const n = 13;
+  const n = 17;
   const cR = (n - 1) / 2;
   return Array.from({ length: n }, (_, r) =>
     Array.from({ length: n }, (_, c) => {
       const d = Math.hypot(r - cR, c - cR);
       if (d > cR + 0.4) return 0;
-      if (d > cR - 1) return 4;
-      if (d <= 2.4) return 3;
+      if (d > cR - 1.2) return 4;
+      if (d <= 3.2) return 3;
       return 1;
     })
   );
@@ -162,28 +162,38 @@ function mulberry32(seed: number) {
   };
 }
 
-/** Puffy cloud: sunlit top highlights, body, flat shaded underside. */
+/** Puffy cloud built from overlapping pixel circles: the outlines rasterize
+ *  into stepped arcs — curves expressed through pixels, never smooth lines. */
 function makeCloud(rng: () => number, front: boolean): number[][] {
-  const w = 20 + Math.floor(rng() * 24);
-  const h = front ? 8 : 6;
+  const w = 22 + Math.floor(rng() * 22);
+  const h = front ? 9 : 7;
   const grid: number[][] = Array.from({ length: h }, () => Array(w).fill(0));
 
-  // 4-6 humps unioned together → fluffy stacked silhouette
-  const humps = 4 + Math.floor(rng() * 3);
-  for (let i = 0; i < humps; i++) {
-    const hw = 7 + Math.floor(rng() * (w / 2));
-    const hx = Math.floor(rng() * (w - hw));
-    const hh = 3 + Math.floor(rng() * (h - 3));
-    for (let r = 0; r < hh; r++) {
-      // narrower towards the top → rounded silhouette
-      const inset = Math.floor(((hh - 1 - r) / hh) * (hw / 2)) as number;
-      for (let c = hx + inset; c < hx + hw - inset; c++) {
-        if (c >= 0 && c < w) grid[h - 2 - r][c] = 1;
+  // 4-7 round puffs unioned along the base line
+  const puffs = 4 + Math.floor(rng() * 4);
+  for (let i = 0; i < puffs; i++) {
+    const pr = 2.2 + rng() * (h - 4);
+    const pcx = pr + rng() * Math.max(1, w - 1 - 2 * pr);
+    const pcy = h - 2 - pr * (0.35 + rng() * 0.4);
+    for (let r = 0; r < h - 1; r++) {
+      for (let c = 0; c < w; c++) {
+        // squash vertically → elliptical, wider-than-tall puffs
+        if (Math.hypot(c - pcx, (r - pcy) * 1.35) <= pr) grid[r][c] = 1;
       }
     }
   }
-  // solid base row + shaded underside
-  for (let c = 1; c < w - 1; c++) {
+  // flat base: fill the span between the outermost filled columns + shade row
+  let lo = w, hi = -1;
+  for (let c = 0; c < w; c++) {
+    for (let r = 0; r < h - 1; r++) {
+      if (grid[r][c]) {
+        lo = Math.min(lo, c);
+        hi = Math.max(hi, c);
+        break;
+      }
+    }
+  }
+  for (let c = lo + 1; c <= hi - 1 && c < w; c++) {
     grid[h - 2][c] = grid[h - 2][c] || 1;
     grid[h - 1][c] = 2;
   }
@@ -464,7 +474,8 @@ export default function Background() {
           y: 13 + Math.floor(rng() * Math.max(6, rows * 0.48)), // 13 = below the fixed nav
           bob: 0,
           map: makeCloud(rng, front),
-          every: front ? 300 + rng() * 200 : 520 + rng() * 260,
+          // clouds are the slowest thing in the sky — slower than balloon (600ms) and birds (150ms)
+          every: front ? 850 + rng() * 300 : 1300 + rng() * 400,
           acc: 0,
           bobEvery: 700 + rng() * 600,
           bobAcc: rng() * 700,
@@ -746,15 +757,15 @@ export default function Background() {
       if (skyDay) ctx!.drawImage(skyDay, 0, 0);
       stepPulse(dt);
 
-      // sun: pulsing halo + hot core flash (1× cells, no rays, uniform pixel size)
-      const sx = Math.floor(cols * 0.82);
+      // sun: pulsing halo + whole-disc flash (1× cells, no rays, uniform pixel size)
+      const sx = Math.floor(cols * 0.8);
       const sy = Math.max(13, Math.floor(rows * 0.07)); // keep clear of the fixed nav
-      halo(sx + 6, sy + 6, "#ffe79a", pulse, 7);
+      halo(sx + 8, sy + 8, "#ffe79a", pulse, 9);
       const hot = pulse % 2 === 0;
       sprite(SUN_MAP, sx, sy, {
-        1: DAY.sunCore,
-        3: hot ? DAY.sunCoreHot : DAY.sunCore,
-        4: DAY.sunRim,
+        1: hot ? "#ffdf6e" : DAY.sunCore,
+        3: hot ? "#fff4bd" : "#ffe066",
+        4: hot ? "#f7bd45" : DAY.sunRim,
       }, 1);
 
       // clouds: drift + bob, back layer then front
@@ -872,7 +883,7 @@ export default function Background() {
       }
 
       if (skylineDay) ctx!.drawImage(skylineDay, 0, 0);
-      drawWater(DAY, DAY.sunLane, sx + 5, dt);
+      drawWater(DAY, DAY.sunLane, sx + 7, dt);
     }
 
     /* ── loop ── */

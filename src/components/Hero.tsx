@@ -132,9 +132,7 @@ export default function Hero() {
         </div>
 
         <div className="hero-photo step-in">
-          <div className="pixel-frame">
-            <div className="pixel-frame-inner">
-              <Image
+          <Image
               src="/photo.png"
               alt="Portrait of Xinge Xu"
               width={600}
@@ -148,9 +146,7 @@ export default function Hero() {
                 objectFit: "cover",
                 objectPosition: "center top",
               }}
-              />
-            </div>
-          </div>
+          />
         </div>
       </div>
     </section>

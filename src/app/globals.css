@@ -236,46 +236,12 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 /* ── Pixel photo frame ── */
 
-.pixel-frame {
-  position: relative;
-  display: inline-block;
-  padding: 10px;
-  background: var(--panel);
-  border: 2px solid var(--border);
-  box-shadow: 8px 8px 0 var(--shadow);
-}
-/* four accent corner blocks: two on the outer frame, two on the inner mat */
-.pixel-frame::before,
-.pixel-frame::after {
-  content: "";
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--accent);
-}
-.pixel-frame::before { top: -2px; left: -2px; }
-.pixel-frame::after { bottom: -2px; right: -2px; }
-
-.pixel-frame-inner {
-  position: relative;
-  border: 2px solid var(--border);
-  padding: 4px;
-  background: var(--panel-solid);
-}
-.pixel-frame-inner::before,
-.pixel-frame-inner::after {
-  content: "";
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  z-index: 1;
-}
-.pixel-frame-inner::before { top: -2px; right: -2px; }
-.pixel-frame-inner::after { bottom: -2px; left: -2px; }
-
+/* photo blends into the scene: thin theme border + the same hard pixel
+   shadow every other element casts — no mat, no decoration */
 .pixel-photo {
   display: block;
+  border: 2px solid var(--border);
+  box-shadow: 6px 6px 0 var(--shadow);
 }
 
 /* ── Hero layout ── */

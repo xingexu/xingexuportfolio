@@ -162,40 +162,61 @@ function mulberry32(seed: number) {
   };
 }
 
-/** Puffy cloud built from overlapping pixel circles: the outlines rasterize
- *  into stepped arcs — curves expressed through pixels, never smooth lines. */
-function makeCloud(rng: () => number, front: boolean): number[][] {
-  const w = 22 + Math.floor(rng() * 22);
-  const h = front ? 9 : 7;
-  const grid: number[][] = Array.from({ length: h }, () => Array(w).fill(0));
+/** Hand-drawn cloud silhouettes (from reference art). X = cloud, . = sky. */
+const CLOUD_SHAPES: string[][] = [
+  [
+    // wide flat-bottomed cloud with a stepped center dome
+    "........XXXXXX........",
+    "....XXXXXXXXXXXX......",
+    "..XXXXXXXXXXXXXXXX....",
+    ".XXXXXXXXXXXXXXXXXXXX.",
+    "XXXXXXXXXXXXXXXXXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXXXX",
+  ],
+  [
+    // classic two-hump cloud: big left dome, smaller right dome
+    "......XXXXXX................",
+    "....XXXXXXXXXX....XXXXX.....",
+    "...XXXXXXXXXXXX..XXXXXXX....",
+    "..XXXXXXXXXXXXXXXXXXXXXXX...",
+    ".XXXXXXXXXXXXXXXXXXXXXXXXXX.",
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  ],
+  [
+    // long low stratus with gentle bumps
+    "..........XXXXXX....XXXX.......",
+    "....XXXXXXXXXXXXXXXXXXXXXX.....",
+    ".XXXXXXXXXXXXXXXXXXXXXXXXXXXX..",
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.",
+  ],
+  [
+    // three-bump cumulus
+    ".....XXXX....XXX........",
+    "...XXXXXXXX.XXXXX..XXX..",
+    ".XXXXXXXXXXXXXXXXXXXXXX.",
+    "XXXXXXXXXXXXXXXXXXXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXXXXXX",
+    "XXXXXXXXXXXXXXXXXXXXXXXX",
+  ],
+];
 
-  // 4-7 round puffs unioned along the base line
-  const puffs = 4 + Math.floor(rng() * 4);
-  for (let i = 0; i < puffs; i++) {
-    const pr = 2.2 + rng() * (h - 4);
-    const pcx = pr + rng() * Math.max(1, w - 1 - 2 * pr);
-    const pcy = h - 2 - pr * (0.35 + rng() * 0.4);
-    for (let r = 0; r < h - 1; r++) {
-      for (let c = 0; c < w; c++) {
-        // squash vertically → elliptical, wider-than-tall puffs
-        if (Math.hypot(c - pcx, (r - pcy) * 1.35) <= pr) grid[r][c] = 1;
-      }
-    }
-  }
-  // flat base: fill the span between the outermost filled columns + shade row
-  let lo = w, hi = -1;
-  for (let c = 0; c < w; c++) {
-    for (let r = 0; r < h - 1; r++) {
-      if (grid[r][c]) {
-        lo = Math.min(lo, c);
-        hi = Math.max(hi, c);
-        break;
-      }
-    }
-  }
-  for (let c = lo + 1; c <= hi - 1 && c < w; c++) {
-    grid[h - 2][c] = grid[h - 2][c] || 1;
-    grid[h - 1][c] = 2;
+/** Parse a silhouette, optionally mirror it, then apply the shading pass:
+ *  3 = sunlit top, 1 = body, 4 = mid-tone edges, 2 = shaded underside. */
+function makeCloud(shape: string[], mirror: boolean): number[][] {
+  const h = shape.length + 1;
+  const w = shape[0].length;
+  const grid: number[][] = Array.from({ length: h }, (_, r) =>
+    Array.from({ length: w }, (_, c) => {
+      if (r >= shape.length) return 0;
+      const col = mirror ? w - 1 - c : c;
+      return shape[r][col] === "X" ? 1 : 0;
+    })
+  );
+  // shaded underside row beneath the base
+  for (let c = 1; c < w - 1; c++) {
+    if (grid[h - 2][c]) grid[h - 1][c] = 2;
   }
   // sunlit highlight: topmost cell of each column
   for (let c = 0; c < w; c++) {
@@ -207,7 +228,7 @@ function makeCloud(rng: () => number, front: boolean): number[][] {
       if (grid[r][c]) break;
     }
   }
-  // mid-tone shading: body cells adjacent to the shaded underside or open edge
+  // mid-tone shading: body cells against the underside or open edges
   for (let c = 0; c < w; c++) {
     for (let r = 0; r < h; r++) {
       if (grid[r][c] !== 1) continue;
@@ -473,7 +494,7 @@ export default function Background() {
           x: Math.floor(rng() * cols),
           y: 13 + Math.floor(rng() * Math.max(6, rows * 0.48)), // 13 = below the fixed nav
           bob: 0,
-          map: makeCloud(rng, front),
+          map: makeCloud(CLOUD_SHAPES[Math.floor(rng() * CLOUD_SHAPES.length)], rng() < 0.5),
           // clouds are the slowest thing in the sky — slower than balloon (600ms) and birds (150ms)
           every: front ? 850 + rng() * 300 : 1300 + rng() * 400,
           acc: 0,

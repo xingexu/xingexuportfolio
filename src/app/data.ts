@@ -43,5 +43,5 @@ export const PROJECTS: Project[] = [
 export const LINKS = {
   github: "https://github.com/xingexu",
   linkedin: "https://www.linkedin.com/in/xinge-xu-5b4191306/",
-  email: "mailto:xingexu1107@gmail.com",
+  email: "mailto:xxu767@uwo.ca",
 } as const;

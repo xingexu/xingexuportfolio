@@ -1,25 +1,20 @@
 import { LINKS } from "@/app/data";
+import { GitHubIcon, LinkedInIcon, MailIcon } from "./PixelIcons";
 
 /**
- * Footer. Server component with crawlable contact links. One line, minimal.
+ * Footer. Transparent — floats over the skyline/water so the scene is
+ * uninterrupted. Crawlable contact links as pixel icons.
  */
 export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer
-      style={{
-        position: "relative",
-        zIndex: 10,
-        borderTop: "2px solid var(--border)",
-        background: "var(--panel)",
-      }}
-    >
+    <footer style={{ position: "relative", zIndex: 10 }}>
       <div
         style={{
           maxWidth: 1040,
           margin: "0 auto",
-          padding: "20px 28px",
+          padding: "18px 28px",
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
@@ -29,21 +24,22 @@ export default function Footer() {
       >
         <span style={{ fontSize: 12, color: "var(--text-3)" }}>© {year} xinge xu</span>
 
-        <nav aria-label="Social and contact" style={{ display: "flex", gap: 20 }}>
+        <nav aria-label="Social and contact" style={{ display: "flex", gap: 18 }}>
           {[
-            { label: "github", href: LINKS.github },
-            { label: "linkedin", href: LINKS.linkedin },
-            { label: "email", href: LINKS.email },
-          ].map((l) => (
+            { label: "GitHub", href: LINKS.github, Icon: GitHubIcon },
+            { label: "LinkedIn", href: LINKS.linkedin, Icon: LinkedInIcon },
+            { label: "Email xxu767@uwo.ca", href: LINKS.email, Icon: MailIcon },
+          ].map(({ label, href, Icon }) => (
             <a
-              key={l.label}
-              href={l.href}
-              target={l.href.startsWith("http") ? "_blank" : undefined}
-              rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
-              className="px-link"
-              style={{ fontSize: 12 }}
+              key={label}
+              href={href}
+              target="_blank"
+              rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+              className="icon-link"
+              aria-label={label}
+              title={label}
             >
-              {l.label}
+              <Icon size={16} />
             </a>
           ))}
         </nav>

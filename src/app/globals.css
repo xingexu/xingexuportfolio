@@ -147,6 +147,15 @@ body {
   padding: 3px 8px;
 }
 
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+.icon-link:hover { color: var(--accent); transform: translateY(-2px); }
+.icon-link:active { transform: translateY(0); }
+
 .px-link {
   font-size: 13px;
   color: var(--link);

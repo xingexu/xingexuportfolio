@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LINKS, SITE } from "@/app/data";
+import { GitHubIcon, LinkedInIcon, MailIcon } from "./PixelIcons";
 
 const NAME = "xinge xu";
 
@@ -114,18 +115,20 @@ export default function Hero() {
             </Link>
 
             {[
-              { label: "github", href: LINKS.github },
-              { label: "linkedin", href: LINKS.linkedin },
-              { label: "email", href: LINKS.email },
-            ].map((l) => (
+              { label: "GitHub", href: LINKS.github, Icon: GitHubIcon },
+              { label: "LinkedIn", href: LINKS.linkedin, Icon: LinkedInIcon },
+              { label: "Email xxu767@uwo.ca", href: LINKS.email, Icon: MailIcon },
+            ].map(({ label, href, Icon }) => (
               <a
-                key={l.label}
-                href={l.href}
-                target={l.href.startsWith("http") ? "_blank" : undefined}
-                rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="px-link"
+                key={label}
+                href={href}
+                target="_blank"
+                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                className="icon-link"
+                aria-label={label}
+                title={label}
               >
-                {l.label}
+                <Icon size={20} />
               </a>
             ))}
           </div>

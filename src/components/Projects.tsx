@@ -1,5 +1,4 @@
-import { PROJECTS, type Project } from "@/app/data";
-
+import Image from "next/image";
 /**
  * Projects grid. Server component — fully indexable HTML, pure-CSS hover.
  */
@@ -21,57 +20,34 @@ export default function Projects() {
         projects
       </h1>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 28 }}>
-        {PROJECTS.map((p) => (
-          <ProjectCard key={p.num} project={p} />
-        ))}
-      </div>
+      <section className="drift-showcase" aria-labelledby="drift-preview-title">
+        <article className="drift-screenshot-card px-panel">
+          <Image
+            src="/drift-full-preview.png"
+            alt="Drift app landing page preview"
+            width={3600}
+            height={2086}
+            priority
+            unoptimized
+            sizes="(max-width: 900px) calc(100vw - 56px), 760px"
+            className="drift-full-preview"
+          />
+        </article>
+
+        <div className="drift-info-stack">
+          <article className="drift-info-card px-panel">
+            <h2 className="font-pixel drift-brick-title">UNDER CONSTRUCTION</h2>
+          </article>
+
+          <article className="drift-info-card px-panel">
+            <h2 className="font-pixel drift-card-title">WHAT DRIFT DOES</h2>
+            <p>
+              Drift helps students understand whether their online time is actually focused. It tracks activity,
+              blocks distracting sites, and turns study sessions into clear analytics about focus habits.
+            </p>
+          </article>
+        </div>
+      </section>
     </div>
   );
-}
-
-function ProjectCard({ project: p }: { project: Project }) {
-  const inner = (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
-        <span style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.08em" }}>{p.num}</span>
-        <span style={{ fontSize: 11, color: "var(--text-3)" }}>{p.year}</span>
-      </div>
-
-      <h2 className="project-title" style={{ marginBottom: 12 }}>
-        {p.name.toLowerCase()}
-        {p.url && (
-          <span aria-hidden style={{ marginLeft: 8, fontSize: 13, color: "var(--accent)" }}>
-            ↗
-          </span>
-        )}
-      </h2>
-
-      <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--text-2)", marginBottom: 20 }}>{p.desc}</p>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {p.stack.map((s) => (
-          <span key={s} className="px-chip">
-            {s.toLowerCase()}
-          </span>
-        ))}
-      </div>
-    </>
-  );
-
-  if (p.url) {
-    return (
-      <a
-        className="project-card"
-        href={p.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${p.name} — visit live site (opens in a new tab)`}
-      >
-        {inner}
-      </a>
-    );
-  }
-
-  return <article className="project-card">{inner}</article>;
 }

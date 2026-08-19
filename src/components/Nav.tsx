@@ -38,6 +38,9 @@ export default function Nav() {
           <Link href="/projects" aria-current={pathname === "/projects" ? "page" : undefined} className="nav-link">
             projects
           </Link>
+          <Link href="/resume" aria-current={pathname === "/resume" ? "page" : undefined} className="nav-link">
+            resume
+          </Link>
           <ThemeToggle />
         </div>
       </nav>

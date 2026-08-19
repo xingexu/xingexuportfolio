@@ -26,17 +26,9 @@ export const PROJECTS: Project[] = [
   {
     num: "01",
     name: "Drift",
-    desc: "AI filter for business communication — cuts outreach noise, surfaces real inquiries in real time.",
-    stack: ["Next.js", "Supabase", "NLP"],
-    year: "2024",
-  },
-  {
-    num: "02",
-    name: "NFASS Journal",
-    desc: "Full-stack publishing platform with clean content workflows and database-backed storage.",
-    stack: ["PostgreSQL", "Backend Systems", "Database Design"],
-    year: "2024",
-    url: "https://nfast.vercel.app/",
+    desc: "Currently building a focus-tracking app for students with activity insights, website blocking, study analytics, and clear signals for whether time online is actually focused.",
+    stack: ["Next.js", "TypeScript", "Analytics"],
+    year: "2026",
   },
 ];
 

@@ -28,7 +28,7 @@ const themeInit = `(function(){try{var t=localStorage.getItem("theme");if(t!=="l
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
-    default: "Xinge Xu — Fullstack Software Developer",
+    default: "Xinge Xu",
     template: "%s · Xinge Xu",
   },
   description: SITE.description,
@@ -52,15 +52,19 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Xinge Xu",
-    title: "Xinge Xu — Fullstack Software Developer",
+    title: "Xinge Xu",
     description: SITE.description,
     url: SITE.url,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Xinge Xu — Fullstack Software Developer",
+    title: "Xinge Xu",
     description: SITE.description,
+  },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
   },
   robots: {
     index: true,
@@ -98,7 +102,12 @@ const personJsonLd = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${jetbrainsMono.variable} ${silkscreen.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${jetbrainsMono.variable} ${silkscreen.variable}`}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <body className="min-h-screen antialiased" style={{ background: "var(--bg)", color: "var(--text)" }}>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <script

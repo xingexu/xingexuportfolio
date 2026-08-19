@@ -137,6 +137,15 @@ body {
 .px-btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--shadow); }
 .px-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
 
+.px-btn-secondary {
+  color: var(--text);
+  background: var(--panel);
+}
+.px-btn-secondary:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .px-chip {
   display: inline-block;
   font-size: 11px;
@@ -254,6 +263,304 @@ a.project-card:hover .project-title { color: var(--accent); }
   color: var(--text);
 }
 
+.drift-showcase {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(270px, 0.62fr);
+  align-items: start;
+  gap: 22px;
+  animation: stepIn 0.5s steps(5) both;
+}
+
+.drift-screenshot-card {
+  overflow: hidden;
+}
+
+.drift-full-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.drift-info-stack {
+  display: grid;
+  align-content: start;
+  grid-template-rows: auto auto;
+  gap: 18px;
+}
+
+.drift-info-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 150px;
+  padding: 20px;
+}
+
+.drift-brick-title {
+  font-size: clamp(24px, 3.2vw, 40px);
+  line-height: 0.95;
+  color: #fff0a4;
+  text-transform: uppercase;
+  text-shadow:
+    0 6px 0 #bd7333,
+    6px 6px 0 #5b2c4d;
+}
+
+.drift-card-title {
+  margin-bottom: 18px;
+  font-size: clamp(18px, 2.3vw, 26px);
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.drift-info-card p {
+  margin-top: 0;
+  font-size: clamp(13px, 1.05vw, 15px);
+  line-height: 1.75;
+  color: var(--text-2);
+}
+
+:root[data-theme="light"] .drift-info-card {
+  background: rgba(232, 245, 255, 0.92);
+  border-color: #6f9bc4;
+  box-shadow: 6px 6px 0 rgba(111, 155, 196, 0.36);
+}
+
+:root[data-theme="light"] .drift-brick-title {
+  color: #19375f;
+  text-shadow:
+    0 5px 0 #79a8cf,
+    5px 5px 0 #c8e3f7;
+}
+
+:root[data-theme="light"] .drift-card-title {
+  color: #9a4f00;
+}
+
+:root[data-theme="light"] .drift-info-card p {
+  color: rgba(18, 35, 65, 0.72);
+}
+
+.project-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+/* ── Resume ── */
+
+.resume-page {
+  position: relative;
+  z-index: 10;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 92px 24px 96px;
+}
+
+.resume-shell {
+  min-height: calc(100vh - 160px);
+  padding: clamp(26px, 4.5vw, 52px);
+  border-left-width: 6px;
+  border-right-width: 6px;
+  animation: stepIn 0.5s steps(5) both;
+}
+
+.resume-heading span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.resume-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 30px 40px;
+}
+
+.resume-section {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 26px 24px;
+  border: 2px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-left: 4px solid var(--border);
+  border-right: 4px solid var(--border);
+  background: color-mix(in srgb, var(--panel-solid) 34%, transparent);
+}
+
+.resume-section:first-child {
+  padding-top: 26px;
+  border-top: 2px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.resume-heading {
+  margin-bottom: 18px;
+}
+
+.resume-heading h2 {
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--text);
+  text-transform: lowercase;
+}
+
+.resume-item h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: lowercase;
+}
+
+.resume-item p {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.resume-stack {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px 28px;
+}
+
+.resume-item {
+  min-width: 0;
+  padding: 0;
+}
+
+.resume-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.resume-row > span {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-3);
+  text-align: right;
+}
+
+.resume-list,
+.award-list {
+  list-style: none;
+}
+
+.resume-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.resume-list li,
+.award-list li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.resume-list li::before,
+.award-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  box-shadow: 2px 2px 0 var(--shadow);
+}
+
+.award-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px 24px;
+}
+
+.award-list li {
+  color: var(--text);
+}
+
+.certification-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.certification-card {
+  display: flex;
+  min-height: 126px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  color: inherit;
+  text-decoration: none;
+  padding: 18px;
+  border: 2px solid var(--border);
+  border-left: 4px solid var(--accent);
+  background: var(--panel);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+
+.certification-card:hover {
+  border-color: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--shadow);
+}
+
+.certification-card h3 {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  text-transform: lowercase;
+}
+
+.certification-card p {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.certification-card span {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.skill-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px 28px;
+}
+
+.skill-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.skill-list dt {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.skill-list dd {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
 /* ── Pixel photo frame ── */
 
 /* photo blends into the scene: thin theme border + the same hard pixel
@@ -278,4 +585,30 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 @media (max-width: 900px) {
   .hero-layout { flex-direction: column-reverse; align-items: flex-start; }
+  .drift-showcase {
+    grid-template-columns: 1fr;
+  }
+  .drift-info-stack {
+    grid-template-rows: none;
+  }
+  .resume-grid,
+  .resume-feature {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .resume-page {
+    padding: 84px 16px 72px;
+  }
+  .resume-shell {
+    padding: 20px;
+  }
+  .resume-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .resume-row > span {
+    text-align: left;
+  }
 }

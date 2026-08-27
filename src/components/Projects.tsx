@@ -21,22 +21,30 @@ export default function Projects() {
       </h1>
 
       <section className="drift-showcase" aria-labelledby="drift-preview-title">
-        <article className="drift-screenshot-card px-panel">
-          <Image
-            src="/drift-full-preview.png"
-            alt="Drift app landing page preview"
-            width={3600}
-            height={2086}
-            priority
-            unoptimized
-            sizes="(max-width: 900px) calc(100vw - 56px), 760px"
-            className="drift-full-preview"
-          />
-        </article>
+        <a
+          className="drift-preview-link"
+          href="https://trydriftfocus.vercel.app/"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open Try Drift"
+        >
+          <article className="drift-screenshot-card px-panel">
+            <Image
+              src="/drift-full-preview.png"
+              alt="Drift app landing page preview"
+              width={3600}
+              height={2086}
+              priority
+              unoptimized
+              sizes="(max-width: 900px) calc(100vw - 56px), 760px"
+              className="drift-full-preview"
+            />
+          </article>
+        </a>
 
         <div className="drift-info-stack">
           <article className="drift-info-card px-panel">
-            <h2 className="font-pixel drift-brick-title">UNDER CONSTRUCTION</h2>
+            <h2 className="font-pixel drift-brick-title">Try Drift!</h2>
           </article>
 
           <article className="drift-info-card px-panel">

@@ -108,7 +108,11 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
-      <body className="min-h-screen antialiased" style={{ background: "var(--bg)", color: "var(--text)" }}>
+      <body
+        className="min-h-screen antialiased"
+        style={{ background: "var(--bg)", color: "var(--text)" }}
+        suppressHydrationWarning
+      >
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <script
           type="application/ld+json"

@@ -272,7 +272,35 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 .drift-screenshot-card {
+  --drift-frame-size: 4px;
+  padding: var(--drift-frame-size);
+  background: var(--border);
+  border: 0;
+  box-shadow: none;
+  clip-path: polygon(
+    var(--drift-frame-size) 0,
+    calc(100% - var(--drift-frame-size)) 0,
+    calc(100% - var(--drift-frame-size)) var(--drift-frame-size),
+    100% var(--drift-frame-size),
+    100% calc(100% - var(--drift-frame-size)),
+    calc(100% - var(--drift-frame-size)) calc(100% - var(--drift-frame-size)),
+    calc(100% - var(--drift-frame-size)) 100%,
+    var(--drift-frame-size) 100%,
+    var(--drift-frame-size) calc(100% - var(--drift-frame-size)),
+    0 calc(100% - var(--drift-frame-size)),
+    0 var(--drift-frame-size),
+    var(--drift-frame-size) var(--drift-frame-size)
+  );
   overflow: hidden;
+}
+
+.drift-preview-link {
+  display: block;
+  outline-offset: 5px;
+}
+
+.drift-preview-link:focus-visible {
+  outline: 3px solid var(--accent);
 }
 
 .drift-full-preview {
@@ -286,7 +314,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   display: grid;
   align-content: start;
   grid-template-rows: auto auto;
-  gap: 18px;
+  gap: 12px;
 }
 
 .drift-info-card {
@@ -298,13 +326,69 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 .drift-brick-title {
-  font-size: clamp(24px, 3.2vw, 40px);
-  line-height: 0.95;
+  font-size: clamp(15px, 1.55vw, 19px);
+  line-height: 1;
   color: #fff0a4;
   text-transform: uppercase;
-  text-shadow:
-    0 6px 0 #bd7333,
-    6px 6px 0 #5b2c4d;
+  white-space: nowrap;
+  text-shadow: none;
+}
+
+.drift-cta-card {
+  min-height: 0;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: none;
+  transition:
+    background 120ms steps(2),
+    border-color 120ms steps(2);
+}
+
+.drift-click-indicator {
+  display: grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  color: var(--text);
+  background: var(--panel-solid);
+  border: 2px solid var(--border);
+  box-shadow: none;
+  place-items: center;
+}
+
+.drift-click-indicator svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 2.4;
+}
+
+.drift-cta-card:hover,
+.drift-cta-card:focus-visible {
+  border-color: var(--accent);
+  background: var(--panel-solid);
+  box-shadow: none;
+  outline: none;
+}
+
+.drift-cta-card:hover .drift-click-indicator,
+.drift-cta-card:focus-visible .drift-click-indicator {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.drift-cta-card:active {
+  box-shadow: none;
 }
 
 .drift-card-title {
@@ -330,9 +414,11 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 :root[data-theme="light"] .drift-brick-title {
   color: #19375f;
-  text-shadow:
-    0 5px 0 #79a8cf,
-    5px 5px 0 #c8e3f7;
+  text-shadow: none;
+}
+
+:root[data-theme="light"] .drift-cta-card {
+  box-shadow: none;
 }
 
 :root[data-theme="light"] .drift-card-title {

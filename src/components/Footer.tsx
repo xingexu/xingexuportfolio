@@ -1,10 +1,7 @@
 import { LINKS } from "@/app/data";
 import { GitHubIcon, LinkedInIcon, MailIcon } from "./PixelIcons";
 
-/**
- * Footer. A clear pixel bar: solid panel, hard top border, and the social
- * icons as bordered pixel buttons so they're unmissable in both themes.
- */
+/** Footer with theme-aware official social marks in pixel-style buttons. */
 export default function Footer() {
   const year = new Date().getFullYear();
 
@@ -46,7 +43,7 @@ export default function Footer() {
               aria-label={label}
               title={label}
             >
-              <Icon size={18} />
+              <Icon size={20} />
             </a>
           ))}
         </nav>

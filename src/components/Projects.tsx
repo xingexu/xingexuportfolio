@@ -28,12 +28,12 @@ export default function Projects() {
           rel="noreferrer"
           aria-label="Open Try Drift"
         >
-          <article className="drift-screenshot-card px-panel">
+          <article className="drift-screenshot-card">
             <Image
               src="/drift-full-preview.png"
               alt="Drift app landing page preview"
               width={3600}
-              height={2086}
+              height={2088}
               priority
               unoptimized
               sizes="(max-width: 900px) calc(100vw - 56px), 760px"
@@ -43,9 +43,21 @@ export default function Projects() {
         </a>
 
         <div className="drift-info-stack">
-          <article className="drift-info-card px-panel">
-            <h2 className="font-pixel drift-brick-title">Try Drift!</h2>
-          </article>
+          <a
+            className="drift-info-card drift-cta-card px-panel"
+            href="https://trydriftfocus.vercel.app/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <h2 id="drift-preview-title" className="font-pixel drift-brick-title">
+              Try Drift!
+            </h2>
+            <span className="drift-click-indicator" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M7 17 17 7M9 7h8v8" />
+              </svg>
+            </span>
+          </a>
 
           <article className="drift-info-card px-panel">
             <h2 className="font-pixel drift-card-title">WHAT DRIFT DOES</h2>

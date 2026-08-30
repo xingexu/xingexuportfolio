@@ -32,7 +32,12 @@ type NameParticleStyle = CSSProperties & {
   "--name-spin": string;
 };
 
-const PARTICLE_COLORS = ["var(--accent)", "#9fc4f0", "#ffffff", "var(--accent)"];
+const PARTICLE_COLORS = [
+  "var(--confetti-1)",
+  "var(--confetti-2)",
+  "var(--confetti-3)",
+  "var(--confetti-4)",
+];
 
 export default function Hero() {
   const [typed, setTyped] = useState(NAME);

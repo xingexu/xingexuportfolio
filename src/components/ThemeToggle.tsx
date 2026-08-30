@@ -3,12 +3,12 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Three-state sky selector. The local-time schedule initializes the phase and
- * reapplies it at the next time boundary; clicking cycles day → twilight →
- * night so every scene is always reachable from the navigation.
+ * Three-state sky selector. The local-time schedule supplies the initial mode
+ * until a visitor chooses one; that preference then survives future reloads.
  */
 
 type SkyPhase = "day" | "twilight" | "night";
+const SKY_PHASE_STORAGE_KEY = "xinge-sky-phase-v1";
 
 function subscribe(onChange: () => void) {
   const observer = new MutationObserver(onChange);
@@ -33,6 +33,11 @@ export default function ThemeToggle() {
   const nextLabel = next === "twilight" ? "sunset and sunrise" : next;
 
   const toggle = () => {
+    try {
+      window.localStorage.setItem(SKY_PHASE_STORAGE_KEY, next);
+    } catch {
+      // The in-page override still works when storage is unavailable.
+    }
     document.documentElement.dataset.skyOverride = next;
   };
 

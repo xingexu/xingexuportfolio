@@ -1341,7 +1341,6 @@ export default function Background() {
       const nextScheduledPhase = getSkyPhase();
       if (nextScheduledPhase !== scheduledPhase) {
         scheduledPhase = nextScheduledPhase;
-        delete document.documentElement.dataset.skyOverride;
       }
       const phase = getSkyOverride() ?? scheduledPhase;
       if (activePhase !== phase) {

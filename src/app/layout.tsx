@@ -19,8 +19,8 @@ const silkscreen = Silkscreen({
   weight: ["400", "700"],
 });
 
-/** Runs before hydration so the local-time sky and matching UI appear on the first paint. */
-const themeInit = `(function(){try{var d=new Date(),m=d.getHours()*60+d.getMinutes(),p=m>=510&&m<=990?"day":(m>=1411||m<=210?"night":"twilight");document.documentElement.dataset.skyPhase=p;document.documentElement.dataset.theme=p==="night"?"dark":"light"}catch(e){document.documentElement.dataset.skyPhase="night";document.documentElement.dataset.theme="dark"}})();`;
+/** Restores a chosen sky before hydration, otherwise falling back to local time. */
+const themeInit = `(function(){var p=null;try{var s=localStorage.getItem("xinge-sky-phase-v1");if(s==="day"||s==="twilight"||s==="night"){p=s;document.documentElement.dataset.skyOverride=s}}catch(e){}if(!p){var d=new Date(),m=d.getHours()*60+d.getMinutes();p=m>=510&&m<=990?"day":(m>=1411||m<=210?"night":"twilight")}document.documentElement.dataset.skyPhase=p;document.documentElement.dataset.theme=p==="night"?"dark":"light"})();`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),

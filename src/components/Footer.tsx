@@ -8,7 +8,7 @@ export default function Footer() {
   return (
     <footer className="site-footer">
       <div className="site-footer-inner">
-        <span style={{ fontSize: 12, color: "var(--text-2)" }}>© {year} xinge xu</span>
+        <span className="site-footer-copyright">© {year} xinge xu</span>
 
         <nav aria-label="Social and contact" style={{ display: "flex", gap: 14 }}>
           {[

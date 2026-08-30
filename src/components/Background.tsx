@@ -465,7 +465,18 @@ export default function Background() {
     // moving sprite below the fixed top bar's exclusion zone.
     const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
     const birdLaneY = () => Math.max(airplaneLaneY() + 18, Math.floor(rows * 0.24));
-    const balloonLaneY = () => Math.max(birdLaneY() + 23, Math.floor(rows * 0.42));
+    const heroNameBottomCell = () => {
+      const name = document.querySelector<HTMLElement>(".name-hover");
+      if (!name) return 0;
+      const bounds = name.getBoundingClientRect();
+      if (bounds.bottom <= 0 || bounds.top >= window.innerHeight) return 0;
+      return Math.ceil(bounds.bottom / CELL);
+    };
+    const balloonLaneY = () => Math.max(
+      birdLaneY() + 23,
+      Math.floor(rows * 0.42),
+      heroNameBottomCell() + 8,
+    );
     const cnTowerX = () => Math.floor(cols * 0.22);
     const towerDims = () => {
       const h = Math.min(Math.floor(rows * 0.46), 64);
@@ -1067,6 +1078,9 @@ export default function Background() {
             if (balloon.x > cols + 6) balloon = null;
           }
           if (balloon) {
+            // Re-read the live name boundary so font loading, navigation, and
+            // viewport changes cannot place the balloon across the hero name.
+            balloon.y = balloonLaneY();
             if (balloon.jiggleElapsed !== null) {
               balloon.jiggleElapsed += dt;
               if (balloon.jiggleElapsed >= 1040) balloon.jiggleElapsed = null;

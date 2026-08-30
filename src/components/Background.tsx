@@ -1106,7 +1106,7 @@ export default function Background() {
       stepPulse(dt);
 
       if (twilight && !reduced) {
-        sunArcProgress = Math.min(1, sunArcProgress + Math.min(dt, 1000) / SUN_ARC_DURATION);
+        sunArcProgress = (sunArcProgress + Math.min(dt, 1000) / SUN_ARC_DURATION) % 1;
       }
       const horizonY = waterTop - Math.max(22, Math.floor(rows * 0.1));
       const peakY = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.08));

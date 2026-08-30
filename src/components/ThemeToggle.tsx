@@ -44,46 +44,44 @@ export default function ThemeToggle() {
       aria-label={`Switch to ${nextLabel} mode`}
       title={`${phase} mode · click for ${nextLabel}`}
     >
-      {phase === "day" ? <PixelSun /> : phase === "twilight" ? <PixelSunset /> : <PixelMoon />}
+      {phase === "day" ? <SunIcon /> : phase === "twilight" ? <SunriseIcon /> : <MoonIcon />}
     </button>
   );
 }
 
-function PixelSun() {
+const iconProps = {
+  width: 20,
+  height: 20,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function SunIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden>
-      <rect x="3" y="0" width="2" height="1" fill="currentColor" />
-      <rect x="3" y="7" width="2" height="1" fill="currentColor" />
-      <rect x="0" y="3" width="1" height="2" fill="currentColor" />
-      <rect x="7" y="3" width="1" height="2" fill="currentColor" />
-      <rect x="2" y="2" width="4" height="4" fill="currentColor" />
+    <svg {...iconProps}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" />
     </svg>
   );
 }
 
-function PixelMoon() {
+function MoonIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden>
-      <rect x="2" y="1" width="4" height="1" fill="currentColor" />
-      <rect x="1" y="2" width="3" height="1" fill="currentColor" />
-      <rect x="1" y="3" width="2" height="2" fill="currentColor" />
-      <rect x="1" y="5" width="3" height="1" fill="currentColor" />
-      <rect x="2" y="6" width="4" height="1" fill="currentColor" />
-      <rect x="5" y="2" width="1" height="1" fill="currentColor" />
-      <rect x="5" y="5" width="1" height="1" fill="currentColor" />
+    <svg {...iconProps}>
+      <path d="M20.7 14.2A8.5 8.5 0 0 1 9.8 3.3 8.5 8.5 0 1 0 20.7 14.2Z" />
     </svg>
   );
 }
 
-function PixelSunset() {
+function SunriseIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden>
-      <rect x="3" y="1" width="2" height="1" fill="currentColor" />
-      <rect x="2" y="2" width="4" height="1" fill="currentColor" />
-      <rect x="1" y="3" width="6" height="2" fill="currentColor" />
-      <rect x="0" y="5" width="8" height="1" fill="currentColor" />
-      <rect x="1" y="7" width="2" height="1" fill="currentColor" />
-      <rect x="4" y="7" width="3" height="1" fill="currentColor" />
+    <svg {...iconProps}>
+      <path d="M4 18h16M6 22h12M8 18a4 4 0 0 1 8 0M12 2v5M4.93 10.93l2.12 2.12M19.07 10.93l-2.12 2.12M2 16h2M20 16h2" />
     </svg>
   );
 }

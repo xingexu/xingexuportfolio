@@ -53,7 +53,7 @@ export default function Hero() {
       left: `${3 + Math.random() * 94}%`,
       size: 5 + Math.floor(Math.random() * 8),
       spin: `${Math.round(Math.random() * 540 - 270)}deg`,
-      top: `${20 + Math.random() * 58}%`,
+      top: `${-14 + Math.random() * 48}%`,
     }));
     setParticles((current) => [...current, ...next].slice(-112));
   };

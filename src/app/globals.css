@@ -97,7 +97,7 @@ body {
 @keyframes particleDrop {
   0% {
     opacity: 0;
-    transform: translate3d(0, 4px, 0) scale(0.35) rotate(0deg);
+    transform: translate3d(0, -8px, 0) scale(0.35) rotate(0deg);
   }
   12% { opacity: 1; }
   62% { opacity: 1; }

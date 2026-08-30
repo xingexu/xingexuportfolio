@@ -326,6 +326,18 @@ a.project-card:hover .project-title { color: var(--accent); }
   animation: stepIn 0.5s steps(5) both;
 }
 
+.drift-preview-stack {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.drift-preview-stack .back-home-wrap {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 .drift-screenshot-card {
   --drift-frame-size: 4px;
   padding: var(--drift-frame-size);

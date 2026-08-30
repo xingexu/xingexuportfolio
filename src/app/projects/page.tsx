@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Projects from "@/components/Projects";
-import BackHome from "@/components/BackHome";
 import { PROJECTS } from "../data";
 
 export const metadata: Metadata = {
@@ -21,7 +20,6 @@ export default function ProjectsPage() {
   return (
     <div className="projects-page tab-enter">
       <Projects />
-      <BackHome />
     </div>
   );
 }

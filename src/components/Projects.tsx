@@ -1,4 +1,5 @@
 import Image from "next/image";
+import BackHome from "@/components/BackHome";
 /**
  * Projects grid. Server component — fully indexable HTML, pure-CSS hover.
  */
@@ -21,26 +22,29 @@ export default function Projects() {
       </h1>
 
       <section className="drift-showcase" aria-labelledby="drift-preview-title">
-        <a
-          className="drift-preview-link"
-          href="https://trydriftfocus.vercel.app/"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open Try Drift"
-        >
-          <article className="drift-screenshot-card">
-            <Image
-              src="/drift-full-preview.png"
-              alt="Drift app landing page preview"
-              width={3600}
-              height={2088}
-              priority
-              unoptimized
-              sizes="(max-width: 900px) calc(100vw - 56px), 760px"
-              className="drift-full-preview"
-            />
-          </article>
-        </a>
+        <div className="drift-preview-stack">
+          <a
+            className="drift-preview-link"
+            href="https://trydriftfocus.vercel.app/"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open Try Drift"
+          >
+            <article className="drift-screenshot-card">
+              <Image
+                src="/drift-full-preview.png"
+                alt="Drift app landing page preview"
+                width={3600}
+                height={2088}
+                priority
+                unoptimized
+                sizes="(max-width: 900px) calc(100vw - 56px), 760px"
+                className="drift-full-preview"
+              />
+            </article>
+          </a>
+          <BackHome />
+        </div>
 
         <div className="drift-info-stack">
           <a

@@ -22,6 +22,8 @@ import { useEffect, useRef } from "react";
 const CELL = 5; // css px per sky pixel
 const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
 const SEED = 20260703;
+const TOP_BAR_HEIGHT = 54;
+const SKY_SAFE_TOP = Math.ceil(TOP_BAR_HEIGHT / CELL) + 4;
 
 /* ── palettes ── */
 
@@ -137,6 +139,19 @@ const BALLOON: number[][] = [
   [0, 0, 3, 3, 3, 0, 0],
 ];
 
+// Toronto Island-style ferry: 1 hull / 2 stripe / 3 cabin / 4 windows /
+// 5 flag + funnel / 6 dark keel.
+const FERRY = [
+  "00000000000000500000000",
+  "00000000000005500000000",
+  "00003333333333333330000",
+  "00034434434434434430000",
+  "00333333333333333333000",
+  "02222222222222222222200",
+  "11111111111111111111110",
+  "06666666666666666666600",
+].map((row) => Array.from(row, Number));
+
 /* ── types ── */
 
 type Star = { x: number; y: number; big: boolean; level: number; every: number; acc: number; color: string };
@@ -152,6 +167,7 @@ type Balloon = {
   yAcc: number;
   jiggleElapsed: number | null;
 };
+type Ferry = { x: number; acc: number; bob: number; bobAcc: number; frame: number };
 type Building = {
   x: number; w: number; h: number; near: boolean; shade: number; antenna: number;
   roof: "flat" | "tank" | "ac"; setback: number; windows: { wx: number; wy: number }[];
@@ -160,6 +176,12 @@ type Trail = { x: number; y: number }[];
 
 const BIRD_FORMATION = [[0, 0], [-7, 3], [-6, -3]] as const;
 const BIRD_SCATTERED = [[8, -5], [-17, 9], [-14, -10]] as const;
+const BIRD_JIGGLE = [
+  [[-1, -1], [1, 0], [0, 1]],
+  [[1, 0], [-1, 1], [1, -1]],
+  [[0, 1], [1, -1], [-1, 0]],
+  [[1, -1], [0, 1], [-1, 1]],
+] as const;
 const BALLOON_SCALE = 1;
 
 /* ── seeded rng ── */
@@ -286,6 +308,7 @@ export default function Background() {
     let satWait = 6000 + Math.random() * 8000;
     let balloon: Balloon | null = null;
     let balloonWait = 4000 + Math.random() * 6000;
+    let ferry: Ferry | null = null;
     let shooting: { cells: Trail; acc: number } | null = null;
     let shootWait = 3000 + Math.random() * 5000;
     let windowAcc = 0;
@@ -348,6 +371,29 @@ export default function Background() {
       oscillator.stop(now + 0.38);
     }
 
+    function playFerryHorn() {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const master = audio.createGain();
+      const now = audio.currentTime;
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.085, now + 0.045);
+      master.gain.setValueAtTime(0.085, now + 0.42);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + 0.92);
+      master.connect(audio.destination);
+
+      for (const [frequency, detune] of [[146.8, -5], [220, 4]] as const) {
+        const oscillator = audio.createOscillator();
+        oscillator.type = "sawtooth";
+        oscillator.frequency.setValueAtTime(frequency, now);
+        oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.94, now + 0.78);
+        oscillator.detune.setValueAtTime(detune, now);
+        oscillator.connect(master);
+        oscillator.start(now);
+        oscillator.stop(now + 0.94);
+      }
+    }
+
     function clickedBird(clientX: number, clientY: number) {
       if (theme() !== "light" || !flock) return false;
       const x = clientX / CELL;
@@ -370,6 +416,15 @@ export default function Background() {
         y >= balloonY && y <= balloonY + BALLOON.length * BALLOON_SCALE;
     }
 
+    function clickedFerry(clientX: number, clientY: number) {
+      if (!ferry) return false;
+      const x = clientX / CELL;
+      const y = clientY / CELL;
+      const ferryY = waterTop - 5 + ferry.bob;
+      return x >= ferry.x && x <= ferry.x + FERRY[0].length &&
+        y >= ferryY && y <= ferryY + FERRY.length;
+    }
+
     function birdOffsets(): readonly (readonly [number, number])[] {
       if (!flock || flock.scatterElapsed === null || flock.scatterElapsed >= 960) {
         return BIRD_FORMATION;
@@ -381,11 +436,13 @@ export default function Background() {
         : elapsed < 240 || elapsed >= 720
           ? 0.66
           : 1;
+      const jiggleFrame = BIRD_JIGGLE[Math.floor(elapsed / TICK) % BIRD_JIGGLE.length];
       return BIRD_FORMATION.map(([baseX, baseY], index) => {
         const [scatterX, scatterY] = BIRD_SCATTERED[index];
+        const [jiggleX, jiggleY] = amount === 1 ? jiggleFrame[index] : [0, 0];
         return [
-          Math.round(baseX + (scatterX - baseX) * amount),
-          Math.round(baseY + (scatterY - baseY) * amount),
+          Math.round(baseX + (scatterX - baseX) * amount) + jiggleX,
+          Math.round(baseY + (scatterY - baseY) * amount) + jiggleY,
         ] as const;
       });
     }
@@ -404,11 +461,11 @@ export default function Background() {
     }
 
     const theme = () => (document.documentElement.dataset.theme === "light" ? "light" : "dark");
-    // These lanes include the full scatter/jiggle extents: plane→birds keeps
-    // at least 6 cells clear, and birds→balloon keeps at least 7 cells clear.
-    const airplaneLaneY = () => Math.max(13, Math.floor(rows * 0.1));
-    const birdLaneY = () => Math.max(airplaneLaneY() + 17, Math.floor(rows * 0.24));
-    const balloonLaneY = () => Math.max(birdLaneY() + 22, Math.floor(rows * 0.42));
+    // These lanes include the full scatter/jiggle extents and keep every
+    // moving sprite below the fixed top bar's exclusion zone.
+    const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
+    const birdLaneY = () => Math.max(airplaneLaneY() + 18, Math.floor(rows * 0.24));
+    const balloonLaneY = () => Math.max(birdLaneY() + 23, Math.floor(rows * 0.42));
     const cnTowerX = () => Math.floor(cols * 0.22);
     const towerDims = () => {
       const h = Math.min(Math.floor(rows * 0.46), 64);
@@ -599,6 +656,15 @@ export default function Background() {
       if (plane) plane.y = airplaneLaneY();
       if (flock) flock.y = birdLaneY();
       if (balloon) balloon.y = balloonLaneY();
+      if (!ferry) {
+        ferry = {
+          x: Math.floor(cols * 0.56),
+          acc: 0,
+          bob: 0,
+          bobAcc: 0,
+          frame: 0,
+        };
+      }
 
       const count = Math.floor((cols * waterTop) / 120);
       stars = Array.from({ length: count }, () => ({
@@ -617,7 +683,7 @@ export default function Background() {
         const front = i % 2 === 0;
         return {
           x: Math.floor(rng() * cols),
-          y: 13 + Math.floor(rng() * Math.max(6, rows * 0.48)), // 13 = below the fixed nav
+          y: SKY_SAFE_TOP + Math.floor(rng() * Math.max(6, rows * 0.48 - SKY_SAFE_TOP)),
           bob: 0,
           map: makeCloud(CLOUD_SHAPES[Math.floor(rng() * CLOUD_SHAPES.length)], rng() < 0.5),
           // clouds are the slowest thing in the sky — slower than balloon (600ms) and birds (150ms)
@@ -819,7 +885,7 @@ export default function Background() {
 
       // moon: pulsing halo + crater-shaded body (1× cells, uniform pixel size)
       const mx = Math.floor(cols * 0.82);
-      const my = Math.floor(rows * 0.1);
+      const my = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.1));
       halo(mx + 5, my + 5, "#e8e0c8", pulse, 6);
       sprite(MOON_MAP, mx, my, { 1: NIGHT.moonBody, 2: NIGHT.moonShade, 3: NIGHT.moonCrater }, 1);
 
@@ -839,7 +905,10 @@ export default function Background() {
           shootWait -= dt;
           if (shootWait <= 0) {
             shooting = {
-              cells: [{ x: Math.floor(Math.random() * cols * 0.6), y: Math.floor(Math.random() * rows * 0.2) }],
+              cells: [{
+                x: Math.floor(Math.random() * cols * 0.6),
+                y: SKY_SAFE_TOP + Math.floor(Math.random() * Math.max(1, rows * 0.2 - SKY_SAFE_TOP)),
+              }],
               acc: 0,
             };
             shootWait = 5000 + Math.random() * 7000;
@@ -886,7 +955,11 @@ export default function Background() {
         } else {
           satWait -= dt;
           if (satWait <= 0) {
-            satellite = { x: -2, y: Math.floor(rows * (0.2 + Math.random() * 0.3)), acc: 0 };
+            satellite = {
+              x: -2,
+              y: Math.max(SKY_SAFE_TOP, Math.floor(rows * (0.2 + Math.random() * 0.3))),
+              acc: 0,
+            };
             satWait = 14000 + Math.random() * 14000;
           }
         }
@@ -895,6 +968,7 @@ export default function Background() {
       if (skylineNight) ctx!.drawImage(skylineNight, 0, 0);
       drawLitWindows(dt);
       drawWater(NIGHT, NIGHT.moonLane, mx + 5, dt);
+      drawFerry(dt, true);
     }
 
     /* ── day ── */
@@ -905,7 +979,7 @@ export default function Background() {
 
       // sun: pulsing halo + whole-disc flash (1× cells, no rays, uniform pixel size)
       const sx = Math.floor(cols * 0.8);
-      const sy = Math.max(13, Math.floor(rows * 0.07)); // keep clear of the fixed nav
+      const sy = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.07));
       halo(sx + 8, sy + 8, "#ffe79a", pulse, 9);
       const hot = pulse % 2 === 0;
       sprite(SUN_MAP, sx, sy, {
@@ -923,7 +997,7 @@ export default function Background() {
             c.x += 1;
             if (c.x > cols + 4) {
               c.x = -c.map[0].length - 6;
-              c.y = 13 + Math.floor(Math.random() * Math.max(6, rows * 0.48));
+              c.y = SKY_SAFE_TOP + Math.floor(Math.random() * Math.max(6, rows * 0.48 - SKY_SAFE_TOP));
             }
           }
           c.bobAcc += dt;
@@ -1053,6 +1127,46 @@ export default function Background() {
 
       if (skylineDay) ctx!.drawImage(skylineDay, 0, 0);
       drawWater(DAY, DAY.sunLane, sx + 7, dt);
+      drawFerry(dt, false);
+    }
+
+    function drawFerry(dt: number, night: boolean) {
+      if (!ferry) return;
+
+      if (!reduced) {
+        ferry.acc += dt;
+        if (ferry.acc >= 330) {
+          ferry.acc = 0;
+          ferry.x += 1;
+          ferry.frame = ferry.frame ? 0 : 1;
+          if (ferry.x > cols + 4) ferry.x = -FERRY[0].length - 5;
+        }
+        ferry.bobAcc += dt;
+        if (ferry.bobAcc >= 720) {
+          ferry.bobAcc = 0;
+          ferry.bob = ferry.bob === 0 ? 1 : 0;
+        }
+      }
+
+      const ferryY = waterTop - 5 + ferry.bob;
+      const foam = night ? "#90abc7" : "#eef9ff";
+      for (let i = 0; i < 8; i += 2) {
+        cell(ferry.x - 2 - i - ferry.frame, waterTop + 1 + ((i / 2 + ferry.frame) % 2), foam, 0.72 - i * 0.05);
+      }
+
+      sprite(FERRY, ferry.x, ferryY, {
+        1: night ? "#d7e2ec" : "#f7fbff",
+        2: night ? "#c44843" : "#df5148",
+        3: night ? "#71869c" : "#dbe9f4",
+        4: night ? NIGHT.window : "#245278",
+        5: night ? "#f0c75e" : "#e9a824",
+        6: night ? "#17283c" : "#315777",
+      }, 1);
+
+      if (ferry.frame) {
+        cell(ferry.x + 14, ferryY - 1, night ? "#8292a4" : "#d2dde7", 0.55);
+        cell(ferry.x + 15, ferryY - 2, night ? "#8292a4" : "#d2dde7", 0.3);
+      }
     }
 
     /* ── loop ── */
@@ -1067,7 +1181,9 @@ export default function Background() {
     }
 
     const onPointerDown = (event: PointerEvent) => {
-      if (clickedBalloon(event.clientX, event.clientY)) {
+      if (clickedFerry(event.clientX, event.clientY)) {
+        playFerryHorn();
+      } else if (clickedBalloon(event.clientX, event.clientY)) {
         if (balloon) balloon.jiggleElapsed = 0;
         playBalloonJiggle();
       } else if (clickedBird(event.clientX, event.clientY)) {

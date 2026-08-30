@@ -16,11 +16,11 @@ const NAME = "xinge xu";
 type Particle = {
   color: string;
   delay: string;
+  drop: string;
   drift: string;
   duration: string;
   id: number;
   left: string;
-  rise: string;
   size: number;
   spin: string;
   top: string;
@@ -28,7 +28,7 @@ type Particle = {
 
 type NameParticleStyle = CSSProperties & {
   "--name-drift": string;
-  "--name-rise": string;
+  "--name-drop": string;
   "--name-spin": string;
 };
 
@@ -45,15 +45,15 @@ export default function Hero() {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const next: Particle[] = Array.from({ length: 56 }, () => ({
       color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
-      delay: `${Math.random() * 0.18}s`,
-      drift: `${Math.round(Math.random() * 116 - 58)}px`,
-      duration: `${0.78 + Math.random() * 0.62}s`,
+      delay: `${Math.random() * 0.2}s`,
+      drop: `${76 + Math.round(Math.random() * 112)}px`,
+      drift: `${Math.round(Math.random() * 144 - 72)}px`,
+      duration: `${0.9 + Math.random() * 0.72}s`,
       id: pid.current++,
       left: `${3 + Math.random() * 94}%`,
-      rise: `${-58 - Math.round(Math.random() * 92)}px`,
-      size: 3 + Math.floor(Math.random() * 7),
+      size: 5 + Math.floor(Math.random() * 8),
       spin: `${Math.round(Math.random() * 540 - 270)}deg`,
-      top: `${28 + Math.random() * 58}%`,
+      top: `${20 + Math.random() * 58}%`,
     }));
     setParticles((current) => [...current, ...next].slice(-112));
   };
@@ -114,7 +114,7 @@ export default function Hero() {
                   style={
                     {
                       "--name-drift": p.drift,
-                      "--name-rise": p.rise,
+                      "--name-drop": p.drop,
                       "--name-spin": p.spin,
                       animationDelay: p.delay,
                       animationDuration: p.duration,

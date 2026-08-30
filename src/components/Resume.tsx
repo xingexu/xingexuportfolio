@@ -16,36 +16,62 @@ function seededUnit(index: number, salt: number) {
   return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
 }
 
-const resumeSparkles = Array.from({ length: 42 }, (_, index) => {
-  const angle = (index / 42) * Math.PI * 2 + (seededUnit(index, 1) - 0.5) * 0.36;
-  const radiusX = 48 + seededUnit(index, 2) * 118;
-  const radiusY = 38 + seededUnit(index, 3) * 92;
+function perimeterOrigin(index: number, salt: number) {
+  const edge = index % 4;
+  const along = 5 + seededUnit(index, salt) * 90;
+
+  if (edge === 0) return { edge, left: `${along}%`, top: "0%" };
+  if (edge === 1) return { edge, left: "100%", top: `${along}%` };
+  if (edge === 2) return { edge, left: `${along}%`, top: "100%" };
+  return { edge, left: "0%", top: `${along}%` };
+}
+
+function outwardVector(index: number, edge: number, salt: number, min: number, range: number) {
+  const distance = min + seededUnit(index, salt) * range;
+  const tangent = (seededUnit(index, salt + 1) - 0.5) * distance * 0.95;
+
+  if (edge === 0) return { x: tangent, y: -distance };
+  if (edge === 1) return { x: distance, y: tangent };
+  if (edge === 2) return { x: tangent, y: distance };
+  return { x: -distance, y: tangent };
+}
+
+const resumeSparkles = Array.from({ length: 52 }, (_, index) => {
+  const origin = perimeterOrigin(index, 1);
+  const burst = outwardVector(index, origin.edge, 2, 52, 126);
 
   return {
-    burstX: `${Math.round(Math.cos(angle) * radiusX)}px`,
-    burstY: `${Math.round(Math.sin(angle) * radiusY)}px`,
+    burstX: `${Math.round(burst.x)}px`,
+    burstY: `${Math.round(burst.y)}px`,
     color: celebrationColors[Math.floor(seededUnit(index, 4) * celebrationColors.length)],
-    delay: `${Math.round(seededUnit(index, 5) * 390)}ms`,
-    drop: `${24 + Math.round(seededUnit(index, 6) * 64)}px`,
-    duration: `${1080 + Math.round(seededUnit(index, 7) * 820)}ms`,
+    delay: `${Math.round(seededUnit(index, 5) * 520)}ms`,
+    drop: `${32 + Math.round(seededUnit(index, 6) * 82)}px`,
+    duration: `${1180 + Math.round(seededUnit(index, 7) * 920)}ms`,
+    left: origin.left,
+    top: origin.top,
   };
 });
 
-const fallingParticles = Array.from({ length: 96 }, (_, index) => ({
-  burstX: `${Math.round((seededUnit(index, 8) - 0.5) * 250)}px`,
-  burstY: `${-42 - Math.round(seededUnit(index, 9) * 118)}px`,
-  color: celebrationColors[Math.floor(seededUnit(index, 10) * celebrationColors.length)],
-  delay: `${Math.round(seededUnit(index, 11) * 720)}ms`,
-  drift: `${Math.round((seededUnit(index, 12) - 0.5) * 230)}px`,
-  duration: `${2200 + Math.round(seededUnit(index, 13) * 1900)}ms`,
-  isComet: index % 7 === 0 || index % 13 === 0,
-  isStar: index % 6 === 0 || index % 17 === 0,
-  left: `${43 + seededUnit(index, 14) * 14}%`,
-  size: 3 + Math.floor(seededUnit(index, 15) * 10),
-  spin: `${180 + Math.round(seededUnit(index, 16) * 900)}deg`,
-  sway: `${Math.round((seededUnit(index, 17) - 0.5) * 180)}px`,
-  top: `${31 + seededUnit(index, 18) * 20}%`,
-}));
+const fallingParticles = Array.from({ length: 112 }, (_, index) => {
+  const origin = perimeterOrigin(index, 8);
+  const burst = outwardVector(index, origin.edge, 9, 72, 148);
+
+  return {
+    burstX: `${Math.round(burst.x)}px`,
+    burstY: `${Math.round(burst.y)}px`,
+    color: celebrationColors[Math.floor(seededUnit(index, 11) * celebrationColors.length)],
+    delay: `${Math.round(seededUnit(index, 12) * 980)}ms`,
+    drift: `${Math.round((seededUnit(index, 13) - 0.5) * 310)}px`,
+    duration: `${2350 + Math.round(seededUnit(index, 14) * 2100)}ms`,
+    isComet: index % 5 === 0 || index % 11 === 0,
+    isStar: index % 5 === 0 || index % 13 === 0,
+    left: origin.left,
+    size: 5 + Math.floor(seededUnit(index, 15) * 11),
+    spin: `${240 + Math.round(seededUnit(index, 16) * 1080)}deg`,
+    sway: `${Math.round((seededUnit(index, 17) - 0.5) * 230)}px`,
+    top: origin.top,
+  };
+});
 
 type SparkleStyle = CSSProperties & {
   "--sparkle-drop": string;
@@ -167,40 +193,42 @@ export default function Resume() {
                     animationDelay: sparkle.delay,
                     animationDuration: sparkle.duration,
                     color: sparkle.color,
+                    left: sparkle.left,
+                    top: sparkle.top,
                   } as SparkleStyle
                 }
               />
             ))}
           </div>
+          <div
+            className={`resume-celebration${activeFrame === -1 ? " is-visible" : ""}`}
+            aria-hidden="true"
+          >
+            {fallingParticles.map((particle, index) => (
+              <span
+                className={`resume-falling-particle${particle.isStar ? " is-star" : ""}${particle.isComet ? " is-comet" : ""}`}
+                key={index}
+                style={
+                  {
+                    "--particle-burst-x": particle.burstX,
+                    "--particle-burst-y": particle.burstY,
+                    "--particle-drift": particle.drift,
+                    "--particle-spin": particle.spin,
+                    "--particle-sway": particle.sway,
+                    animationDelay: particle.delay,
+                    animationDuration: particle.duration,
+                    background: particle.color,
+                    color: particle.color,
+                    height: particle.size,
+                    left: particle.left,
+                    top: particle.top,
+                    width: particle.size,
+                  } as FallingParticleStyle
+                }
+              />
+            ))}
+          </div>
         </div>
-      </div>
-      <div
-        className={`resume-celebration${activeFrame === -1 ? " is-visible" : ""}`}
-        aria-hidden="true"
-      >
-        {fallingParticles.map((particle, index) => (
-          <span
-            className={`resume-falling-particle${particle.isStar ? " is-star" : ""}${particle.isComet ? " is-comet" : ""}`}
-            key={index}
-            style={
-              {
-                "--particle-burst-x": particle.burstX,
-                "--particle-burst-y": particle.burstY,
-                "--particle-drift": particle.drift,
-                "--particle-spin": particle.spin,
-                "--particle-sway": particle.sway,
-                animationDelay: particle.delay,
-                animationDuration: particle.duration,
-                background: particle.color,
-                color: particle.color,
-                height: particle.size,
-                left: particle.left,
-                top: particle.top,
-                width: particle.size,
-              } as FallingParticleStyle
-            }
-          />
-        ))}
       </div>
     </div>
   );

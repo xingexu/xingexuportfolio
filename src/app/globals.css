@@ -180,14 +180,14 @@ body {
 
 :root[data-sky-phase="twilight"] .hero-resume-btn {
   color: #4a2b39;
-  background: #ffc857;
-  border-color: #e8944e;
+  background: #f4d79a;
+  border-color: #d6a66f;
 }
 
 :root[data-sky-phase="twilight"] .hero-resume-btn:hover {
   color: #4a2b39;
-  background: #ffd978;
-  border-color: #f09b51;
+  background: #f8e4b5;
+  border-color: #dfb47d;
 }
 
 .back-home-wrap {

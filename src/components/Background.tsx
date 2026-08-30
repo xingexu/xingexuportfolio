@@ -380,6 +380,16 @@ export default function Background() {
     let skylineDay: HTMLCanvasElement | null = null;
     let skylineTwilight: HTMLCanvasElement | null = null;
     let activePhase: SkyPhase | null = null;
+    let scheduledPhase = getSkyPhase();
+
+    function getSkyOverride(): SkyPhase | null {
+      const override = document.documentElement.dataset.skyOverride;
+      return override === "day" || override === "twilight" || override === "night" ? override : null;
+    }
+
+    function getVisibleSkyPhase() {
+      return getSkyOverride() ?? getSkyPhase();
+    }
 
     function getAudioContext() {
       if (audioContext) return audioContext;
@@ -452,7 +462,7 @@ export default function Background() {
     }
 
     function clickedBird(clientX: number, clientY: number) {
-      if (getSkyPhase() === "night" || !flock) return false;
+      if (getVisibleSkyPhase() === "night" || !flock) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
       return birdOffsets().some(([dx, dy]) => {
@@ -463,7 +473,7 @@ export default function Background() {
     }
 
     function clickedBalloon(clientX: number, clientY: number) {
-      if (getSkyPhase() === "night" || !balloon) return false;
+      if (getVisibleSkyPhase() === "night" || !balloon) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
       const jiggle = balloonJiggleOffset();
@@ -1316,7 +1326,12 @@ export default function Background() {
     /* ── loop ── */
 
     function drawCurrentScene(dt: number) {
-      const phase = getSkyPhase();
+      const nextScheduledPhase = getSkyPhase();
+      if (nextScheduledPhase !== scheduledPhase) {
+        scheduledPhase = nextScheduledPhase;
+        delete document.documentElement.dataset.skyOverride;
+      }
+      const phase = getSkyOverride() ?? scheduledPhase;
       if (activePhase !== phase) {
         activePhase = phase;
         document.documentElement.dataset.skyPhase = phase;
@@ -1367,12 +1382,18 @@ export default function Background() {
     };
     window.addEventListener("resize", onResize);
 
+    const phaseObserver = new MutationObserver(() => {
+      if (reduced) drawCurrentScene(0);
+    });
+    phaseObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-sky-override"] });
+
     return () => {
       cancelAnimationFrame(raf);
       window.clearInterval(clockTimer);
       window.removeEventListener("pointerdown", onPointerDown);
       void audioContext?.close();
       window.removeEventListener("resize", onResize);
+      phaseObserver.disconnect();
     };
   }, []);
 

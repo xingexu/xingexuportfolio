@@ -92,7 +92,7 @@ const DAY = {
 };
 
 const TWILIGHT = {
-  bands: ["#ffe58a", "#ffc76f", "#f7a071", "#f38f88", "#eda0ad", "#e9a1b8", "#e29fc3", "#d79bc8"],
+  bands: ["#ffe58a", "#ffc266", "#f59b6f", "#ef7f7d", "#e98796", "#e58fac", "#dd96c0", "#ca8bcb", "#ad78c7"],
   far: "#8e7197",
   farLight: "#bd8fae",
   nearShades: ["#493650", "#56405b", "#624764"],
@@ -112,14 +112,14 @@ const TWILIGHT = {
   sunCoreHot: "#ffe1a3",
   sunRim: "#e66b4f",
   sunRay: "#ffbd70",
-  cloudBackHi: "#ffd7c1",
-  cloudBack: "#eeb0b9",
-  cloudBackMid: "#dda0b5",
-  cloudBackShade: "#bd82a0",
-  cloudFrontHi: "#fff0cf",
-  cloudFront: "#ffd0b3",
-  cloudFrontMid: "#f4b0ae",
-  cloudShade: "#d58fa8",
+  cloudBackHi: "#ffe0bf",
+  cloudBack: "#e7a2b0",
+  cloudBackMid: "#cf89aa",
+  cloudBackShade: "#a86f96",
+  cloudFrontHi: "#fff2cf",
+  cloudFront: "#ffcaa9",
+  cloudFrontMid: "#ed9fa9",
+  cloudShade: "#bd7899",
   bird: "#372644",
   birdWing: "#563653",
   balloonA: "#e85f56",
@@ -1105,13 +1105,17 @@ export default function Background() {
       if (sky) ctx!.drawImage(sky, 0, 0);
       stepPulse(dt);
 
-      if (!reduced) {
+      if (twilight && !reduced) {
         sunArcProgress = Math.min(1, sunArcProgress + Math.min(dt, 1000) / SUN_ARC_DURATION);
       }
-      const sx = Math.round(cols * (0.06 + sunArcProgress * 0.78));
       const horizonY = waterTop - Math.max(22, Math.floor(rows * 0.1));
       const peakY = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.08));
-      const sy = Math.round(horizonY - Math.sin(Math.PI * sunArcProgress) * Math.max(0, horizonY - peakY));
+      const sx = twilight
+        ? Math.round(cols * (0.06 + sunArcProgress * 0.78))
+        : Math.round(cols * 0.82);
+      const sy = twilight
+        ? Math.round(horizonY - Math.sin(Math.PI * sunArcProgress) * Math.max(0, horizonY - peakY))
+        : peakY;
       halo(sx + 8, sy + 8, pal.sunRay, pulse, twilight ? 12 : 9);
       const hot = pulse % 2 === 0;
       sprite(SUN_MAP, sx, sy, {

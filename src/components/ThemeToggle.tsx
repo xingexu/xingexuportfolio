@@ -34,8 +34,6 @@ export default function ThemeToggle() {
 
   const toggle = () => {
     document.documentElement.dataset.skyOverride = next;
-    document.documentElement.dataset.skyPhase = next;
-    document.documentElement.dataset.theme = next === "night" ? "dark" : "light";
   };
 
   return (
@@ -44,9 +42,9 @@ export default function ThemeToggle() {
       onClick={toggle}
       className="theme-toggle"
       aria-label={`Switch to ${nextLabel} mode`}
-      title={nextLabel}
+      title={`${phase} mode · click for ${nextLabel}`}
     >
-      {next === "day" ? <PixelSun /> : next === "twilight" ? <PixelSunset /> : <PixelMoon />}
+      {phase === "day" ? <PixelSun /> : phase === "twilight" ? <PixelSunset /> : <PixelMoon />}
     </button>
   );
 }

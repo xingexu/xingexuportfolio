@@ -22,6 +22,7 @@ import { useEffect, useRef } from "react";
 const CELL = 5; // css px per sky pixel
 const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
 const SEED = 20260703;
+const SUN_ARC_DURATION = 180000;
 const TOP_BAR_HEIGHT = 54;
 const SKY_SAFE_TOP = Math.ceil(TOP_BAR_HEIGHT / CELL) + 4;
 
@@ -91,34 +92,34 @@ const DAY = {
 };
 
 const TWILIGHT = {
-  bands: ["#33235f", "#56306f", "#7d3d73", "#aa4d70", "#d86468", "#ee7f66", "#f5a06f", "#ffd08a"],
-  far: "#4c365f",
-  farLight: "#725070",
-  nearShades: ["#29213f", "#332548", "#3d294e"],
-  nearEdge: "#69415c",
-  nearShadow: "#1d1730",
-  tower: "#66506d",
-  towerLit: "#a46f7c",
-  dome: "#59445f",
-  domeLit: "#966979",
-  domeSeam: "#3f324d",
-  stadiumBase: "#352c43",
+  bands: ["#ffe58a", "#ffc76f", "#f7a071", "#f38f88", "#eda0ad", "#dda4c8", "#c497d1", "#a987ca"],
+  far: "#8e7197",
+  farLight: "#bd8fae",
+  nearShades: ["#493650", "#56405b", "#624764"],
+  nearEdge: "#94657d",
+  nearShadow: "#33273e",
+  tower: "#82677e",
+  towerLit: "#c18aa0",
+  dome: "#765d76",
+  domeLit: "#bd8ba3",
+  domeSeam: "#5c485f",
+  stadiumBase: "#4d3d52",
   window: "#ffd889",
-  waterBase: "#563956",
-  waterGlint: "#e58a72",
-  sunLane: "#ffd08b",
+  waterBase: "#846087",
+  waterGlint: "#f2a18e",
+  sunLane: "#ffe0a0",
   sunCore: "#ffb24f",
   sunCoreHot: "#ffe1a3",
   sunRim: "#e66b4f",
   sunRay: "#ffbd70",
-  cloudBackHi: "#f4afb0",
-  cloudBack: "#d686a1",
-  cloudBackMid: "#c17094",
-  cloudBackShade: "#965675",
-  cloudFrontHi: "#ffd6b2",
-  cloudFront: "#f5a68d",
-  cloudFrontMid: "#df867e",
-  cloudShade: "#b56578",
+  cloudBackHi: "#ffd7c1",
+  cloudBack: "#eeb0b9",
+  cloudBackMid: "#dda0b5",
+  cloudBackShade: "#bd82a0",
+  cloudFrontHi: "#fff0cf",
+  cloudFront: "#ffd0b3",
+  cloudFrontMid: "#f4b0ae",
+  cloudShade: "#d58fa8",
   bird: "#372644",
   birdWing: "#563653",
   balloonA: "#e85f56",
@@ -381,6 +382,7 @@ export default function Background() {
     let skylineTwilight: HTMLCanvasElement | null = null;
     let activePhase: SkyPhase | null = null;
     let scheduledPhase = getSkyPhase();
+    let sunArcProgress = 0;
 
     function getSkyOverride(): SkyPhase | null {
       const override = document.documentElement.dataset.skyOverride;
@@ -562,19 +564,24 @@ export default function Background() {
 
     /** Sky gradient rendered as full noise-dither: no visible band edges,
      *  every row is a probabilistic blend of its two nearest band colors. */
-    function renderSky(bands: string[]) {
+    function renderSky(bands: string[], diagonal = false) {
       const off = document.createElement("canvas");
       off.width = canvas!.width;
       off.height = canvas!.height;
       const o = off.getContext("2d")!;
       const rng = mulberry32(SEED ^ 0x51ed270b);
       const segs = bands.length - 1;
+      const maxX = Math.max(1, cols - 1);
+      const maxY = Math.max(1, rows - 1);
 
       for (let y = 0; y < rows; y++) {
-        const f = Math.min((y / rows) * segs, segs - 0.0001);
-        const i = Math.floor(f);
-        const frac = f - i;
         for (let x = 0; x < cols; x++) {
+          const progress = diagonal
+            ? Math.min(0.9999, (x / maxX) * 0.78 + (1 - y / maxY) * 0.22)
+            : Math.min(0.9999, y / maxY);
+          const f = progress * segs;
+          const i = Math.floor(f);
+          const frac = f - i;
           o.fillStyle = rng() < frac ? bands[i + 1] : bands[i];
           o.fillRect(x * CELL, y * CELL, CELL, CELL);
         }
@@ -788,7 +795,7 @@ export default function Background() {
       buildSkyline();
       skyNight = renderSky(NIGHT.bands);
       skyDay = renderSky(DAY.bands);
-      skyTwilight = renderSky(TWILIGHT.bands);
+      skyTwilight = renderSky(TWILIGHT.bands, true);
     }
 
     /* ── draw helpers ── */
@@ -1099,11 +1106,13 @@ export default function Background() {
       if (sky) ctx!.drawImage(sky, 0, 0);
       stepPulse(dt);
 
-      // Twilight lowers the sun toward the skyline and expands its warm glow.
-      const sx = Math.floor(cols * 0.8);
-      const sy = twilight
-        ? Math.max(SKY_SAFE_TOP + 4, waterTop - Math.max(28, Math.floor(rows * 0.22)))
-        : Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.07));
+      if (!reduced) {
+        sunArcProgress = Math.min(1, sunArcProgress + Math.min(dt, 1000) / SUN_ARC_DURATION);
+      }
+      const sx = Math.round(cols * (0.06 + sunArcProgress * 0.78));
+      const horizonY = waterTop - Math.max(22, Math.floor(rows * 0.1));
+      const peakY = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.08));
+      const sy = Math.round(horizonY - Math.sin(Math.PI * sunArcProgress) * Math.max(0, horizonY - peakY));
       halo(sx + 8, sy + 8, pal.sunRay, pulse, twilight ? 12 : 9);
       const hot = pulse % 2 === 0;
       sprite(SUN_MAP, sx, sy, {
@@ -1333,6 +1342,9 @@ export default function Background() {
       }
       const phase = getSkyOverride() ?? scheduledPhase;
       if (activePhase !== phase) {
+        if (phase !== "night" && (activePhase === null || activePhase === "night")) {
+          sunArcProgress = 0;
+        }
         activePhase = phase;
         document.documentElement.dataset.skyPhase = phase;
         document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";
@@ -1383,7 +1395,7 @@ export default function Background() {
     window.addEventListener("resize", onResize);
 
     const phaseObserver = new MutationObserver(() => {
-      if (reduced) drawCurrentScene(0);
+      drawCurrentScene(0);
     });
     phaseObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-sky-override"] });
 

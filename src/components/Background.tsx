@@ -92,7 +92,7 @@ const DAY = {
 };
 
 const TWILIGHT = {
-  bands: ["#ffe58a", "#ffc76f", "#f7a071", "#f38f88", "#eda0ad", "#dda4c8", "#c497d1", "#a987ca"],
+  bands: ["#ffe58a", "#ffc76f", "#f7a071", "#f38f88", "#eda0ad", "#e9a1b8", "#e29fc3", "#d79bc8"],
   far: "#8e7197",
   farLight: "#bd8fae",
   nearShades: ["#493650", "#56405b", "#624764"],
@@ -564,20 +564,19 @@ export default function Background() {
 
     /** Sky gradient rendered as full noise-dither: no visible band edges,
      *  every row is a probabilistic blend of its two nearest band colors. */
-    function renderSky(bands: string[], diagonal = false) {
+    function renderSky(bands: string[], bottomUp = false) {
       const off = document.createElement("canvas");
       off.width = canvas!.width;
       off.height = canvas!.height;
       const o = off.getContext("2d")!;
       const rng = mulberry32(SEED ^ 0x51ed270b);
       const segs = bands.length - 1;
-      const maxX = Math.max(1, cols - 1);
       const maxY = Math.max(1, rows - 1);
 
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
-          const progress = diagonal
-            ? Math.min(0.9999, (x / maxX) * 0.78 + (1 - y / maxY) * 0.22)
+          const progress = bottomUp
+            ? Math.min(0.9999, 1 - y / maxY)
             : Math.min(0.9999, y / maxY);
           const f = progress * segs;
           const i = Math.floor(f);

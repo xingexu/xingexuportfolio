@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { SITE } from "@/app/data";
@@ -97,11 +96,11 @@ export default function Hero() {
             </span>
           </h1>
 
-          <p className="step-in-2" style={{ fontSize: 15, color: "var(--text-2)", marginTop: 20 }}>
+          <p className="step-in-2 hero-subtitle" style={{ fontSize: 15, marginTop: 20 }}>
             {SITE.role.toLowerCase()}
           </p>
 
-          <p className="step-in-2" style={{ fontSize: 13, color: "var(--text-3)", marginTop: 8 }}>
+          <p className="step-in-2 hero-subtitle" style={{ fontSize: 13, marginTop: 8 }}>
             western cs + ivey aeo &apos;30
           </p>
 
@@ -118,23 +117,6 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="hero-photo step-in">
-          <Image
-              src="/photo.png"
-              alt="Portrait of Xinge Xu"
-              width={600}
-              height={600}
-              priority
-              sizes="(max-width: 900px) 208px, 288px"
-              className="pixel-photo"
-              style={{
-                width: "clamp(208px, 26vw, 288px)",
-                height: "clamp(208px, 26vw, 288px)",
-                objectFit: "cover",
-                objectPosition: "center top",
-              }}
-          />
-        </div>
       </div>
     </section>
   );

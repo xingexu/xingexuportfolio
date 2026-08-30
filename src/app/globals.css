@@ -178,6 +178,18 @@ body {
   border-color: var(--accent);
 }
 
+:root[data-sky-phase="twilight"] .hero-resume-btn {
+  color: #4a2b39;
+  background: #ffc857;
+  border-color: #e8944e;
+}
+
+:root[data-sky-phase="twilight"] .hero-resume-btn:hover {
+  color: #4a2b39;
+  background: #ffd978;
+  border-color: #f09b51;
+}
+
 .back-home-wrap {
   position: relative;
   z-index: 10;

@@ -145,7 +145,7 @@ export default function Hero() {
             <Link href="/projects" className="px-btn">
               see what i built! <span aria-hidden>→</span>
             </Link>
-            <Link href="/resume" className="px-btn px-btn-secondary">
+            <Link href="/resume" className="px-btn px-btn-secondary hero-resume-btn">
               resume <span aria-hidden>→</span>
             </Link>
           </div>

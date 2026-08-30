@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { SITE } from "@/app/data";
 
 const NAME = "xinge xu";
@@ -13,7 +13,24 @@ const NAME = "xinge xu";
  * visitors always get "xinge xu" in the <h1>. The typing animation re-runs
  * client-side as progressive enhancement, stepped like a terminal.
  */
-type Particle = { id: number; left: string; top: string; color: string; delay: string };
+type Particle = {
+  color: string;
+  delay: string;
+  drift: string;
+  duration: string;
+  id: number;
+  left: string;
+  rise: string;
+  size: number;
+  spin: string;
+  top: string;
+};
+
+type NameParticleStyle = CSSProperties & {
+  "--name-drift": string;
+  "--name-rise": string;
+  "--name-spin": string;
+};
 
 const PARTICLE_COLORS = ["var(--accent)", "#9fc4f0", "#ffffff", "var(--accent)"];
 
@@ -26,14 +43,19 @@ export default function Hero() {
 
   const burst = () => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const next: Particle[] = Array.from({ length: 16 }, () => ({
-      id: pid.current++,
-      left: `${Math.random() * 100}%`,
-      top: `${20 + Math.random() * 70}%`,
+    const next: Particle[] = Array.from({ length: 56 }, () => ({
       color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
-      delay: `${Math.random() * 0.25}s`,
+      delay: `${Math.random() * 0.18}s`,
+      drift: `${Math.round(Math.random() * 116 - 58)}px`,
+      duration: `${0.78 + Math.random() * 0.62}s`,
+      id: pid.current++,
+      left: `${3 + Math.random() * 94}%`,
+      rise: `${-58 - Math.round(Math.random() * 92)}px`,
+      size: 3 + Math.floor(Math.random() * 7),
+      spin: `${Math.round(Math.random() * 540 - 270)}deg`,
+      top: `${28 + Math.random() * 58}%`,
     }));
-    setParticles((p) => [...p.slice(-32), ...next]);
+    setParticles((current) => [...current, ...next].slice(-112));
   };
 
   useEffect(() => {
@@ -72,9 +94,9 @@ export default function Hero() {
       <div className="hero-layout" style={{ width: "100%", maxWidth: 1040 }}>
         <div className="hero-copy">
           <h1
-            className="font-pixel name-hover"
-            onMouseEnter={burst}
+            className="font-pixel"
             style={{
+              display: "inline-block",
               fontSize: "clamp(40px, 8vw, 88px)",
               fontWeight: 700,
               lineHeight: 1.05,
@@ -82,15 +104,27 @@ export default function Hero() {
               position: "relative",
             }}
           >
-            <span>{typed}</span>
+            <span className="name-hover" onMouseEnter={burst}>{typed}</span>
             <span className="type-cursor" aria-hidden style={{ visibility: typing ? "visible" : "hidden" }} />
             <span aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}>
               {particles.map((p) => (
                 <span
                   key={p.id}
                   className="name-particle"
-                  style={{ left: p.left, top: p.top, background: p.color, animationDelay: p.delay }}
-                  onAnimationEnd={() => setParticles((ps) => ps.filter((q) => q.id !== p.id))}
+                  style={
+                    {
+                      "--name-drift": p.drift,
+                      "--name-rise": p.rise,
+                      "--name-spin": p.spin,
+                      animationDelay: p.delay,
+                      animationDuration: p.duration,
+                      background: p.color,
+                      height: p.size,
+                      left: p.left,
+                      top: p.top,
+                      width: p.size,
+                    } as NameParticleStyle
+                  }
                 />
               ))}
             </span>

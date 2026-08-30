@@ -95,16 +95,26 @@ body {
 
 /* pixel particles that burst from the name on hover */
 @keyframes particleUp {
-  0%   { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-46px); }
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.35) rotate(0deg);
+  }
+  12% { opacity: 1; }
+  62% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(var(--name-drift), var(--name-rise), 0)
+      scale(0.65)
+      rotate(var(--name-spin));
+  }
 }
 
 .name-particle {
   position: absolute;
-  width: 6px;
-  height: 6px;
   pointer-events: none;
-  animation: particleUp 0.8s steps(7) both;
+  image-rendering: pixelated;
+  animation: particleUp 1s steps(11, end) both;
 }
 
 .type-cursor {
@@ -592,13 +602,15 @@ body:has(.resume-page) footer {
 
 .resume-sparkles {
   position: absolute;
-  inset: -20px;
+  inset: 0;
   z-index: 4;
   pointer-events: none;
 }
 
 .resume-sparkle {
   position: absolute;
+  top: 46%;
+  left: 50%;
   width: 6px;
   height: 6px;
   color: #fff;
@@ -635,29 +647,33 @@ body:has(.resume-page) footer {
     -8px 0 0 currentColor;
 }
 
-.resume-sparkle:nth-child(even) { animation-duration: 1450ms; }
-.resume-sparkle:nth-child(5n) { animation-duration: 1750ms; }
-
-.resume-sparkle:nth-child(1) { top: 0; left: 8%; animation-delay: 0ms; color: var(--accent); }
-.resume-sparkle:nth-child(2) { top: 1%; left: 31%; animation-delay: 90ms; }
-.resume-sparkle:nth-child(3) { top: 0; left: 58%; animation-delay: 180ms; color: #9fc4f0; }
-.resume-sparkle:nth-child(4) { top: 2%; left: 88%; animation-delay: 270ms; color: var(--accent); }
-.resume-sparkle:nth-child(5) { top: 24%; right: 0; animation-delay: 360ms; }
-.resume-sparkle:nth-child(6) { top: 53%; right: 1%; animation-delay: 450ms; color: #9fc4f0; }
-.resume-sparkle:nth-child(7) { top: 82%; right: 0; animation-delay: 540ms; color: var(--accent); }
-.resume-sparkle:nth-child(8) { bottom: 0; left: 84%; animation-delay: 630ms; }
-.resume-sparkle:nth-child(9) { bottom: 1%; left: 59%; animation-delay: 720ms; color: #9fc4f0; }
-.resume-sparkle:nth-child(10) { bottom: 0; left: 32%; animation-delay: 810ms; color: var(--accent); }
-.resume-sparkle:nth-child(11) { bottom: 2%; left: 7%; animation-delay: 900ms; }
-.resume-sparkle:nth-child(12) { top: 76%; left: 0; animation-delay: 990ms; color: #9fc4f0; }
-.resume-sparkle:nth-child(13) { top: 48%; left: 1%; animation-delay: 1080ms; color: var(--accent); }
-.resume-sparkle:nth-child(14) { top: 19%; left: 0; animation-delay: 1170ms; }
-
 @keyframes resume-sparkle-pop {
-  0% { opacity: 0; transform: scale(0); }
-  24% { opacity: 1; transform: scale(1.7) rotate(45deg); }
-  58% { opacity: 1; transform: scale(0.75) rotate(90deg); }
-  100% { opacity: 0; transform: scale(0); }
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0) rotate(0deg);
+  }
+  12% { opacity: 1; }
+  48% {
+    opacity: 1;
+    transform:
+      translate(
+        calc(-50% + var(--sparkle-x)),
+        calc(-50% + var(--sparkle-y))
+      )
+      scale(1.65)
+      rotate(45deg);
+  }
+  72% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform:
+      translate(
+        calc(-50% + var(--sparkle-x)),
+        calc(-50% + var(--sparkle-y) + var(--sparkle-drop))
+      )
+      scale(0.25)
+      rotate(135deg);
+  }
 }
 
 .resume-celebration {
@@ -682,6 +698,19 @@ body:has(.resume-page) footer {
     -10px 0 0 currentColor;
 }
 
+.resume-falling-particle.is-comet::after {
+  content: "";
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  width: 2px;
+  height: 12px;
+  background: currentColor;
+  box-shadow: 0 -6px 0 currentColor;
+  opacity: 0.5;
+  transform: translateX(-50%);
+}
+
 .resume-celebration.is-visible .resume-falling-particle {
   animation-name: resume-particle-fall;
   animation-timing-function: steps(18, end);
@@ -701,11 +730,32 @@ body:has(.resume-page) footer {
       scale(1.45)
       rotate(45deg);
   }
-  68% { opacity: 1; }
+  52% {
+    opacity: 1;
+    transform:
+      translate3d(
+        calc(var(--particle-burst-x) + var(--particle-sway)),
+        17vh,
+        0
+      )
+      scale(1.1)
+      rotate(180deg);
+  }
+  76% {
+    opacity: 1;
+    transform:
+      translate3d(
+        calc(var(--particle-drift) - var(--particle-sway)),
+        58vh,
+        0
+      )
+      scale(0.9)
+      rotate(360deg);
+  }
   100% {
     opacity: 0;
     transform:
-      translate3d(var(--particle-drift), 105svh, 0)
+      translate3d(var(--particle-drift), 105vh, 0)
       scale(0.75)
       rotate(var(--particle-spin));
   }

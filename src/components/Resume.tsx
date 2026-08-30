@@ -8,27 +8,57 @@ const resumeFrames = Array.from(
   { length: 16 },
   (_, index) => `/resume-frames/frame-${String(index + 1).padStart(2, "0")}.png`,
 );
-const resumeSparkles = Array.from({ length: 14 }, (_, index) => index);
 const celebrationColors = ["#ffffff", "#ffd24a", "#9fc4f0", "#6ecbff", "#ff8a3d"];
-const fallingParticles = Array.from({ length: 36 }, (_, index) => ({
-  burstX: `${((index * 41) % 150) - 75}px`,
-  burstY: `${-28 - ((index * 19) % 72)}px`,
-  color: celebrationColors[index % celebrationColors.length],
-  delay: `${(index % 9) * 75 + Math.floor(index / 9) * 35}ms`,
-  drift: `${((index * 67) % 300) - 150}px`,
-  duration: `${1700 + ((index * 137) % 1100)}ms`,
-  isStar: index % 5 === 0 || index % 11 === 0,
-  left: `${4 + ((index * 29) % 92)}%`,
-  size: 4 + ((index * 7) % 9),
-  spin: `${180 + ((index * 113) % 720)}deg`,
-  top: `${7 + ((index * 23) % 48)}%`,
+
+function seededUnit(index: number, salt: number) {
+  let value = Math.imul(index + 1, 0x45d9f3b) ^ Math.imul(salt + 1, 0x119de1f3);
+  value = Math.imul(value ^ (value >>> 16), 0x45d9f3b);
+  return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
+}
+
+const resumeSparkles = Array.from({ length: 42 }, (_, index) => {
+  const angle = (index / 42) * Math.PI * 2 + (seededUnit(index, 1) - 0.5) * 0.36;
+  const radiusX = 48 + seededUnit(index, 2) * 118;
+  const radiusY = 38 + seededUnit(index, 3) * 92;
+
+  return {
+    burstX: `${Math.round(Math.cos(angle) * radiusX)}px`,
+    burstY: `${Math.round(Math.sin(angle) * radiusY)}px`,
+    color: celebrationColors[Math.floor(seededUnit(index, 4) * celebrationColors.length)],
+    delay: `${Math.round(seededUnit(index, 5) * 390)}ms`,
+    drop: `${24 + Math.round(seededUnit(index, 6) * 64)}px`,
+    duration: `${1080 + Math.round(seededUnit(index, 7) * 820)}ms`,
+  };
+});
+
+const fallingParticles = Array.from({ length: 96 }, (_, index) => ({
+  burstX: `${Math.round((seededUnit(index, 8) - 0.5) * 250)}px`,
+  burstY: `${-42 - Math.round(seededUnit(index, 9) * 118)}px`,
+  color: celebrationColors[Math.floor(seededUnit(index, 10) * celebrationColors.length)],
+  delay: `${Math.round(seededUnit(index, 11) * 720)}ms`,
+  drift: `${Math.round((seededUnit(index, 12) - 0.5) * 230)}px`,
+  duration: `${2200 + Math.round(seededUnit(index, 13) * 1900)}ms`,
+  isComet: index % 7 === 0 || index % 13 === 0,
+  isStar: index % 6 === 0 || index % 17 === 0,
+  left: `${43 + seededUnit(index, 14) * 14}%`,
+  size: 3 + Math.floor(seededUnit(index, 15) * 10),
+  spin: `${180 + Math.round(seededUnit(index, 16) * 900)}deg`,
+  sway: `${Math.round((seededUnit(index, 17) - 0.5) * 180)}px`,
+  top: `${31 + seededUnit(index, 18) * 20}%`,
 }));
+
+type SparkleStyle = CSSProperties & {
+  "--sparkle-drop": string;
+  "--sparkle-x": string;
+  "--sparkle-y": string;
+};
 
 type FallingParticleStyle = CSSProperties & {
   "--particle-burst-x": string;
   "--particle-burst-y": string;
   "--particle-drift": string;
   "--particle-spin": string;
+  "--particle-sway": string;
 };
 
 export default function Resume() {
@@ -125,8 +155,21 @@ export default function Resume() {
             className={`resume-sparkles${activeFrame === -1 ? " is-visible" : ""}`}
             aria-hidden="true"
           >
-            {resumeSparkles.map((sparkle) => (
-              <span className="resume-sparkle" key={sparkle} />
+            {resumeSparkles.map((sparkle, index) => (
+              <span
+                className="resume-sparkle"
+                key={index}
+                style={
+                  {
+                    "--sparkle-drop": sparkle.drop,
+                    "--sparkle-x": sparkle.burstX,
+                    "--sparkle-y": sparkle.burstY,
+                    animationDelay: sparkle.delay,
+                    animationDuration: sparkle.duration,
+                    color: sparkle.color,
+                  } as SparkleStyle
+                }
+              />
             ))}
           </div>
         </div>
@@ -137,7 +180,7 @@ export default function Resume() {
       >
         {fallingParticles.map((particle, index) => (
           <span
-            className={`resume-falling-particle${particle.isStar ? " is-star" : ""}`}
+            className={`resume-falling-particle${particle.isStar ? " is-star" : ""}${particle.isComet ? " is-comet" : ""}`}
             key={index}
             style={
               {
@@ -145,6 +188,7 @@ export default function Resume() {
                 "--particle-burst-y": particle.burstY,
                 "--particle-drift": particle.drift,
                 "--particle-spin": particle.spin,
+                "--particle-sway": particle.sway,
                 animationDelay: particle.delay,
                 animationDuration: particle.duration,
                 background: particle.color,

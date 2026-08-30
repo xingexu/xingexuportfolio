@@ -81,7 +81,8 @@ function MoonIcon() {
 function SunriseIcon() {
   return (
     <svg {...iconProps}>
-      <path d="M4 18h16M6 22h12M8 18a4 4 0 0 1 8 0M12 2v5M4.93 10.93l2.12 2.12M19.07 10.93l-2.12 2.12M2 16h2M20 16h2" />
+      <path d="M7 18a5 5 0 0 1 10 0Z" fill="currentColor" stroke="none" />
+      <path d="M4 18h16" />
     </svg>
   );
 }

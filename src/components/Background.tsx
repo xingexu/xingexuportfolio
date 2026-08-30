@@ -158,6 +158,7 @@ type Star = { x: number; y: number; big: boolean; level: number; every: number; 
 type Sparkle = { x: number; y: number; ttl: number; color: string };
 type Cloud = { x: number; y: number; bob: number; map: number[][]; every: number; acc: number; bobEvery: number; bobAcc: number; front: boolean };
 type Flock = { x: number; y: number; frame: number; acc: number; scatterElapsed: number | null };
+type FerrySplash = { x: number; y: number; vx: number; vy: number; ttl: number; maxTtl: number };
 type Balloon = {
   x: number;
   y: number;
@@ -312,6 +313,8 @@ export default function Background() {
     let balloon: Balloon | null = null;
     let balloonWait = 4000 + Math.random() * 6000;
     let ferry: Ferry | null = null;
+    let ferrySplashes: FerrySplash[] = [];
+    let ferrySplashAcc = 0;
     let shooting: { cells: Trail; acc: number } | null = null;
     let shootWait = 3000 + Math.random() * 5000;
     let windowAcc = 0;
@@ -1175,11 +1178,11 @@ export default function Background() {
     function drawFerry(dt: number, night: boolean) {
       if (!ferry) return;
 
+      const boosted = !reduced && ferry.boostRemaining > 0;
       if (!reduced) {
-        const boosted = ferry.boostRemaining > 0;
         ferry.boostRemaining = Math.max(0, ferry.boostRemaining - dt);
         ferry.acc += dt;
-        const moveEvery = boosted ? 165 : 330;
+        const moveEvery = boosted ? 330 / 4 : 330;
         while (ferry.acc >= moveEvery) {
           ferry.acc -= moveEvery;
           ferry.x += 1;
@@ -1195,6 +1198,37 @@ export default function Background() {
 
       const ferryY = waterTop - 5 + ferry.bob;
       const foam = night ? "#90abc7" : "#eef9ff";
+
+      if (boosted) {
+        ferrySplashAcc += dt;
+        while (ferrySplashAcc >= 55) {
+          ferrySplashAcc -= 55;
+          for (let i = 0; i < 2; i++) {
+            const ttl = 420 + Math.random() * 280;
+            ferrySplashes.push({
+              x: ferry.x - 1 - Math.random() * 3,
+              y: waterTop + Math.random(),
+              vx: -2 - Math.random() * 5,
+              vy: -8 - Math.random() * 8,
+              ttl,
+              maxTtl: ttl,
+            });
+          }
+        }
+      } else {
+        ferrySplashAcc = 0;
+      }
+
+      const splashStep = dt / 1000;
+      for (const splash of ferrySplashes) {
+        splash.x += splash.vx * splashStep;
+        splash.y += splash.vy * splashStep;
+        splash.vy += 26 * splashStep;
+        splash.ttl -= dt;
+        cell(Math.round(splash.x), Math.round(splash.y), foam, Math.max(0, splash.ttl / splash.maxTtl));
+      }
+      ferrySplashes = ferrySplashes.filter((splash) => splash.ttl > 0 && splash.y < rows + 2);
+
       for (let i = 0; i < 8; i += 2) {
         cell(ferry.x - 2 - i - ferry.frame, waterTop + 1 + ((i / 2 + ferry.frame) % 2), foam, 0.72 - i * 0.05);
       }

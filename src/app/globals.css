@@ -522,6 +522,16 @@ a.project-card:hover .project-title { color: var(--accent); }
   color: rgba(18, 35, 65, 0.72);
 }
 
+:root[data-sky-phase="twilight"] .drift-info-card {
+  background: rgba(255, 248, 232, 0.96);
+  border-color: #9870ad;
+  box-shadow: 6px 6px 0 rgba(116, 76, 137, 0.38);
+}
+
+:root[data-sky-phase="twilight"] .drift-cta-card {
+  box-shadow: none;
+}
+
 .project-meta {
   display: flex;
   justify-content: space-between;

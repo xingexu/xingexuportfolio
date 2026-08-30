@@ -523,7 +523,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 :root[data-sky-phase="twilight"] .drift-info-card {
-  background: rgba(255, 248, 232, 0.96);
+  background: rgba(255, 245, 218, 0.97);
   border-color: #9870ad;
   box-shadow: 6px 6px 0 rgba(116, 76, 137, 0.38);
 }

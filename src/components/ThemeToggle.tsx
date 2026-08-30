@@ -82,7 +82,7 @@ function SunriseIcon() {
   return (
     <svg {...iconProps}>
       <path d="M5.5 18a6.5 6.5 0 0 1 13 0Z" fill="currentColor" stroke="none" />
-      <path d="M3 18h18M12 6.5V9M5.2 9.2 7 11M18.8 9.2 17 11M2.5 14h3M18.5 14h3" />
+      <path d="M3 18h18M12 6.5v5M4.6 10.2l3.6 3.6M19.4 10.2l-3.6 3.6M2.5 15.5H6M18 15.5h3.5" />
     </svg>
   );
 }

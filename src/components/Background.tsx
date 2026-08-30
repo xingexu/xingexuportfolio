@@ -266,6 +266,7 @@ export default function Background() {
     let glints: { x: number; y: number }[] = [];
     let flock: Flock | null = null;
     let flockWait = 5000 + Math.random() * 5000;
+    let audioContext: AudioContext | null = null;
     let plane: { x: number; y: number; acc: number; blink: boolean } | null = null;
     let planeWait = 8000 + Math.random() * 10000;
     let satellite: { x: number; y: number; acc: number } | null = null;
@@ -286,6 +287,73 @@ export default function Background() {
     let skyDay: HTMLCanvasElement | null = null;
     let skylineNight: HTMLCanvasElement | null = null;
     let skylineDay: HTMLCanvasElement | null = null;
+
+    function getAudioContext() {
+      if (audioContext) return audioContext;
+      const AudioContextConstructor = window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextConstructor) return null;
+      audioContext = new AudioContextConstructor();
+      return audioContext;
+    }
+
+    function playChirp() {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const oscillator = audio.createOscillator();
+      const volume = audio.createGain();
+      const now = audio.currentTime;
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(900, now);
+      oscillator.frequency.exponentialRampToValueAtTime(1800, now + 0.09);
+      oscillator.frequency.exponentialRampToValueAtTime(720, now + 0.24);
+      volume.gain.setValueAtTime(0.0001, now);
+      volume.gain.exponentialRampToValueAtTime(0.075, now + 0.025);
+      volume.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+      oscillator.connect(volume).connect(audio.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.26);
+    }
+
+    function playBalloonJiggle() {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const oscillator = audio.createOscillator();
+      const volume = audio.createGain();
+      const now = audio.currentTime;
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(420, now);
+      oscillator.frequency.exponentialRampToValueAtTime(690, now + 0.08);
+      oscillator.frequency.exponentialRampToValueAtTime(380, now + 0.16);
+      oscillator.frequency.exponentialRampToValueAtTime(610, now + 0.24);
+      oscillator.frequency.exponentialRampToValueAtTime(330, now + 0.34);
+      volume.gain.setValueAtTime(0.0001, now);
+      volume.gain.exponentialRampToValueAtTime(0.065, now + 0.025);
+      volume.gain.exponentialRampToValueAtTime(0.0001, now + 0.36);
+      oscillator.connect(volume).connect(audio.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.38);
+    }
+
+    function clickedBird(clientX: number, clientY: number) {
+      if (theme() !== "light" || !flock) return false;
+      const x = clientX / CELL;
+      const y = clientY / CELL;
+      return [[0, 0], [-7, 3], [-6, -3]].some(([dx, dy]) => {
+        const bx = flock!.x + dx;
+        const by = flock!.y + dy;
+        return x >= bx - 4 && x <= bx + 4 && y >= by - 2 && y <= by + 3;
+      });
+    }
+
+    function clickedBalloon(clientX: number, clientY: number) {
+      if (theme() !== "light" || !balloon) return false;
+      const x = clientX / CELL;
+      const y = clientY / CELL;
+      const balloonX = balloon.x + balloon.sway;
+      return x >= balloonX && x <= balloonX + BALLOON[0].length &&
+        y >= balloon.y && y <= balloon.y + BALLOON.length;
+    }
 
     const theme = () => (document.documentElement.dataset.theme === "light" ? "light" : "dark");
     const cnTowerX = () => Math.floor(cols * 0.22);
@@ -918,7 +986,13 @@ export default function Background() {
       else drawNight(dt);
     }
 
+    const onPointerDown = (event: PointerEvent) => {
+      if (clickedBalloon(event.clientX, event.clientY)) playBalloonJiggle();
+      else if (clickedBird(event.clientX, event.clientY)) playChirp();
+    };
+
     build();
+    window.addEventListener("pointerdown", onPointerDown);
 
     if (reduced) {
       if (theme() === "light") drawDay(0);
@@ -940,6 +1014,8 @@ export default function Background() {
 
     return () => {
       cancelAnimationFrame(raf);
+      window.removeEventListener("pointerdown", onPointerDown);
+      void audioContext?.close();
       window.removeEventListener("resize", onResize);
       observer.disconnect();
     };

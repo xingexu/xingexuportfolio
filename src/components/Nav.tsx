@@ -18,27 +18,18 @@ export default function Nav() {
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-end",
           height: 54,
           maxWidth: 1040,
           margin: "0 auto",
           padding: "0 20px",
         }}
       >
-        <Link
-          href="/"
-          aria-current={pathname === "/" ? "page" : undefined}
-          className="nav-link"
-          style={{ paddingLeft: 0, border: "none", background: "none", color: pathname === "/" ? "var(--text)" : undefined }}
-        >
-          xinge xu
-        </Link>
-
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Link href="/projects" aria-current={pathname === "/projects" ? "page" : undefined} className="nav-link">
             projects
           </Link>
-          <Link href="/resume" aria-current={pathname === "/resume" ? "page" : undefined} className="nav-link">
+          <Link href="/resume" aria-current={pathname.startsWith("/resume") ? "page" : undefined} className="nav-link">
             resume
           </Link>
           <ThemeToggle />

@@ -85,6 +85,14 @@ body {
 .step-in-2 { animation: stepIn 0.5s steps(5) 0.12s both; }
 .step-in-3 { animation: stepIn 0.5s steps(5) 0.24s both; }
 
+.hero-subtitle {
+  color: #fff;
+}
+
+:root[data-theme="light"] .hero-subtitle {
+  color: var(--text);
+}
+
 /* pixel particles that burst from the name on hover */
 @keyframes particleUp {
   0%   { opacity: 1; transform: translateY(0); }
@@ -144,6 +152,18 @@ body {
 .px-btn-secondary:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.back-home-wrap {
+  position: relative;
+  z-index: 10;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 28px 72px;
+}
+
+.back-home {
+  display: inline-flex;
 }
 
 .px-chip {
@@ -441,9 +461,21 @@ a.project-card:hover .project-title { color: var(--accent); }
 .resume-page {
   position: relative;
   z-index: 10;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 92px 24px 96px;
+  display: grid;
+  width: 100%;
+  height: 100svh;
+  margin: 0;
+  padding: 66px 16px 12px;
+  place-items: center;
+  overflow: hidden;
+}
+
+body:has(.resume-page) {
+  overflow: hidden;
+}
+
+body:has(.resume-page) footer {
+  display: none;
 }
 
 .resume-shell {
@@ -452,6 +484,261 @@ a.project-card:hover .project-title { color: var(--accent); }
   border-left-width: 6px;
   border-right-width: 6px;
   animation: stepIn 0.5s steps(5) both;
+}
+
+.resume-stage {
+  display: flex;
+  max-width: calc(100vw - 24px);
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.resume-side-back {
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 44px;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--panel);
+  border: 2px solid var(--border);
+  box-shadow: 4px 4px 0 var(--shadow);
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.resume-side-back:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--shadow);
+}
+
+.resume-side-back:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--shadow);
+}
+
+.resume-document-wrap {
+  position: relative;
+  width: min(900px, calc(100vw - 132px), calc(77.295svh - 92px));
+  aspect-ratio: 1600 / 2070;
+}
+
+.resume-preview-shell {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 8px 8px 0 var(--shadow);
+  transition: transform 120ms steps(2), box-shadow 120ms steps(2);
+}
+
+.resume-preview-shell:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 10px 10px 0 var(--shadow);
+}
+
+.resume-preview-hit-area:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 5px;
+}
+
+.resume-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  pointer-events: none;
+}
+
+.resume-animation-frames,
+.resume-animation-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.resume-animation-frame {
+  visibility: hidden;
+  background: #fff;
+}
+
+.resume-animation-frame.is-active {
+  visibility: visible;
+}
+
+.resume-animation-image {
+  object-fit: cover;
+  transform: scale(1.03);
+  transform-origin: center;
+}
+
+.resume-sparkles {
+  position: absolute;
+  inset: -20px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.resume-sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  color: #fff;
+  background: currentColor;
+  box-shadow:
+    0 -12px 0 currentColor,
+    12px 0 0 currentColor,
+    0 12px 0 currentColor,
+    -12px 0 0 currentColor;
+  opacity: 0;
+}
+
+.resume-sparkles.is-visible .resume-sparkle {
+  animation: resume-sparkle-pop 1150ms steps(7, end) both;
+}
+
+.resume-sparkle:nth-child(3n) {
+  width: 9px;
+  height: 9px;
+  box-shadow:
+    0 -18px 0 currentColor,
+    18px 0 0 currentColor,
+    0 18px 0 currentColor,
+    -18px 0 0 currentColor;
+}
+
+.resume-sparkle:nth-child(4n) {
+  width: 4px;
+  height: 4px;
+  box-shadow:
+    0 -8px 0 currentColor,
+    8px 0 0 currentColor,
+    0 8px 0 currentColor,
+    -8px 0 0 currentColor;
+}
+
+.resume-sparkle:nth-child(even) { animation-duration: 1450ms; }
+.resume-sparkle:nth-child(5n) { animation-duration: 1750ms; }
+
+.resume-sparkle:nth-child(1) { top: 0; left: 8%; animation-delay: 0ms; color: var(--accent); }
+.resume-sparkle:nth-child(2) { top: 1%; left: 31%; animation-delay: 90ms; }
+.resume-sparkle:nth-child(3) { top: 0; left: 58%; animation-delay: 180ms; color: #9fc4f0; }
+.resume-sparkle:nth-child(4) { top: 2%; left: 88%; animation-delay: 270ms; color: var(--accent); }
+.resume-sparkle:nth-child(5) { top: 24%; right: 0; animation-delay: 360ms; }
+.resume-sparkle:nth-child(6) { top: 53%; right: 1%; animation-delay: 450ms; color: #9fc4f0; }
+.resume-sparkle:nth-child(7) { top: 82%; right: 0; animation-delay: 540ms; color: var(--accent); }
+.resume-sparkle:nth-child(8) { bottom: 0; left: 84%; animation-delay: 630ms; }
+.resume-sparkle:nth-child(9) { bottom: 1%; left: 59%; animation-delay: 720ms; color: #9fc4f0; }
+.resume-sparkle:nth-child(10) { bottom: 0; left: 32%; animation-delay: 810ms; color: var(--accent); }
+.resume-sparkle:nth-child(11) { bottom: 2%; left: 7%; animation-delay: 900ms; }
+.resume-sparkle:nth-child(12) { top: 76%; left: 0; animation-delay: 990ms; color: #9fc4f0; }
+.resume-sparkle:nth-child(13) { top: 48%; left: 1%; animation-delay: 1080ms; color: var(--accent); }
+.resume-sparkle:nth-child(14) { top: 19%; left: 0; animation-delay: 1170ms; }
+
+@keyframes resume-sparkle-pop {
+  0% { opacity: 0; transform: scale(0); }
+  24% { opacity: 1; transform: scale(1.7) rotate(45deg); }
+  58% { opacity: 1; transform: scale(0.75) rotate(90deg); }
+  100% { opacity: 0; transform: scale(0); }
+}
+
+.resume-celebration {
+  position: absolute;
+  inset: 54px 0 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.resume-falling-particle {
+  position: absolute;
+  opacity: 0;
+  image-rendering: pixelated;
+}
+
+.resume-falling-particle.is-star {
+  box-shadow:
+    0 -10px 0 currentColor,
+    10px 0 0 currentColor,
+    0 10px 0 currentColor,
+    -10px 0 0 currentColor;
+}
+
+.resume-celebration.is-visible .resume-falling-particle {
+  animation-name: resume-particle-fall;
+  animation-timing-function: steps(18, end);
+  animation-fill-mode: both;
+}
+
+@keyframes resume-particle-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.2) rotate(0deg);
+  }
+  9% { opacity: 1; }
+  22% {
+    opacity: 1;
+    transform:
+      translate3d(var(--particle-burst-x), var(--particle-burst-y), 0)
+      scale(1.45)
+      rotate(45deg);
+  }
+  68% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(var(--particle-drift), 105svh, 0)
+      scale(0.75)
+      rotate(var(--particle-spin));
+  }
+}
+
+.resume-preview-hit-area {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  cursor: zoom-in;
+}
+
+.resume-preview-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.resume-editor-page {
+  position: relative;
+  z-index: 10;
+  height: 100vh;
+  min-height: 720px;
+  padding: 70px 16px 16px;
+}
+
+.resume-editor-document {
+  display: block;
+  width: min(1280px, 100%);
+  height: 100%;
+  margin: 0 auto;
+  border: 0;
+  background: #fff;
+  box-shadow: 8px 8px 0 var(--shadow);
 }
 
 .resume-heading span {
@@ -685,7 +972,15 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 @media (max-width: 640px) {
   .resume-page {
-    padding: 84px 16px 72px;
+    padding: 64px 10px 10px;
+  }
+  .resume-preview-shell,
+  .resume-editor-document {
+    box-shadow: 5px 5px 0 var(--shadow);
+  }
+  .resume-editor-page {
+    min-height: 620px;
+    padding: 64px 8px 8px;
   }
   .resume-shell {
     padding: 20px;
@@ -696,5 +991,13 @@ a.project-card:hover .project-title { color: var(--accent); }
   }
   .resume-row > span {
     text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume-animation-frames,
+  .resume-sparkles,
+  .resume-celebration {
+    display: none;
   }
 }

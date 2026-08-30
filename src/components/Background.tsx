@@ -123,7 +123,7 @@ const TWILIGHT = {
   bird: "#372644",
   birdWing: "#563653",
   balloonA: "#e85f56",
-  balloonB: "#ffd47f",
+  balloonB: "#ffffff",
   basket: "#654032",
   rope: "#4a2e2a",
   planeBody: "#ffe2c2",

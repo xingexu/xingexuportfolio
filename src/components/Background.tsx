@@ -167,7 +167,9 @@ type Balloon = {
   yAcc: number;
   jiggleElapsed: number | null;
 };
-type Ferry = { x: number; acc: number; bob: number; bobAcc: number; frame: number };
+type Ferry = { x: number; acc: number; bob: number; bobAcc: number; boostRemaining: number; frame: number };
+type Plane = { x: number; y: number; acc: number; blink: boolean; boostRemaining: number };
+type PlaneSmoke = { x: number; y: number; ttl: number };
 type Building = {
   x: number; w: number; h: number; near: boolean; shade: number; antenna: number;
   roof: "flat" | "tank" | "ac"; setback: number; windows: { wx: number; wy: number }[];
@@ -302,7 +304,8 @@ export default function Background() {
     let flock: Flock | null = null;
     let flockWait = 5000 + Math.random() * 5000;
     let audioContext: AudioContext | null = null;
-    let plane: { x: number; y: number; acc: number; blink: boolean } | null = null;
+    let plane: Plane | null = null;
+    let planeSmoke: PlaneSmoke[] = [];
     let planeWait = 8000 + Math.random() * 10000;
     let satellite: { x: number; y: number; acc: number } | null = null;
     let satWait = 6000 + Math.random() * 8000;
@@ -425,6 +428,14 @@ export default function Background() {
         y >= ferryY && y <= ferryY + FERRY.length;
     }
 
+    function clickedPlane(clientX: number, clientY: number) {
+      if (!plane) return false;
+      const x = clientX / CELL;
+      const y = clientY / CELL;
+      return x >= plane.x - 1 && x <= plane.x + 4 &&
+        y >= plane.y - 2 && y <= plane.y + 2;
+    }
+
     function birdOffsets(): readonly (readonly [number, number])[] {
       if (!flock || flock.scatterElapsed === null || flock.scatterElapsed >= 960) {
         return BIRD_FORMATION;
@@ -465,18 +476,16 @@ export default function Background() {
     // moving sprite below the fixed top bar's exclusion zone.
     const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
     const birdLaneY = () => Math.max(airplaneLaneY() + 18, Math.floor(rows * 0.24));
-    const heroNameBottomCell = () => {
-      const name = document.querySelector<HTMLElement>(".name-hover");
-      if (!name) return 0;
-      const bounds = name.getBoundingClientRect();
-      if (bounds.bottom <= 0 || bounds.top >= window.innerHeight) return 0;
-      return Math.ceil(bounds.bottom / CELL);
+    const balloonLaneY = () => birdLaneY();
+    const airTrafficOverlaps = (flockX: number, balloonX: number) => {
+      // Conservative envelopes include fully scattered birds, balloon sway,
+      // click jiggle, sprite widths, and a 3-cell visual safety gap.
+      const flockLeft = flockX - 23;
+      const flockRight = flockX + 13;
+      const balloonLeft = balloonX - 2;
+      const balloonRight = balloonX + BALLOON[0].length * BALLOON_SCALE + 2;
+      return flockRight + 3 >= balloonLeft && balloonRight + 3 >= flockLeft;
     };
-    const balloonLaneY = () => Math.max(
-      birdLaneY() + 23,
-      Math.floor(rows * 0.42),
-      heroNameBottomCell() + 8,
-    );
     const cnTowerX = () => Math.floor(cols * 0.22);
     const towerDims = () => {
       const h = Math.min(Math.floor(rows * 0.46), 64);
@@ -673,6 +682,7 @@ export default function Background() {
           acc: 0,
           bob: 0,
           bobAcc: 0,
+          boostRemaining: 0,
           frame: 0,
         };
       }
@@ -847,6 +857,61 @@ export default function Background() {
       }
     }
 
+    function drawPlane(dt: number, bodyColor: string, tailColor: string, tailFin: boolean) {
+      planeSmoke = planeSmoke.filter((puff) => {
+        puff.ttl -= dt;
+        return puff.ttl > 0;
+      });
+      for (const puff of planeSmoke) {
+        const alpha = Math.min(0.72, puff.ttl / 900);
+        cell(puff.x, puff.y, tailColor, alpha);
+        if (puff.ttl < 620) cell(puff.x + 1, puff.y - 1, tailColor, alpha * 0.38);
+      }
+
+      if (plane) {
+        const boosted = plane.boostRemaining > 0;
+        plane.boostRemaining = Math.max(0, plane.boostRemaining - dt);
+        plane.acc += dt;
+        const moveEvery = boosted ? 130 / 3 : 130;
+
+        while (plane && plane.acc >= moveEvery) {
+          plane.acc -= moveEvery;
+          plane.x -= 1;
+          plane.blink = !plane.blink;
+          if (boosted) {
+            planeSmoke.push({
+              x: plane.x + 4,
+              y: plane.y + (plane.x % 2 === 0 ? 0 : 1),
+              ttl: 900,
+            });
+            if (planeSmoke.length > 80) planeSmoke.shift();
+          }
+          if (plane.x < -6) plane = null;
+        }
+      }
+
+      if (plane) {
+        cell(plane.x, plane.y, bodyColor, 0.95);
+        cell(plane.x + 1, plane.y, bodyColor, 0.95);
+        cell(plane.x + 2, plane.y, tailColor, 0.95);
+        if (tailFin) cell(plane.x + 2, plane.y - 1, tailColor, 0.95);
+        if (plane.blink) cell(plane.x + 3, plane.y, NIGHT.beacon, 0.95);
+        return;
+      }
+
+      planeWait -= dt;
+      if (planeWait <= 0) {
+        plane = {
+          x: cols + 4,
+          y: airplaneLaneY(),
+          acc: 0,
+          blink: false,
+          boostRemaining: 0,
+        };
+        planeWait = 16000 + Math.random() * 18000;
+      }
+    }
+
     /* ── night ── */
 
     function drawNight(dt: number) {
@@ -926,28 +991,8 @@ export default function Background() {
           }
         }
 
-        // plane with blinking beacon
-        if (plane) {
-          plane.acc += dt;
-          if (plane.acc >= 130) {
-            plane.acc = 0;
-            plane.x -= 1;
-            plane.blink = !plane.blink;
-            if (plane.x < -6) plane = null;
-          }
-          if (plane) {
-            cell(plane.x, plane.y, "#9fb3c8", 0.9);
-            cell(plane.x + 1, plane.y, "#9fb3c8", 0.9);
-            cell(plane.x + 2, plane.y, "#7c93ab", 0.9);
-            if (plane.blink) cell(plane.x + 3, plane.y, NIGHT.beacon, 0.95);
-          }
-        } else {
-          planeWait -= dt;
-          if (planeWait <= 0) {
-            plane = { x: cols + 4, y: airplaneLaneY(), acc: 0, blink: false };
-            planeWait = 16000 + Math.random() * 18000;
-          }
-        }
+        // plane with blinking beacon + click-boost smoke trail
+        drawPlane(dt, "#9fb3c8", "#7c93ab", false);
 
         // satellite: slow diagonal drift, dim
         if (satellite) {
@@ -1035,8 +1080,9 @@ export default function Background() {
           }
           if (flock.acc >= 150) {
             flock.acc = 0;
-            flock.x += 1;
             flock.frame = flock.frame ? 0 : 1;
+            const nextX = flock.x + 1;
+            if (!balloon || !airTrafficOverlaps(nextX, balloon.x)) flock.x = nextX;
             if (flock.x > cols + 8) flock = null;
           }
           if (flock) {
@@ -1057,14 +1103,16 @@ export default function Background() {
         } else {
           flockWait -= dt;
           if (flockWait <= 0) {
-            flock = {
-              x: -8,
-              y: birdLaneY(),
-              frame: 0,
-              acc: 0,
-              scatterElapsed: null,
-            };
-            flockWait = 11000 + Math.random() * 10000;
+            if (!balloon || !airTrafficOverlaps(-8, balloon.x)) {
+              flock = {
+                x: -8,
+                y: birdLaneY(),
+                frame: 0,
+                acc: 0,
+                scatterElapsed: null,
+              };
+              flockWait = 11000 + Math.random() * 10000;
+            }
           }
         }
 
@@ -1078,8 +1126,6 @@ export default function Background() {
             if (balloon.x > cols + 6) balloon = null;
           }
           if (balloon) {
-            // Re-read the live name boundary so font loading, navigation, and
-            // viewport changes cannot place the balloon across the hero name.
             balloon.y = balloonLaneY();
             if (balloon.jiggleElapsed !== null) {
               balloon.jiggleElapsed += dt;
@@ -1101,42 +1147,24 @@ export default function Background() {
         } else {
           balloonWait -= dt;
           if (balloonWait <= 0) {
-            balloon = {
-              x: -BALLOON[0].length * BALLOON_SCALE,
-              y: balloonLaneY(),
-              sway: 0,
-              bob: 0,
-              acc: 0,
-              yAcc: 0,
-              jiggleElapsed: null,
-            };
-            balloonWait = 18000 + Math.random() * 16000;
+            const spawnX = -BALLOON[0].length * BALLOON_SCALE;
+            if (!flock || !airTrafficOverlaps(flock.x, spawnX)) {
+              balloon = {
+                x: spawnX,
+                y: balloonLaneY(),
+                sway: 0,
+                bob: 0,
+                acc: 0,
+                yAcc: 0,
+                jiggleElapsed: null,
+              };
+              balloonWait = 18000 + Math.random() * 16000;
+            }
           }
         }
 
         // plane crosses by day too
-        if (plane) {
-          plane.acc += dt;
-          if (plane.acc >= 130) {
-            plane.acc = 0;
-            plane.x -= 1;
-            plane.blink = !plane.blink;
-            if (plane.x < -6) plane = null;
-          }
-          if (plane) {
-            cell(plane.x, plane.y, DAY.planeBody, 0.95);
-            cell(plane.x + 1, plane.y, DAY.planeBody, 0.95);
-            cell(plane.x + 2, plane.y, DAY.planeTail, 0.95);
-            cell(plane.x + 2, plane.y - 1, DAY.planeTail, 0.95); // tail fin
-            if (plane.blink) cell(plane.x + 3, plane.y, NIGHT.beacon, 0.95);
-          }
-        } else {
-          planeWait -= dt;
-          if (planeWait <= 0) {
-            plane = { x: cols + 4, y: airplaneLaneY(), acc: 0, blink: false };
-            planeWait = 16000 + Math.random() * 18000;
-          }
-        }
+        drawPlane(dt, DAY.planeBody, DAY.planeTail, true);
       }
 
       if (skylineDay) ctx!.drawImage(skylineDay, 0, 0);
@@ -1148,9 +1176,12 @@ export default function Background() {
       if (!ferry) return;
 
       if (!reduced) {
+        const boosted = ferry.boostRemaining > 0;
+        ferry.boostRemaining = Math.max(0, ferry.boostRemaining - dt);
         ferry.acc += dt;
-        if (ferry.acc >= 330) {
-          ferry.acc = 0;
+        const moveEvery = boosted ? 165 : 330;
+        while (ferry.acc >= moveEvery) {
+          ferry.acc -= moveEvery;
           ferry.x += 1;
           ferry.frame = ferry.frame ? 0 : 1;
           if (ferry.x > cols + 4) ferry.x = -FERRY[0].length - 5;
@@ -1196,6 +1227,7 @@ export default function Background() {
 
     const onPointerDown = (event: PointerEvent) => {
       if (clickedFerry(event.clientX, event.clientY)) {
+        if (ferry) ferry.boostRemaining = 2000;
         playFerryHorn();
       } else if (clickedBalloon(event.clientX, event.clientY)) {
         if (balloon) balloon.jiggleElapsed = 0;
@@ -1203,6 +1235,8 @@ export default function Background() {
       } else if (clickedBird(event.clientX, event.clientY)) {
         if (flock) flock.scatterElapsed = 0;
         playChirp();
+      } else if (clickedPlane(event.clientX, event.clientY)) {
+        if (plane) plane.boostRemaining = 2000;
       }
     };
 

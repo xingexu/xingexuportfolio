@@ -3,11 +3,10 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Day/night toggle. The active theme lives on html[data-theme] (set before
- * hydration by the inline script in layout.tsx, so there is no flash) and is
- * persisted to localStorage. The component subscribes to the attribute via
- * useSyncExternalStore, so anything that changes the attribute stays in sync.
- * The pixel sun/moon glyphs are inline SVG drawn on a coarse grid.
+ * Temporary contrast override. The local-time schedule initializes the theme
+ * and reapplies it at the next phase boundary; this button lets a visitor flip
+ * the foreground UI during the current phase. The component subscribes to the
+ * root attribute so scheduled changes stay in sync.
  */
 
 function subscribe(onChange: () => void) {
@@ -26,9 +25,6 @@ export default function ThemeToggle() {
   const toggle = () => {
     const next = theme === "light" ? "dark" : "light";
     document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("theme", next);
-    } catch {}
   };
 
   return (

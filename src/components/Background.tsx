@@ -90,6 +90,45 @@ const DAY = {
   planeTail: "#b9c9d8",
 };
 
+const TWILIGHT = {
+  bands: ["#33235f", "#56306f", "#7d3d73", "#aa4d70", "#d86468", "#ee7f66", "#f5a06f", "#ffd08a"],
+  far: "#4c365f",
+  farLight: "#725070",
+  nearShades: ["#29213f", "#332548", "#3d294e"],
+  nearEdge: "#69415c",
+  nearShadow: "#1d1730",
+  tower: "#66506d",
+  towerLit: "#a46f7c",
+  dome: "#59445f",
+  domeLit: "#966979",
+  domeSeam: "#3f324d",
+  stadiumBase: "#352c43",
+  window: "#ffd889",
+  waterBase: "#563956",
+  waterGlint: "#e58a72",
+  sunLane: "#ffd08b",
+  sunCore: "#ffb24f",
+  sunCoreHot: "#ffe1a3",
+  sunRim: "#e66b4f",
+  sunRay: "#ffbd70",
+  cloudBackHi: "#f4afb0",
+  cloudBack: "#d686a1",
+  cloudBackMid: "#c17094",
+  cloudBackShade: "#965675",
+  cloudFrontHi: "#ffd6b2",
+  cloudFront: "#f5a68d",
+  cloudFrontMid: "#df867e",
+  cloudShade: "#b56578",
+  bird: "#372644",
+  birdWing: "#563653",
+  balloonA: "#e85f56",
+  balloonB: "#ffd47f",
+  basket: "#654032",
+  rope: "#4a2e2a",
+  planeBody: "#ffe2c2",
+  planeTail: "#d38b82",
+};
+
 /* ── bitmaps ── */
 
 /** Moon disc at 1× cell scale (all pixels uniform): 1 body / 2 bright rim / 3 crater. */
@@ -176,6 +215,15 @@ type Building = {
   roof: "flat" | "tank" | "ac"; setback: number; windows: { wx: number; wy: number }[];
 };
 type Trail = { x: number; y: number }[];
+type SkyPhase = "day" | "twilight" | "night";
+
+function getSkyPhase(now = new Date()): SkyPhase {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  if (minutes >= 8 * 60 + 30 && minutes <= 16 * 60 + 30) return "day";
+  if (minutes >= 16 * 60 + 31 && minutes <= 23 * 60 + 30) return "twilight";
+  if (minutes >= 23 * 60 + 31 || minutes <= 3 * 60 + 30) return "night";
+  return "twilight";
+}
 
 const BIRD_FORMATION = [[0, 0], [-7, 3], [-6, -3]] as const;
 const BIRD_SCATTERED = [[8, -5], [-17, 9], [-14, -10]] as const;
@@ -327,8 +375,11 @@ export default function Background() {
     let beaconOn = true;
     let skyNight: HTMLCanvasElement | null = null;
     let skyDay: HTMLCanvasElement | null = null;
+    let skyTwilight: HTMLCanvasElement | null = null;
     let skylineNight: HTMLCanvasElement | null = null;
     let skylineDay: HTMLCanvasElement | null = null;
+    let skylineTwilight: HTMLCanvasElement | null = null;
+    let activePhase: SkyPhase | null = null;
 
     function getAudioContext() {
       if (audioContext) return audioContext;
@@ -401,7 +452,7 @@ export default function Background() {
     }
 
     function clickedBird(clientX: number, clientY: number) {
-      if (theme() !== "light" || !flock) return false;
+      if (getSkyPhase() === "night" || !flock) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
       return birdOffsets().some(([dx, dy]) => {
@@ -412,7 +463,7 @@ export default function Background() {
     }
 
     function clickedBalloon(clientX: number, clientY: number) {
-      if (theme() !== "light" || !balloon) return false;
+      if (getSkyPhase() === "night" || !balloon) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
       const jiggle = balloonJiggleOffset();
@@ -474,7 +525,6 @@ export default function Background() {
       return { x: 0, y: 0 };
     }
 
-    const theme = () => (document.documentElement.dataset.theme === "light" ? "light" : "dark");
     // These lanes include the full scatter/jiggle extents and keep every
     // moving sprite below the fixed top bar's exclusion zone.
     const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
@@ -564,10 +614,11 @@ export default function Background() {
 
       skylineNight = renderSkyline(NIGHT, null);
       skylineDay = renderSkyline(DAY, DAY.window);
+      skylineTwilight = renderSkyline(TWILIGHT, null);
     }
 
     /** Skyline with per-building shading, lit edges, roof details and an accurate CN Tower. */
-    function renderSkyline(pal: typeof NIGHT | typeof DAY, dayWindow: string | null) {
+    function renderSkyline(pal: typeof NIGHT | typeof DAY | typeof TWILIGHT, dayWindow: string | null) {
       const off = document.createElement("canvas");
       off.width = canvas!.width;
       off.height = canvas!.height;
@@ -727,6 +778,7 @@ export default function Background() {
       buildSkyline();
       skyNight = renderSky(NIGHT.bands);
       skyDay = renderSky(DAY.bands);
+      skyTwilight = renderSky(TWILIGHT.bands);
     }
 
     /* ── draw helpers ── */
@@ -774,7 +826,7 @@ export default function Background() {
       }
     }
 
-    function drawWater(pal: typeof NIGHT | typeof DAY, laneColor: string, laneX: number, dt: number) {
+    function drawWater(pal: typeof NIGHT | typeof DAY | typeof TWILIGHT, laneColor: string, laneX: number, dt: number) {
       ctx!.fillStyle = pal.waterBase;
       ctx!.fillRect(0, waterTop * CELL, canvas!.width, (rows - waterTop) * CELL);
 
@@ -1030,21 +1082,24 @@ export default function Background() {
       drawFerry(dt, true);
     }
 
-    /* ── day ── */
+    /* ── daylight + shared sunrise/sunset scene ── */
 
-    function drawDay(dt: number) {
-      if (skyDay) ctx!.drawImage(skyDay, 0, 0);
+    function drawDayScene(dt: number, pal: typeof DAY | typeof TWILIGHT, twilight: boolean) {
+      const sky = twilight ? skyTwilight : skyDay;
+      if (sky) ctx!.drawImage(sky, 0, 0);
       stepPulse(dt);
 
-      // sun: pulsing halo + whole-disc flash (1× cells, no rays, uniform pixel size)
+      // Twilight lowers the sun toward the skyline and expands its warm glow.
       const sx = Math.floor(cols * 0.8);
-      const sy = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.07));
-      halo(sx + 8, sy + 8, "#ffe79a", pulse, 9);
+      const sy = twilight
+        ? Math.max(SKY_SAFE_TOP + 4, waterTop - Math.max(28, Math.floor(rows * 0.22)))
+        : Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.07));
+      halo(sx + 8, sy + 8, pal.sunRay, pulse, twilight ? 12 : 9);
       const hot = pulse % 2 === 0;
       sprite(SUN_MAP, sx, sy, {
-        1: hot ? "#ffdf6e" : DAY.sunCore,
-        3: hot ? "#fff4bd" : "#ffe066",
-        4: hot ? "#f7bd45" : DAY.sunRim,
+        1: hot ? pal.sunCoreHot : pal.sunCore,
+        3: hot ? pal.sunCoreHot : pal.sunRay,
+        4: hot ? pal.sunRay : pal.sunRim,
       }, 1);
 
       // clouds: drift + bob, back layer then front
@@ -1066,11 +1121,11 @@ export default function Background() {
           }
         }
         if (!c.front)
-          sprite(c.map, c.x, c.y + c.bob, { 1: DAY.cloudBack, 2: DAY.cloudBackShade, 3: DAY.cloudBackHi, 4: DAY.cloudBackMid }, 1);
+          sprite(c.map, c.x, c.y + c.bob, { 1: pal.cloudBack, 2: pal.cloudBackShade, 3: pal.cloudBackHi, 4: pal.cloudBackMid }, 1);
       }
       for (const c of clouds) {
         if (c.front)
-          sprite(c.map, c.x, c.y + c.bob, { 1: DAY.cloudFront, 2: DAY.cloudShade, 3: DAY.cloudFrontHi, 4: DAY.cloudFrontMid }, 1);
+          sprite(c.map, c.x, c.y + c.bob, { 1: pal.cloudFront, 2: pal.cloudShade, 3: pal.cloudFrontHi, 4: pal.cloudFrontMid }, 1);
       }
 
       if (!reduced) {
@@ -1094,10 +1149,10 @@ export default function Background() {
               const by = flock.y + dy;
               const wingY = by + (flock.frame ? 0 : 1);
               // 2×-scale bird: wing tips, wing arms, body
-              ctx!.fillStyle = DAY.birdWing;
+              ctx!.fillStyle = pal.birdWing;
               ctx!.fillRect((bx - 3) * CELL, (wingY - 1) * CELL, CELL, CELL);
               ctx!.fillRect((bx + 3) * CELL, (wingY - 1) * CELL, CELL, CELL);
-              ctx!.fillStyle = DAY.bird;
+              ctx!.fillStyle = pal.bird;
               ctx!.fillRect((bx - 2) * CELL, wingY * CELL, 2 * CELL, CELL);
               ctx!.fillRect((bx + 1) * CELL, wingY * CELL, 2 * CELL, CELL);
               ctx!.fillRect((bx - 1) * CELL, (by + (flock.frame ? 1 : 0)) * CELL, 2 * CELL, CELL);
@@ -1141,10 +1196,10 @@ export default function Background() {
             }
             const jiggle = balloonJiggleOffset();
             sprite(BALLOON, balloon.x + balloon.sway + jiggle.x, balloon.y + balloon.bob + jiggle.y, {
-              1: DAY.balloonA,
-              2: DAY.balloonB,
-              3: DAY.basket,
-              4: DAY.rope,
+              1: pal.balloonA,
+              2: pal.balloonB,
+              3: pal.basket,
+              4: pal.rope,
             }, BALLOON_SCALE);
           }
         } else {
@@ -1167,12 +1222,22 @@ export default function Background() {
         }
 
         // plane crosses by day too
-        drawPlane(dt, DAY.planeBody, DAY.planeTail, true);
+        drawPlane(dt, pal.planeBody, pal.planeTail, true);
       }
 
-      if (skylineDay) ctx!.drawImage(skylineDay, 0, 0);
-      drawWater(DAY, DAY.sunLane, sx + 7, dt);
-      drawFerry(dt, false);
+      const skyline = twilight ? skylineTwilight : skylineDay;
+      if (skyline) ctx!.drawImage(skyline, 0, 0);
+      if (twilight) drawLitWindows(dt);
+      drawWater(pal, pal.sunLane, sx + 7, dt);
+      drawFerry(dt, twilight);
+    }
+
+    function drawDay(dt: number) {
+      drawDayScene(dt, DAY, false);
+    }
+
+    function drawTwilight(dt: number) {
+      drawDayScene(dt, TWILIGHT, true);
     }
 
     function drawFerry(dt: number, night: boolean) {
@@ -1250,13 +1315,24 @@ export default function Background() {
 
     /* ── loop ── */
 
+    function drawCurrentScene(dt: number) {
+      const phase = getSkyPhase();
+      if (activePhase !== phase) {
+        activePhase = phase;
+        document.documentElement.dataset.skyPhase = phase;
+        document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";
+      }
+      if (phase === "day") drawDay(dt);
+      else if (phase === "twilight") drawTwilight(dt);
+      else drawNight(dt);
+    }
+
     function frame(now: number) {
       raf = requestAnimationFrame(frame);
       const dt = last ? now - last : TICK;
       if (dt < TICK) return;
       last = now;
-      if (theme() === "light") drawDay(dt);
-      else drawNight(dt);
+      drawCurrentScene(dt);
     }
 
     const onPointerDown = (event: PointerEvent) => {
@@ -1277,30 +1353,26 @@ export default function Background() {
     build();
     window.addEventListener("pointerdown", onPointerDown);
 
+    let clockTimer = 0;
     if (reduced) {
-      if (theme() === "light") drawDay(0);
-      else drawNight(0);
+      drawCurrentScene(0);
+      clockTimer = window.setInterval(() => drawCurrentScene(0), 30000);
     } else {
       raf = requestAnimationFrame(frame);
     }
 
     const onResize = () => {
       build();
-      if (reduced) (theme() === "light" ? drawDay : drawNight)(0);
+      if (reduced) drawCurrentScene(0);
     };
     window.addEventListener("resize", onResize);
 
-    const observer = new MutationObserver(() => {
-      if (reduced) (theme() === "light" ? drawDay : drawNight)(0);
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-
     return () => {
       cancelAnimationFrame(raf);
+      window.clearInterval(clockTimer);
       window.removeEventListener("pointerdown", onPointerDown);
       void audioContext?.close();
       window.removeEventListener("resize", onResize);
-      observer.disconnect();
     };
   }, []);
 

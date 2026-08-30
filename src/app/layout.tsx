@@ -19,11 +19,8 @@ const silkscreen = Silkscreen({
   weight: ["400", "700"],
 });
 
-/**
- * Runs before hydration so the correct theme is set before first paint —
- * no flash of the wrong theme. Dark (night) is the default.
- */
-const themeInit = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="dark"}})();`;
+/** Runs before hydration so the local-time sky and matching UI appear on the first paint. */
+const themeInit = `(function(){try{var d=new Date(),m=d.getHours()*60+d.getMinutes(),p=m>=510&&m<=990?"day":(m>=1411||m<=210?"night":"twilight");document.documentElement.dataset.skyPhase=p;document.documentElement.dataset.theme=p==="night"?"dark":"light"}catch(e){document.documentElement.dataset.skyPhase="night";document.documentElement.dataset.theme="dark"}})();`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),

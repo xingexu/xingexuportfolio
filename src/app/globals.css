@@ -6,8 +6,7 @@
 }
 
 /* ── Theme tokens ─────────────────────────────────────────────────────────
-   Dark (night sky) is the default. Light (day sky) is opted into via
-   html[data-theme="light"], set pre-hydration by the script in layout.tsx. */
+   The local-time schedule sets day, twilight, or night before hydration. */
 
 :root,
 :root[data-theme="dark"] {
@@ -38,6 +37,21 @@
   --accent-ink: #ffffff;
   --link: #1d5ca8;
   --shadow: #9dbfdd;
+}
+
+:root[data-sky-phase="twilight"] {
+  color-scheme: light;
+  --bg: #d86468;
+  --panel: rgba(255, 241, 222, 0.9);
+  --panel-solid: #fff1de;
+  --text: #35233f;
+  --text-2: rgba(53, 35, 63, 0.68);
+  --text-3: rgba(53, 35, 63, 0.4);
+  --border: #aa5c70;
+  --accent: #b4473f;
+  --accent-ink: #fff7e9;
+  --link: #744170;
+  --shadow: #713d59;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }

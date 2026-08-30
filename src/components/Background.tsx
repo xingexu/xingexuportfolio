@@ -142,12 +142,25 @@ const BALLOON: number[][] = [
 type Star = { x: number; y: number; big: boolean; level: number; every: number; acc: number; color: string };
 type Sparkle = { x: number; y: number; ttl: number; color: string };
 type Cloud = { x: number; y: number; bob: number; map: number[][]; every: number; acc: number; bobEvery: number; bobAcc: number; front: boolean };
-type Flock = { x: number; y: number; frame: number; acc: number };
+type Flock = { x: number; y: number; frame: number; acc: number; scatterElapsed: number | null };
+type Balloon = {
+  x: number;
+  y: number;
+  sway: number;
+  bob: number;
+  acc: number;
+  yAcc: number;
+  jiggleElapsed: number | null;
+};
 type Building = {
   x: number; w: number; h: number; near: boolean; shade: number; antenna: number;
   roof: "flat" | "tank" | "ac"; setback: number; windows: { wx: number; wy: number }[];
 };
 type Trail = { x: number; y: number }[];
+
+const BIRD_FORMATION = [[0, 0], [-7, 3], [-6, -3]] as const;
+const BIRD_SCATTERED = [[8, -5], [-17, 9], [-14, -10]] as const;
+const BALLOON_SCALE = 1;
 
 /* ── seeded rng ── */
 
@@ -271,7 +284,7 @@ export default function Background() {
     let planeWait = 8000 + Math.random() * 10000;
     let satellite: { x: number; y: number; acc: number } | null = null;
     let satWait = 6000 + Math.random() * 8000;
-    let balloon: { x: number; y: number; sway: number; acc: number; yAcc: number } | null = null;
+    let balloon: Balloon | null = null;
     let balloonWait = 4000 + Math.random() * 6000;
     let shooting: { cells: Trail; acc: number } | null = null;
     let shootWait = 3000 + Math.random() * 5000;
@@ -339,7 +352,7 @@ export default function Background() {
       if (theme() !== "light" || !flock) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
-      return [[0, 0], [-7, 3], [-6, -3]].some(([dx, dy]) => {
+      return birdOffsets().some(([dx, dy]) => {
         const bx = flock!.x + dx;
         const by = flock!.y + dy;
         return x >= bx - 4 && x <= bx + 4 && y >= by - 2 && y <= by + 3;
@@ -350,12 +363,52 @@ export default function Background() {
       if (theme() !== "light" || !balloon) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
-      const balloonX = balloon.x + balloon.sway;
-      return x >= balloonX && x <= balloonX + BALLOON[0].length &&
-        y >= balloon.y && y <= balloon.y + BALLOON.length;
+      const jiggle = balloonJiggleOffset();
+      const balloonX = balloon.x + balloon.sway + jiggle.x;
+      const balloonY = balloon.y + balloon.bob + jiggle.y;
+      return x >= balloonX && x <= balloonX + BALLOON[0].length * BALLOON_SCALE &&
+        y >= balloonY && y <= balloonY + BALLOON.length * BALLOON_SCALE;
+    }
+
+    function birdOffsets(): readonly (readonly [number, number])[] {
+      if (!flock || flock.scatterElapsed === null || flock.scatterElapsed >= 960) {
+        return BIRD_FORMATION;
+      }
+
+      const elapsed = flock.scatterElapsed;
+      const amount = elapsed < 120 || elapsed >= 840
+        ? 0.33
+        : elapsed < 240 || elapsed >= 720
+          ? 0.66
+          : 1;
+      return BIRD_FORMATION.map(([baseX, baseY], index) => {
+        const [scatterX, scatterY] = BIRD_SCATTERED[index];
+        return [
+          Math.round(baseX + (scatterX - baseX) * amount),
+          Math.round(baseY + (scatterY - baseY) * amount),
+        ] as const;
+      });
+    }
+
+    function balloonJiggleOffset() {
+      if (!balloon || balloon.jiggleElapsed === null) return { x: 0, y: 0 };
+      const elapsed = balloon.jiggleElapsed;
+      if (elapsed < 120) return { x: -1, y: 0 };
+      if (elapsed < 240) return { x: 1, y: -2 };
+      if (elapsed < 360) return { x: -1, y: -4 };
+      if (elapsed < 480) return { x: 1, y: -2 };
+      if (elapsed < 620) return { x: -1, y: 1 };
+      if (elapsed < 760) return { x: 1, y: 3 };
+      if (elapsed < 900) return { x: -1, y: 1 };
+      return { x: 0, y: 0 };
     }
 
     const theme = () => (document.documentElement.dataset.theme === "light" ? "light" : "dark");
+    // These lanes include the full scatter/jiggle extents: plane→birds keeps
+    // at least 6 cells clear, and birds→balloon keeps at least 7 cells clear.
+    const airplaneLaneY = () => Math.max(13, Math.floor(rows * 0.1));
+    const birdLaneY = () => Math.max(airplaneLaneY() + 17, Math.floor(rows * 0.24));
+    const balloonLaneY = () => Math.max(birdLaneY() + 22, Math.floor(rows * 0.42));
     const cnTowerX = () => Math.floor(cols * 0.22);
     const towerDims = () => {
       const h = Math.min(Math.floor(rows * 0.46), 64);
@@ -542,6 +595,10 @@ export default function Background() {
       cols = Math.ceil(canvas!.width / CELL);
       rows = Math.ceil(canvas!.height / CELL);
       waterTop = rows - 6;
+
+      if (plane) plane.y = airplaneLaneY();
+      if (flock) flock.y = birdLaneY();
+      if (balloon) balloon.y = balloonLaneY();
 
       const count = Math.floor((cols * waterTop) / 120);
       stars = Array.from({ length: count }, () => ({
@@ -807,7 +864,7 @@ export default function Background() {
         } else {
           planeWait -= dt;
           if (planeWait <= 0) {
-            plane = { x: cols + 4, y: 13 + Math.floor(Math.random() * rows * 0.12), acc: 0, blink: false };
+            plane = { x: cols + 4, y: airplaneLaneY(), acc: 0, blink: false };
             planeWait = 16000 + Math.random() * 18000;
           }
         }
@@ -887,6 +944,10 @@ export default function Background() {
         // bird flock
         if (flock) {
           flock.acc += dt;
+          if (flock.scatterElapsed !== null) {
+            flock.scatterElapsed += dt;
+            if (flock.scatterElapsed >= 960) flock.scatterElapsed = null;
+          }
           if (flock.acc >= 150) {
             flock.acc = 0;
             flock.x += 1;
@@ -894,7 +955,7 @@ export default function Background() {
             if (flock.x > cols + 8) flock = null;
           }
           if (flock) {
-            for (const [dx, dy] of [[0, 0], [-7, 3], [-6, -3]] as const) {
+            for (const [dx, dy] of birdOffsets()) {
               const bx = flock.x + dx;
               const by = flock.y + dy;
               const wingY = by + (flock.frame ? 0 : 1);
@@ -911,7 +972,13 @@ export default function Background() {
         } else {
           flockWait -= dt;
           if (flockWait <= 0) {
-            flock = { x: -8, y: 4 + Math.floor(Math.random() * rows * 0.25), frame: 0, acc: 0 };
+            flock = {
+              x: -8,
+              y: birdLaneY(),
+              frame: 0,
+              acc: 0,
+              scatterElapsed: null,
+            };
             flockWait = 11000 + Math.random() * 10000;
           }
         }
@@ -926,22 +993,35 @@ export default function Background() {
             if (balloon.x > cols + 6) balloon = null;
           }
           if (balloon) {
+            if (balloon.jiggleElapsed !== null) {
+              balloon.jiggleElapsed += dt;
+              if (balloon.jiggleElapsed >= 1040) balloon.jiggleElapsed = null;
+            }
             balloon.yAcc += dt;
             if (balloon.yAcc >= 2400) {
               balloon.yAcc = 0;
-              balloon.y += Math.random() < 0.5 ? -1 : 1;
+              balloon.bob = balloon.bob === 0 ? (Math.random() < 0.5 ? -1 : 1) : 0;
             }
-            sprite(BALLOON, balloon.x + balloon.sway, balloon.y, {
+            const jiggle = balloonJiggleOffset();
+            sprite(BALLOON, balloon.x + balloon.sway + jiggle.x, balloon.y + balloon.bob + jiggle.y, {
               1: DAY.balloonA,
               2: DAY.balloonB,
               3: DAY.basket,
               4: DAY.rope,
-            }, 1);
+            }, BALLOON_SCALE);
           }
         } else {
           balloonWait -= dt;
           if (balloonWait <= 0) {
-            balloon = { x: -6, y: Math.floor(rows * (0.18 + Math.random() * 0.25)), sway: 0, acc: 0, yAcc: 0 };
+            balloon = {
+              x: -BALLOON[0].length * BALLOON_SCALE,
+              y: balloonLaneY(),
+              sway: 0,
+              bob: 0,
+              acc: 0,
+              yAcc: 0,
+              jiggleElapsed: null,
+            };
             balloonWait = 18000 + Math.random() * 16000;
           }
         }
@@ -965,7 +1045,7 @@ export default function Background() {
         } else {
           planeWait -= dt;
           if (planeWait <= 0) {
-            plane = { x: cols + 4, y: 13 + Math.floor(Math.random() * rows * 0.12), acc: 0, blink: false };
+            plane = { x: cols + 4, y: airplaneLaneY(), acc: 0, blink: false };
             planeWait = 16000 + Math.random() * 18000;
           }
         }
@@ -987,8 +1067,13 @@ export default function Background() {
     }
 
     const onPointerDown = (event: PointerEvent) => {
-      if (clickedBalloon(event.clientX, event.clientY)) playBalloonJiggle();
-      else if (clickedBird(event.clientX, event.clientY)) playChirp();
+      if (clickedBalloon(event.clientX, event.clientY)) {
+        if (balloon) balloon.jiggleElapsed = 0;
+        playBalloonJiggle();
+      } else if (clickedBird(event.clientX, event.clientY)) {
+        if (flock) flock.scatterElapsed = 0;
+        playChirp();
+      }
     };
 
     build();

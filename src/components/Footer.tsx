@@ -6,26 +6,8 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer
-      style={{
-        position: "relative",
-        zIndex: 10,
-        background: "var(--panel-solid)",
-        borderTop: "2px solid var(--border)",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1040,
-          margin: "0 auto",
-          padding: "16px 28px",
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 14,
-        }}
-      >
+    <footer className="site-footer">
+      <div className="site-footer-inner">
         <span style={{ fontSize: 12, color: "var(--text-2)" }}>© {year} xinge xu</span>
 
         <nav aria-label="Social and contact" style={{ display: "flex", gap: 14 }}>

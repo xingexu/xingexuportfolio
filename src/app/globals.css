@@ -252,6 +252,35 @@ body {
   background: var(--panel-solid);
 }
 
+/* ── Footer ── */
+
+.site-footer {
+  position: relative;
+  z-index: 10;
+  background: var(--panel-solid);
+  border-top: 2px solid var(--border);
+}
+
+.site-footer-inner {
+  display: flex;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px 28px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+body:has(.projects-page) .site-footer {
+  background: transparent;
+  border-top: 0;
+}
+
+body:has(.projects-page) .site-footer-inner {
+  padding-bottom: 46px;
+}
+
 /* ── Project cards ── */
 
 .project-card {

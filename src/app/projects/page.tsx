@@ -19,7 +19,7 @@ export const metadata: Metadata = {
  */
 export default function ProjectsPage() {
   return (
-    <div className="tab-enter">
+    <div className="projects-page tab-enter">
       <Projects />
       <BackHome />
     </div>

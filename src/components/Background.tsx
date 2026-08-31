@@ -25,6 +25,10 @@ const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
 const SEED = 20260703;
 const TOP_BAR_HEIGHT = 54;
 const SKY_SAFE_TOP = Math.ceil(TOP_BAR_HEIGHT / CELL) + 4;
+const AIR_TRAFFIC_STAGGER = 3; // 15 CSS px between successive entrances
+const PLANE_SPRITE_SRC = "/background-plane.png";
+const PLANE_WIDTH_CELLS = 12;
+const PLANE_SPRITE_ASPECT = 192 / 74;
 
 /* ── palettes ── */
 
@@ -215,9 +219,10 @@ type Balloon = {
   acc: number;
   yAcc: number;
   jiggleElapsed: number | null;
+  trafficOffset: number;
 };
 type Ferry = { x: number; acc: number; bob: number; bobAcc: number; boostRemaining: number; frame: number };
-type Plane = { x: number; y: number; acc: number; blink: boolean; boostRemaining: number };
+type Plane = { x: number; y: number; acc: number; boostRemaining: number };
 type PlaneSmoke = { x: number; y: number; ttl: number };
 type Building = {
   x: number; w: number; h: number; near: boolean; shade: number; antenna: number;
@@ -369,6 +374,7 @@ export default function Background() {
     const flockWait: Record<FlockKind, number> = { three: 0, five: 650 };
     let plane: Plane | null = null;
     let planeSmoke: PlaneSmoke[] = [];
+    let planeSmokeAcc = 0;
     let planeWait = 8000 + Math.random() * 10000;
     let sunriseOpeningPlanePending = true;
     let sunriseOpeningPlaneWait = 0;
@@ -399,6 +405,15 @@ export default function Background() {
     let scheduledPhase = getSkyPhase();
     let sunriseBannerTopCell = 0;
     let sunriseBannerMeasured = false;
+    const planeSprite = new window.Image();
+    let planeSpriteReady = false;
+    const onPlaneSpriteLoad = () => {
+      planeSpriteReady = true;
+      if (reduced) drawCurrentScene(0);
+    };
+    planeSprite.addEventListener("load", onPlaneSpriteLoad);
+    planeSprite.decoding = "async";
+    planeSprite.src = PLANE_SPRITE_SRC;
 
     function getSkyOverride(): SkyPhase | null {
       const override = document.documentElement.dataset.skyOverride;
@@ -547,7 +562,7 @@ export default function Background() {
       const x = clientX / CELL;
       const y = clientY / CELL;
       const jiggle = balloonJiggleOffset();
-      const balloonX = balloon.x + balloon.sway + jiggle.x;
+      const balloonX = balloon.x + balloon.sway + jiggle.x + balloonTrafficOffset();
       const balloonY = balloon.y + balloon.bob + jiggle.y;
       return x >= balloonX && x <= balloonX + BALLOON[0].length * BALLOON_SCALE &&
         y >= balloonY && y <= balloonY + BALLOON.length * BALLOON_SCALE;
@@ -566,8 +581,9 @@ export default function Background() {
       if (!plane) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
-      return x >= plane.x - 2 && x <= plane.x + 6 &&
-        y >= plane.y - 2 && y <= plane.y + 2;
+      const halfHeight = PLANE_WIDTH_CELLS / PLANE_SPRITE_ASPECT / 2;
+      return x >= plane.x && x <= plane.x + PLANE_WIDTH_CELLS &&
+        y >= plane.y - halfHeight && y <= plane.y + halfHeight;
     }
 
     function birdOffsets(flock: Flock): readonly (readonly [number, number])[] {
@@ -604,6 +620,55 @@ export default function Background() {
       if (elapsed < 760) return { x: 1, y: 3 };
       if (elapsed < 900) return { x: -1, y: 1 };
       return { x: 0, y: 0 };
+    }
+
+    function balloonTrafficOffset() {
+      if (!balloon) return 0;
+      const occupiedByBirds = new Set<string>();
+
+      for (const flock of flocks) {
+        for (const [dx, dy] of birdOffsets(flock)) {
+          const bx = flock.x + dx;
+          const by = flock.y + dy;
+          const wingY = by + (flock.frame ? 0 : 1);
+          for (const [x, y] of [
+            [bx - 3, wingY - 1],
+            [bx + 3, wingY - 1],
+            [bx - 2, wingY],
+            [bx - 1, wingY],
+            [bx + 1, wingY],
+            [bx + 2, wingY],
+            [bx - 1, by + (flock.frame ? 1 : 0)],
+            [bx, by + (flock.frame ? 1 : 0)],
+          ] as const) {
+            occupiedByBirds.add(`${x},${y}`);
+          }
+        }
+      }
+
+      const jiggle = balloonJiggleOffset();
+      const baseX = balloon.x + balloon.sway + jiggle.x;
+      const baseY = balloon.y + balloon.bob + jiggle.y;
+      const candidates = [...new Set([balloon.trafficOffset, 0, -1, -2, -3])];
+
+      for (const offset of candidates) {
+        let intersects = false;
+        for (let row = 0; row < BALLOON.length && !intersects; row += 1) {
+          for (let column = 0; column < BALLOON[row].length; column += 1) {
+            if (!BALLOON[row][column]) continue;
+            if (occupiedByBirds.has(`${baseX + offset + column},${baseY + row}`)) {
+              intersects = true;
+              break;
+            }
+          }
+        }
+        if (!intersects) {
+          balloon.trafficOffset = offset;
+          return offset;
+        }
+      }
+
+      return balloon.trafficOffset;
     }
 
     // Sunrise traffic is vertically stacked above the banner. The lower
@@ -1022,9 +1087,7 @@ export default function Background() {
 
     function drawPlane(
       dt: number,
-      bodyColor: string,
-      tailColor: string,
-      tailFin: boolean,
+      smokeColor: string,
       sunriseOpening = false,
     ) {
       planeSmoke = planeSmoke.filter((puff) => {
@@ -1033,45 +1096,54 @@ export default function Background() {
       });
       for (const puff of planeSmoke) {
         const alpha = Math.min(0.72, puff.ttl / 900);
-        cell(puff.x, puff.y, tailColor, alpha);
-        if (puff.ttl < 620) cell(puff.x + 1, puff.y - 1, tailColor, alpha * 0.38);
+        cell(puff.x, puff.y, smokeColor, alpha);
+        if (puff.ttl < 620) cell(puff.x + 1, puff.y - 1, smokeColor, alpha * 0.38);
       }
 
       if (plane) {
         const boosted = plane.boostRemaining > 0;
         plane.boostRemaining = Math.max(0, plane.boostRemaining - dt);
+        planeSmokeAcc += dt;
+        const smokeEvery = boosted ? 55 : 190;
+        while (planeSmokeAcc >= smokeEvery) {
+          planeSmokeAcc -= smokeEvery;
+          planeSmoke.push({
+            x: plane.x + PLANE_WIDTH_CELLS + (boosted ? Math.floor(Math.random() * 2) : 0),
+            y: plane.y + (Math.random() < 0.5 ? 0 : 1),
+            ttl: boosted ? 1050 : 820,
+          });
+          if (planeSmoke.length > 80) planeSmoke.shift();
+        }
+
         plane.acc += dt;
         const moveEvery = boosted ? 130 / 3 : 130;
 
         while (plane && plane.acc >= moveEvery) {
           plane.acc -= moveEvery;
           plane.x -= 1;
-          plane.blink = !plane.blink;
-          if (boosted) {
-            planeSmoke.push({
-              x: plane.x + 6,
-              y: plane.y + (plane.x % 2 === 0 ? 0 : 1),
-              ttl: 900,
-            });
-            if (planeSmoke.length > 80) planeSmoke.shift();
+          if (plane.x < -PLANE_WIDTH_CELLS - 2) {
+            plane = null;
+            planeSmokeAcc = 0;
           }
-          if (plane.x < -6) plane = null;
         }
       }
 
       if (plane) {
-        // A slightly larger 5×3 silhouette that keeps the chunky pixel scale.
-        cell(plane.x - 1, plane.y, bodyColor, 0.95);
-        cell(plane.x, plane.y, bodyColor, 0.95);
-        cell(plane.x + 1, plane.y, bodyColor, 0.95);
-        cell(plane.x + 2, plane.y, tailColor, 0.95);
-        cell(plane.x + 3, plane.y, tailColor, 0.95);
-        cell(plane.x + 1, plane.y + 1, bodyColor, 0.95);
-        if (tailFin) {
-          cell(plane.x + 1, plane.y - 1, bodyColor, 0.95);
-          cell(plane.x + 2, plane.y - 1, tailColor, 0.95);
+        if (planeSpriteReady) {
+          const drawWidth = PLANE_WIDTH_CELLS * CELL;
+          const drawHeight = drawWidth / PLANE_SPRITE_ASPECT;
+          ctx!.save();
+          ctx!.globalAlpha = 0.98;
+          ctx!.imageSmoothingEnabled = false;
+          ctx!.drawImage(
+            planeSprite,
+            Math.round(plane.x * CELL),
+            Math.round(plane.y * CELL - drawHeight / 2),
+            drawWidth,
+            drawHeight,
+          );
+          ctx!.restore();
         }
-        if (plane.blink) cell(plane.x + 4, plane.y, NIGHT.beacon, 0.95);
         return;
       }
 
@@ -1082,7 +1154,6 @@ export default function Background() {
             x: cols + 1,
             y: airplaneLaneY(),
             acc: 0,
-            blink: false,
             boostRemaining: 0,
           };
           sunriseOpeningPlanePending = false;
@@ -1097,7 +1168,6 @@ export default function Background() {
           x: cols + 1,
           y: airplaneLaneY(),
           acc: 0,
-          blink: false,
           boostRemaining: 0,
         };
         planeWait = 16000 + Math.random() * 18000;
@@ -1183,8 +1253,8 @@ export default function Background() {
           }
         }
 
-        // plane with blinking beacon + click-boost smoke trail
-        drawPlane(dt, "#9fb3c8", "#7c93ab", false);
+        // Transparent sprite plane with a soft smoke trail and click boost.
+        drawPlane(dt, "#7c93ab");
 
         // satellite: slow diagonal drift, dim
         if (satellite) {
@@ -1308,7 +1378,7 @@ export default function Background() {
 
           flocks.push({
             kind,
-            x: -2,
+            x: kind === "three" ? -2 : -1,
             y: birdLaneY(kind),
             frame: 0,
             acc: 0,
@@ -1340,7 +1410,8 @@ export default function Background() {
               balloon.bob = balloon.bob === 0 ? (Math.random() < 0.5 ? -1 : 1) : 0;
             }
             const jiggle = balloonJiggleOffset();
-            sprite(BALLOON, balloon.x + balloon.sway + jiggle.x, balloon.y + balloon.bob + jiggle.y, {
+            const trafficOffset = balloonTrafficOffset();
+            sprite(BALLOON, balloon.x + balloon.sway + jiggle.x + trafficOffset, balloon.y + balloon.bob + jiggle.y, {
               1: pal.balloonA,
               2: pal.balloonB,
               3: pal.basket,
@@ -1351,20 +1422,21 @@ export default function Background() {
           balloonWait -= dt;
           if (balloonWait <= 0) {
             balloon = {
-              x: -2,
+              x: -2 - AIR_TRAFFIC_STAGGER * 2,
               y: balloonLaneY(),
               sway: 0,
               bob: 0,
               acc: 0,
               yAcc: 0,
               jiggleElapsed: null,
+              trafficOffset: -AIR_TRAFFIC_STAGGER,
             };
             balloonWait = 18000 + Math.random() * 16000;
           }
         }
 
         // plane crosses by day too
-        drawPlane(dt, pal.planeBody, pal.planeTail, true, twilight);
+        drawPlane(dt, pal.planeTail, twilight);
       }
 
       const skyline = twilight ? skylineTwilight : skylineDay;
@@ -1526,6 +1598,7 @@ export default function Background() {
       window.clearInterval(clockTimer);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("resize", onResize);
+      planeSprite.removeEventListener("load", onPlaneSpriteLoad);
       phaseObserver.disconnect();
     };
   }, []);

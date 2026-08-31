@@ -29,6 +29,8 @@ const AIR_TRAFFIC_STAGGER = 3; // 15 CSS px between successive entrances
 const PLANE_SPRITE_SRC = "/background-plane.png";
 const PLANE_WIDTH_CELLS = 12;
 const PLANE_SPRITE_ASPECT = 192 / 74;
+const PLANE_SMOKE = "#898f97";
+const BALLOON_STEP_MS = 480;
 
 /* ── palettes ── */
 
@@ -1087,7 +1089,6 @@ export default function Background() {
 
     function drawPlane(
       dt: number,
-      smokeColor: string,
       sunriseOpening = false,
     ) {
       planeSmoke = planeSmoke.filter((puff) => {
@@ -1096,8 +1097,8 @@ export default function Background() {
       });
       for (const puff of planeSmoke) {
         const alpha = Math.min(0.72, puff.ttl / 900);
-        cell(puff.x, puff.y, smokeColor, alpha);
-        if (puff.ttl < 620) cell(puff.x + 1, puff.y - 1, smokeColor, alpha * 0.38);
+        cell(puff.x, puff.y, PLANE_SMOKE, alpha);
+        if (puff.ttl < 620) cell(puff.x + 1, puff.y - 1, PLANE_SMOKE, alpha * 0.38);
       }
 
       if (plane) {
@@ -1254,7 +1255,7 @@ export default function Background() {
         }
 
         // Transparent sprite plane with a soft smoke trail and click boost.
-        drawPlane(dt, "#7c93ab");
+        drawPlane(dt);
 
         // satellite: slow diagonal drift, dim
         if (satellite) {
@@ -1392,7 +1393,7 @@ export default function Background() {
         // hot-air balloon: slow drift with stepped sway
         if (balloon) {
           balloon.acc += dt;
-          if (balloon.acc >= 540) {
+          if (balloon.acc >= BALLOON_STEP_MS) {
             balloon.acc = 0;
             balloon.x += 1;
             balloon.sway = balloon.sway === 0 ? 1 : 0;
@@ -1436,7 +1437,7 @@ export default function Background() {
         }
 
         // plane crosses by day too
-        drawPlane(dt, pal.planeTail, twilight);
+        drawPlane(dt, twilight);
       }
 
       const skyline = twilight ? skylineTwilight : skylineDay;

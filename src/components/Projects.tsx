@@ -43,7 +43,6 @@ export default function Projects() {
               />
             </article>
           </a>
-          <BackHome />
         </div>
 
         <div className="drift-info-stack">
@@ -64,12 +63,19 @@ export default function Projects() {
           </a>
 
           <article className="drift-info-card px-panel">
-            <h2 className="font-pixel drift-card-title">WHAT DRIFT DOES</h2>
+            <div className="drift-card-heading">
+              <time className="font-pixel drift-card-date" dateTime="2026-07">
+                — July 2026
+              </time>
+              <h2 className="font-pixel drift-card-title">ABOUT</h2>
+            </div>
             <p>
-              Drift helps students understand whether their online time is actually focused. It tracks activity,
-              blocks distracting sites, and turns study sessions into clear analytics about focus habits.
+              Drift is my first macOS app. It helps students understand their online focus through activity tracking,
+              website blocking, and clear study-session insights.
             </p>
           </article>
+
+          <BackHome />
         </div>
       </section>
     </div>

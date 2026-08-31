@@ -421,21 +421,28 @@ a.project-card:hover .project-title { color: var(--accent); }
 .drift-showcase {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(270px, 0.62fr);
-  align-items: start;
-  gap: 22px;
+  align-items: stretch;
+  column-gap: 22px;
   animation: stepIn 0.5s steps(5) both;
 }
 
 .drift-preview-stack {
   display: grid;
+  grid-column: 1;
+  grid-row: 1;
   align-content: start;
-  gap: 18px;
 }
 
-.drift-preview-stack .back-home-wrap {
+.drift-info-stack .back-home-wrap {
   max-width: none;
   margin: 0;
   padding: 0;
+}
+
+.drift-info-stack .back-home {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .drift-screenshot-card {
@@ -479,8 +486,9 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 .drift-info-stack {
   display: grid;
-  align-content: start;
-  grid-template-rows: auto auto;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-rows: auto 1fr auto;
   gap: 12px;
 }
 
@@ -488,12 +496,13 @@ a.project-card:hover .project-title { color: var(--accent); }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 150px;
-  padding: 20px;
+  min-height: 136px;
+  padding: 16px 18px;
 }
 
 .drift-brick-title {
-  font-size: clamp(15px, 1.55vw, 19px);
+  font-size: clamp(18px, 1.85vw, 23px);
+  font-style: italic;
   line-height: 1;
   color: #fff0a4;
   text-transform: uppercase;
@@ -559,17 +568,38 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 .drift-card-title {
-  margin-bottom: 18px;
-  font-size: clamp(18px, 2.3vw, 26px);
+  margin: 0;
+  font-size: clamp(17px, 2vw, 23px);
   line-height: 1.15;
   letter-spacing: 0.08em;
   color: var(--accent);
 }
 
+.drift-card-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.drift-card-date {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  font-size: clamp(11px, 1vw, 13px);
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .drift-info-card p {
   margin-top: 0;
-  font-size: clamp(13px, 1.05vw, 15px);
-  line-height: 1.75;
+  font-family: var(--font-pixel);
+  font-size: clamp(13px, 1.1vw, 14px);
+  line-height: 1.65;
+  letter-spacing: 0.01em;
   color: var(--text-2);
 }
 
@@ -1176,6 +1206,12 @@ a.project-card:hover .project-title { color: var(--accent); }
   .hero-layout { flex-direction: column-reverse; align-items: flex-start; }
   .drift-showcase {
     grid-template-columns: 1fr;
+    row-gap: 18px;
+  }
+  .drift-preview-stack,
+  .drift-info-stack {
+    grid-column: 1;
+    grid-row: auto;
   }
   .drift-info-stack {
     grid-template-rows: none;

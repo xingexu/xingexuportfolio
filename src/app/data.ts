@@ -26,9 +26,9 @@ export const PROJECTS: Project[] = [
   {
     num: "01",
     name: "Drift",
-    desc: "Currently building a focus-tracking app for students with activity insights, website blocking, study analytics, and clear signals for whether time online is actually focused.",
-    stack: ["Next.js", "TypeScript", "Analytics"],
-    year: "2026",
+    desc: "My first macOS app, built to help students understand whether their online time is focused through activity insights, website blocking, and study analytics.",
+    stack: ["macOS", "Next.js", "TypeScript"],
+    year: "July 2026",
   },
 ];
 

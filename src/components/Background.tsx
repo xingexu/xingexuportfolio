@@ -196,7 +196,15 @@ const FERRY = [
 type Star = { x: number; y: number; big: boolean; level: number; every: number; acc: number; color: string };
 type Sparkle = { x: number; y: number; ttl: number; color: string };
 type Cloud = { x: number; y: number; bob: number; map: number[][]; every: number; acc: number; bobEvery: number; bobAcc: number; front: boolean };
-type Flock = { x: number; y: number; frame: number; acc: number; scatterElapsed: number | null };
+type FlockKind = "three" | "five";
+type Flock = {
+  kind: FlockKind;
+  x: number;
+  y: number;
+  frame: number;
+  acc: number;
+  scatterElapsed: number | null;
+};
 type FerrySplash = { x: number; y: number; vx: number; vy: number; ttl: number; maxTtl: number };
 type Balloon = {
   x: number;
@@ -225,20 +233,19 @@ function getSkyPhase(now = new Date()): SkyPhase {
   return "twilight";
 }
 
-// Two neighboring flocks: a five-bird V followed by a smaller three-bird V.
-const BIRD_FORMATION = [
-  [0, 0], [-6, -3], [-6, 3], [-12, -6], [-12, 6],
-  [-23, 0], [-29, -3], [-29, 3],
-] as const;
-const BIRD_SCATTERED = [
-  [8, -7], [-12, -9], [-9, 11], [-23, -12], [-19, 15],
-  [-15, -3], [-39, -10], [-39, 12],
-] as const;
+const BIRD_FORMATIONS = {
+  three: [[0, 0], [-6, -3], [-6, 3]],
+  five: [[0, 0], [-6, -3], [-6, 3], [-12, -6], [-12, 6]],
+} as const;
+const BIRD_SCATTERED = {
+  three: [[8, -7], [-12, -9], [-9, 4]],
+  five: [[8, -4], [-12, -6], [-9, 9], [-23, -7], [-19, 14]],
+} as const;
 const BIRD_JIGGLE = [
-  [[-1, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [0, -1], [-1, 1], [1, -1]],
-  [[1, 0], [-1, 1], [1, -1], [0, 1], [-1, -1], [1, 1], [0, -1], [-1, 0]],
-  [[0, 1], [1, -1], [-1, 0], [1, 1], [0, -1], [-1, 1], [1, 0], [-1, -1]],
-  [[1, -1], [0, 1], [-1, 1], [1, 0], [-1, 0], [0, -1], [-1, -1], [1, 1]],
+  [[-1, -1], [1, 0], [0, 1], [-1, 0], [1, 1]],
+  [[1, 0], [-1, 1], [1, -1], [0, 1], [-1, -1]],
+  [[0, 1], [1, -1], [-1, 0], [1, 1], [0, -1]],
+  [[1, -1], [0, 1], [-1, 1], [1, 0], [-1, 0]],
 ] as const;
 const BALLOON_SCALE = 1;
 
@@ -357,8 +364,8 @@ export default function Background() {
     let buildings: Building[] = [];
     let litWindows = new Set<string>();
     let glints: { x: number; y: number }[] = [];
-    let flock: Flock | null = null;
-    let flockWait = 5000 + Math.random() * 5000;
+    let flocks: Flock[] = [];
+    const flockWait: Record<FlockKind, number> = { three: 0, five: 650 };
     let audioContext: AudioContext | null = null;
     let plane: Plane | null = null;
     let planeSmoke: PlaneSmoke[] = [];
@@ -481,14 +488,18 @@ export default function Background() {
     }
 
     function clickedBird(clientX: number, clientY: number) {
-      if (getVisibleSkyPhase() === "night" || !flock) return false;
+      if (getVisibleSkyPhase() === "night") return null;
       const x = clientX / CELL;
       const y = clientY / CELL;
-      return birdOffsets().some(([dx, dy]) => {
-        const bx = flock!.x + dx;
-        const by = flock!.y + dy;
-        return x >= bx - 4 && x <= bx + 4 && y >= by - 2 && y <= by + 3;
-      });
+      for (const flock of flocks) {
+        const hit = birdOffsets(flock).some(([dx, dy]) => {
+          const bx = flock.x + dx;
+          const by = flock.y + dy;
+          return x >= bx - 4 && x <= bx + 4 && y >= by - 2 && y <= by + 3;
+        });
+        if (hit) return flock;
+      }
+      return null;
     }
 
     function clickedBalloon(clientX: number, clientY: number) {
@@ -519,9 +530,10 @@ export default function Background() {
         y >= plane.y - 2 && y <= plane.y + 2;
     }
 
-    function birdOffsets(): readonly (readonly [number, number])[] {
-      if (!flock || flock.scatterElapsed === null || flock.scatterElapsed >= 960) {
-        return BIRD_FORMATION;
+    function birdOffsets(flock: Flock): readonly (readonly [number, number])[] {
+      const formation = BIRD_FORMATIONS[flock.kind];
+      if (flock.scatterElapsed === null || flock.scatterElapsed >= 960) {
+        return formation;
       }
 
       const elapsed = flock.scatterElapsed;
@@ -531,8 +543,8 @@ export default function Background() {
           ? 0.66
           : 1;
       const jiggleFrame = BIRD_JIGGLE[Math.floor(elapsed / TICK) % BIRD_JIGGLE.length];
-      return BIRD_FORMATION.map(([baseX, baseY], index) => {
-        const [scatterX, scatterY] = BIRD_SCATTERED[index];
+      return formation.map(([baseX, baseY], index) => {
+        const [scatterX, scatterY] = BIRD_SCATTERED[flock.kind][index];
         const [jiggleX, jiggleY] = amount === 1 ? jiggleFrame[index] : [0, 0];
         return [
           Math.round(baseX + (scatterX - baseX) * amount) + jiggleX,
@@ -557,13 +569,18 @@ export default function Background() {
     // These lanes include the full scatter/jiggle extents and keep every
     // moving sprite below the fixed top bar's exclusion zone.
     const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
-    const birdLaneY = () => Math.max(airplaneLaneY() + 18, Math.floor(rows * 0.24));
-    const balloonLaneY = () => birdLaneY();
+    const birdLaneY = (kind: FlockKind) => {
+      const threeBirdLane = Math.max(airplaneLaneY() + 12, Math.floor(rows * 0.18));
+      return kind === "three"
+        ? threeBirdLane
+        : Math.max(threeBirdLane + 20, Math.floor(rows * 0.31));
+    };
+    const balloonLaneY = () => birdLaneY("five");
     const airTrafficOverlaps = (flockX: number, balloonX: number) => {
-      // Conservative envelopes include fully scattered birds, balloon sway,
-      // click jiggle, sprite widths, and a 3-cell visual safety gap.
-      const flockLeft = flockX - 44;
-      const flockRight = flockX + 14;
+      // The balloon shares the lower five-bird lane. Include the flock's
+      // full scatter, balloon sway, and a 3-cell visual safety gap.
+      const flockLeft = flockX - 28;
+      const flockRight = flockX + 13;
       const balloonLeft = balloonX - 2;
       const balloonRight = balloonX + BALLOON[0].length * BALLOON_SCALE + 2;
       return flockRight + 3 >= balloonLeft && balloonRight + 3 >= flockLeft;
@@ -761,7 +778,7 @@ export default function Background() {
       waterTop = rows - 6;
 
       if (plane) plane.y = airplaneLaneY();
-      if (flock) flock.y = birdLaneY();
+      for (const flock of flocks) flock.y = birdLaneY(flock.kind);
       if (balloon) balloon.y = balloonLaneY();
       if (!ferry) {
         ferry = {
@@ -1161,50 +1178,63 @@ export default function Background() {
       }
 
       if (!reduced) {
-        // bird flock
-        if (flock) {
+        // Independent bird flocks: three enter immediately on the upper lane,
+        // then five follow shortly afterward on a lower, slightly slower path.
+        for (const flock of flocks) {
           flock.acc += dt;
           if (flock.scatterElapsed !== null) {
             flock.scatterElapsed += dt;
             if (flock.scatterElapsed >= 960) flock.scatterElapsed = null;
           }
-          if (flock.acc >= 150) {
-            flock.acc = 0;
+
+          const stepMs = flock.kind === "three" ? 140 : 190;
+          if (flock.acc >= stepMs) {
+            flock.acc -= stepMs;
             flock.frame = flock.frame ? 0 : 1;
             const nextX = flock.x + 1;
-            if (!balloon || !airTrafficOverlaps(nextX, balloon.x)) flock.x = nextX;
-            // Keep drawing until the trailing three-bird group fully exits.
-            if (flock.x > cols + 44) flock = null;
+            const blockedByBalloon = flock.kind === "five" && balloon && airTrafficOverlaps(nextX, balloon.x);
+            if (!blockedByBalloon) flock.x = nextX;
           }
-          if (flock) {
-            for (const [dx, dy] of birdOffsets()) {
-              const bx = flock.x + dx;
-              const by = flock.y + dy;
-              const wingY = by + (flock.frame ? 0 : 1);
-              // 2×-scale bird: wing tips, wing arms, body
-              ctx!.fillStyle = pal.birdWing;
-              ctx!.fillRect((bx - 3) * CELL, (wingY - 1) * CELL, CELL, CELL);
-              ctx!.fillRect((bx + 3) * CELL, (wingY - 1) * CELL, CELL, CELL);
-              ctx!.fillStyle = pal.bird;
-              ctx!.fillRect((bx - 2) * CELL, wingY * CELL, 2 * CELL, CELL);
-              ctx!.fillRect((bx + 1) * CELL, wingY * CELL, 2 * CELL, CELL);
-              ctx!.fillRect((bx - 1) * CELL, (by + (flock.frame ? 1 : 0)) * CELL, 2 * CELL, CELL);
-            }
+        }
+
+        flocks = flocks.filter((flock) => flock.x <= cols + (flock.kind === "three" ? 10 : 16));
+
+        for (const flock of flocks) {
+          for (const [dx, dy] of birdOffsets(flock)) {
+            const bx = flock.x + dx;
+            const by = flock.y + dy;
+            const wingY = by + (flock.frame ? 0 : 1);
+            // 2×-scale bird: wing tips, wing arms, body
+            ctx!.fillStyle = pal.birdWing;
+            ctx!.fillRect((bx - 3) * CELL, (wingY - 1) * CELL, CELL, CELL);
+            ctx!.fillRect((bx + 3) * CELL, (wingY - 1) * CELL, CELL, CELL);
+            ctx!.fillStyle = pal.bird;
+            ctx!.fillRect((bx - 2) * CELL, wingY * CELL, 2 * CELL, CELL);
+            ctx!.fillRect((bx + 1) * CELL, wingY * CELL, 2 * CELL, CELL);
+            ctx!.fillRect((bx - 1) * CELL, (by + (flock.frame ? 1 : 0)) * CELL, 2 * CELL, CELL);
           }
-        } else {
-          flockWait -= dt;
-          if (flockWait <= 0) {
-            if (!balloon || !airTrafficOverlaps(-8, balloon.x)) {
-              flock = {
-                x: -8,
-                y: birdLaneY(),
-                frame: 0,
-                acc: 0,
-                scatterElapsed: null,
-              };
-              flockWait = 11000 + Math.random() * 10000;
-            }
-          }
+        }
+
+        for (const kind of ["three", "five"] as const) {
+          if (flocks.some((flock) => flock.kind === kind)) continue;
+          flockWait[kind] -= dt;
+          if (flockWait[kind] > 0) continue;
+
+          const spawnX = -2;
+          const blockedByBalloon = kind === "five" && balloon && airTrafficOverlaps(spawnX, balloon.x);
+          if (blockedByBalloon) continue;
+
+          flocks.push({
+            kind,
+            x: spawnX,
+            y: birdLaneY(kind),
+            frame: 0,
+            acc: 0,
+            scatterElapsed: null,
+          });
+          flockWait[kind] = kind === "three"
+            ? 9000 + Math.random() * 5000
+            : 10500 + Math.random() * 5000;
         }
 
         // hot-air balloon: slow drift with stepped sway
@@ -1239,7 +1269,8 @@ export default function Background() {
           balloonWait -= dt;
           if (balloonWait <= 0) {
             const spawnX = -BALLOON[0].length * BALLOON_SCALE;
-            if (!flock || !airTrafficOverlaps(flock.x, spawnX)) {
+            const lowerFlock = flocks.find((candidate) => candidate.kind === "five");
+            if (!lowerFlock || !airTrafficOverlaps(lowerFlock.x, spawnX)) {
               balloon = {
                 x: spawnX,
                 y: balloonLaneY(),
@@ -1373,14 +1404,15 @@ export default function Background() {
     }
 
     const onPointerDown = (event: PointerEvent) => {
+      const birdHit = clickedBird(event.clientX, event.clientY);
       if (clickedFerry(event.clientX, event.clientY)) {
         if (ferry) ferry.boostRemaining = 2000;
         playFerryHorn();
       } else if (clickedBalloon(event.clientX, event.clientY)) {
         if (balloon) balloon.jiggleElapsed = 0;
         playBalloonJiggle();
-      } else if (clickedBird(event.clientX, event.clientY)) {
-        if (flock) flock.scatterElapsed = 0;
+      } else if (birdHit) {
+        birdHit.scatterElapsed = 0;
         playChirp();
       } else if (clickedPlane(event.clientX, event.clientY)) {
         if (plane) plane.boostRemaining = 2000;

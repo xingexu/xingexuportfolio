@@ -240,6 +240,155 @@ body {
   opacity: 0;
 }
 
+.hero-banner-firework-trigger {
+  position: absolute;
+  z-index: 3;
+  top: 18%;
+  right: 0;
+  bottom: 15%;
+  left: var(--hero-banner-scroll-offset);
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.hero-banner-firework-trigger:active {
+  background: rgba(255, 216, 137, 0.08);
+}
+
+.hero-banner-firework-trigger:focus-visible {
+  outline: 3px dashed #ffd889;
+  outline-offset: -8px;
+}
+
+.hero-banner-fireworks {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.hero-banner-firework {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.hero-banner-firework-rocket {
+  position: absolute;
+  left: -2px;
+  top: -5px;
+  width: 5px;
+  height: 10px;
+  background: #fff0cf;
+  box-shadow:
+    0 5px 0 #ffd889,
+    0 10px 0 rgba(239, 127, 125, 0.72),
+    0 0 8px rgba(255, 216, 137, 0.9);
+  opacity: 0;
+  image-rendering: pixelated;
+  animation: heroBannerFireworkRocket 680ms steps(9, end) var(--firework-delay) both;
+}
+
+.hero-banner-firework-burst {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform:
+    translate3d(var(--firework-x), var(--firework-y), 0)
+    scale(var(--firework-scale));
+}
+
+.hero-banner-firework-core,
+.hero-banner-firework-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  image-rendering: pixelated;
+}
+
+.hero-banner-firework-core {
+  width: 8px;
+  height: 8px;
+  background: #fff0cf;
+  box-shadow:
+    -11px 0 0 #ffd889,
+    11px 0 0 #ffd889,
+    0 -11px 0 #ef7f7d,
+    0 11px 0 #a878c2,
+    0 0 15px rgba(255, 216, 137, 0.98);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: heroBannerFireworkCore 520ms steps(6, end) calc(var(--firework-delay) + 590ms) both;
+}
+
+.hero-banner-firework-spark {
+  width: 7px;
+  height: 7px;
+  background: var(--spark-color);
+  box-shadow: 0 0 10px var(--spark-color);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.25);
+  animation: heroBannerFireworkSpark 920ms steps(9, end)
+    calc(var(--firework-delay) + 610ms + var(--spark-lag)) both;
+}
+
+@keyframes heroBannerFireworkRocket {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  10% { opacity: 1; }
+  82% {
+    opacity: 1;
+    transform: translate3d(var(--firework-x), var(--firework-y), 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--firework-x), var(--firework-y), 0);
+  }
+}
+
+@keyframes heroBannerFireworkCore {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  24% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  58% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55);
+  }
+}
+
+@keyframes heroBannerFireworkSpark {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  14% { opacity: 1; }
+  66% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform:
+      translate(
+        calc(-50% + var(--spark-x)),
+        calc(-50% + var(--spark-y))
+      )
+      scale(0.55);
+  }
+}
+
 @media (max-width: 956px) {
   .hero-plane-banner {
     --hero-plane-rest-x: calc(-50vw + 50% + 28px - var(--hero-banner-scroll-offset));
@@ -1321,11 +1470,12 @@ a.project-card:hover .project-title { color: var(--accent); }
     padding: 64px 20px;
   }
   .hero-plane-banner {
-    --hero-plane-rest-x: calc(-50vw + 50% + 20px - var(--hero-banner-scroll-offset));
+    --hero-plane-rest-x: calc(-50vw + 50% + 8px);
     width: 84vw;
   }
   .hero-layout-under-banner {
     margin-top: -18px;
+    padding-left: calc(11.725vw - 12px);
   }
   .resume-page {
     padding: 64px 10px 76px;
@@ -1354,6 +1504,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-banner-fireworks,
   .resume-animation-frames,
   .resume-sparkles,
   .resume-celebration {

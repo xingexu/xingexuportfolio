@@ -392,11 +392,23 @@ export default function Background() {
     }
 
     function getAudioContext() {
-      if (audioContext) return audioContext;
+      if (audioContext) {
+        if (audioContext.state !== "running" && audioContext.state !== "closed") {
+          void audioContext.resume().catch(() => undefined);
+        }
+        return audioContext;
+      }
       const AudioContextConstructor = window.AudioContext ||
         (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioContextConstructor) return null;
-      audioContext = new AudioContextConstructor();
+      try {
+        audioContext = new AudioContextConstructor();
+        if (audioContext.state !== "running") {
+          void audioContext.resume().catch(() => undefined);
+        }
+      } catch {
+        audioContext = null;
+      }
       return audioContext;
     }
 

@@ -9,9 +9,135 @@ const NAME = "xinge xu";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
 const BANNER_STATIC = "/xinge-plane-banner-static.png";
 const BANNER_ENTRANCE_DURATION_MS = 6000;
+const SUNRISE_FIREWORK_COLORS = ["#ffd889", "#fff0cf", "#ef7f7d", "#a878c2"];
+
+const SUNRISE_LANDING_FIREWORKS = [
+  { delay: "0ms", left: "37%", scale: "1.32", top: "49%", x: "-14px", y: "-124px" },
+  { delay: "220ms", left: "62%", scale: "1.52", top: "46%", x: "10px", y: "-142px" },
+  { delay: "440ms", left: "82%", scale: "1.22", top: "51%", x: "-8px", y: "-112px" },
+];
+
+const SUNRISE_CLICK_FIREWORKS = [
+  ...SUNRISE_LANDING_FIREWORKS,
+  { delay: "110ms", left: "26%", scale: "1.05", top: "54%", x: "6px", y: "-104px" },
+  { delay: "330ms", left: "50%", scale: "1.24", top: "50%", x: "-10px", y: "-132px" },
+  { delay: "550ms", left: "90%", scale: "0.9", top: "55%", x: "-4px", y: "-96px" },
+];
+
+const SUNRISE_FIREWORK_SPARKS = [
+  { x: "0px", y: "-74px" },
+  { x: "37px", y: "-64px" },
+  { x: "64px", y: "-37px" },
+  { x: "74px", y: "0px" },
+  { x: "64px", y: "37px" },
+  { x: "37px", y: "64px" },
+  { x: "0px", y: "74px" },
+  { x: "-37px", y: "64px" },
+  { x: "-64px", y: "37px" },
+  { x: "-74px", y: "0px" },
+  { x: "-64px", y: "-37px" },
+  { x: "-37px", y: "-64px" },
+];
+
+function createMobileAudioContext() {
+  if (typeof window === "undefined") return null;
+  const AudioContextConstructor = window.AudioContext ||
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextConstructor) return null;
+
+  try {
+    return new AudioContextConstructor();
+  } catch {
+    return null;
+  }
+}
+
+function resumeAudioContext(audio: AudioContext) {
+  if (audio.state !== "running" && audio.state !== "closed") {
+    void audio.resume().catch(() => undefined);
+  }
+}
+
+function createFireworkNoise(audio: AudioContext) {
+  const length = Math.round(audio.sampleRate * 0.38);
+  const buffer = audio.createBuffer(1, length, audio.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let index = 0; index < length; index += 1) {
+    const fade = 1 - index / length;
+    data[index] = (Math.random() * 2 - 1) * (0.35 + fade * 0.65);
+  }
+
+  return buffer;
+}
+
+function scheduleFireworkSounds(audio: AudioContext, noise: AudioBuffer, mode: FireworkMode) {
+  const fireworks = mode === "extra" ? SUNRISE_CLICK_FIREWORKS : SUNRISE_LANDING_FIREWORKS;
+  const start = audio.currentTime + 0.018;
+
+  const lift = audio.createOscillator();
+  const liftVolume = audio.createGain();
+  lift.type = "triangle";
+  lift.frequency.setValueAtTime(170, start);
+  lift.frequency.exponentialRampToValueAtTime(mode === "extra" ? 520 : 440, start + 0.54);
+  liftVolume.gain.setValueAtTime(0.0001, start);
+  liftVolume.gain.exponentialRampToValueAtTime(mode === "extra" ? 0.055 : 0.045, start + 0.08);
+  liftVolume.gain.exponentialRampToValueAtTime(0.0001, start + 0.57);
+  lift.connect(liftVolume).connect(audio.destination);
+  lift.start(start);
+  lift.stop(start + 0.59);
+
+  fireworks.forEach((firework, index) => {
+    const delay = Number.parseInt(firework.delay, 10) / 1000;
+    const burstAt = start + 0.59 + delay;
+    const burstVolume = mode === "extra" ? 0.052 : 0.06;
+
+    const crackle = audio.createBufferSource();
+    const crackleFilter = audio.createBiquadFilter();
+    const crackleVolume = audio.createGain();
+    crackle.buffer = noise;
+    crackleFilter.type = "lowpass";
+    crackleFilter.frequency.setValueAtTime(2100 + (index % 3) * 360, burstAt);
+    crackleFilter.frequency.exponentialRampToValueAtTime(380, burstAt + 0.32);
+    crackleVolume.gain.setValueAtTime(0.0001, burstAt);
+    crackleVolume.gain.exponentialRampToValueAtTime(burstVolume, burstAt + 0.012);
+    crackleVolume.gain.exponentialRampToValueAtTime(0.0001, burstAt + 0.34);
+    crackle.connect(crackleFilter).connect(crackleVolume).connect(audio.destination);
+    crackle.start(burstAt);
+    crackle.stop(burstAt + 0.36);
+
+    const boom = audio.createOscillator();
+    const boomVolume = audio.createGain();
+    boom.type = "sine";
+    boom.frequency.setValueAtTime(105 + (index % 3) * 12, burstAt);
+    boom.frequency.exponentialRampToValueAtTime(48, burstAt + 0.3);
+    boomVolume.gain.setValueAtTime(0.0001, burstAt);
+    boomVolume.gain.exponentialRampToValueAtTime(burstVolume * 0.92, burstAt + 0.014);
+    boomVolume.gain.exponentialRampToValueAtTime(0.0001, burstAt + 0.32);
+    boom.connect(boomVolume).connect(audio.destination);
+    boom.start(burstAt);
+    boom.stop(burstAt + 0.34);
+  });
+}
 
 type SkyPhase = "day" | "twilight" | "night";
 type BannerStage = "entrance" | "loop" | "static";
+type FireworkMode = "landing" | "extra";
+type FireworkBurst = { id: number; mode: FireworkMode };
+
+type FireworkStyle = CSSProperties & {
+  "--firework-delay": string;
+  "--firework-scale": string;
+  "--firework-x": string;
+  "--firework-y": string;
+};
+
+type FireworkSparkStyle = CSSProperties & {
+  "--spark-color": string;
+  "--spark-lag": string;
+  "--spark-x": string;
+  "--spark-y": string;
+};
 
 type Particle = {
   color: string;
@@ -53,10 +179,58 @@ function getSkyPhase(): SkyPhase {
   return phase === "day" || phase === "twilight" || phase === "night" ? phase : "night";
 }
 
+function BannerFireworks({ mode }: { mode: FireworkMode }) {
+  const fireworks = mode === "extra" ? SUNRISE_CLICK_FIREWORKS : SUNRISE_LANDING_FIREWORKS;
+
+  return (
+    <div className="hero-banner-fireworks" aria-hidden="true">
+      {fireworks.map((firework, fireworkIndex) => (
+        <span
+          className="hero-banner-firework"
+          key={`${firework.left}-${firework.top}`}
+          style={
+            {
+              "--firework-delay": firework.delay,
+              "--firework-scale": firework.scale,
+              "--firework-x": firework.x,
+              "--firework-y": firework.y,
+              left: firework.left,
+              top: firework.top,
+            } as FireworkStyle
+          }
+        >
+          <span className="hero-banner-firework-rocket" />
+          <span className="hero-banner-firework-burst">
+            <span className="hero-banner-firework-core" />
+            {SUNRISE_FIREWORK_SPARKS.map((spark, sparkIndex) => (
+              <span
+                className="hero-banner-firework-spark"
+                key={`${spark.x}-${spark.y}`}
+                style={
+                  {
+                    "--spark-color":
+                      SUNRISE_FIREWORK_COLORS[(fireworkIndex + sparkIndex) % SUNRISE_FIREWORK_COLORS.length],
+                    "--spark-lag": `${(sparkIndex % 3) * 22}ms`,
+                    "--spark-x": spark.x,
+                    "--spark-y": spark.y,
+                  } as FireworkSparkStyle
+                }
+              />
+            ))}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** Plays the one-shot plane entrance, then hands off to the seamless wind loop. */
 function PlaneBanner() {
   const [stage, setStage] = useState<BannerStage>("entrance");
   const [windLoaded, setWindLoaded] = useState(false);
+  const [fireworkBurst, setFireworkBurst] = useState<FireworkBurst | null>(null);
+  const audioContext = useRef<AudioContext | null>(null);
+  const fireworkNoise = useRef<AudioBuffer | null>(null);
   const entranceFinished = useRef(false);
 
   useEffect(() => {
@@ -64,6 +238,29 @@ function PlaneBanner() {
       const frame = window.requestAnimationFrame(() => setStage("static"));
       return () => window.cancelAnimationFrame(frame);
     }
+  }, []);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (!audioContext.current || audioContext.current.state === "closed") {
+        audioContext.current = createMobileAudioContext();
+        fireworkNoise.current = null;
+      }
+      if (audioContext.current) resumeAudioContext(audioContext.current);
+    };
+
+    window.addEventListener("pointerdown", unlockAudio, { capture: true, once: true, passive: true });
+    window.addEventListener("touchstart", unlockAudio, { capture: true, once: true, passive: true });
+    window.addEventListener("keydown", unlockAudio, { capture: true, once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio, true);
+      window.removeEventListener("touchstart", unlockAudio, true);
+      window.removeEventListener("keydown", unlockAudio, true);
+      void audioContext.current?.close();
+      audioContext.current = null;
+      fireworkNoise.current = null;
+    };
   }, []);
 
   const handleWindLoad = () => {
@@ -76,7 +273,30 @@ function PlaneBanner() {
     if (stage !== "entrance") return;
 
     entranceFinished.current = true;
+    launchFireworks("landing", false);
     if (windLoaded) setStage("loop");
+  };
+
+  const playFireworkSounds = (mode: FireworkMode, allowCreate: boolean) => {
+    let audio = audioContext.current;
+    if ((!audio || audio.state === "closed") && allowCreate) {
+      audio = createMobileAudioContext();
+      audioContext.current = audio;
+      fireworkNoise.current = null;
+    }
+    if (!audio || audio.state === "closed") return;
+    if (audio.state !== "running") {
+      if (!allowCreate) return;
+      resumeAudioContext(audio);
+    }
+
+    if (!fireworkNoise.current) fireworkNoise.current = createFireworkNoise(audio);
+    scheduleFireworkSounds(audio, fireworkNoise.current, mode);
+  };
+
+  const launchFireworks = (mode: FireworkMode, fromGesture: boolean) => {
+    setFireworkBurst((current) => ({ id: (current?.id ?? 0) + 1, mode }));
+    playFireworkSounds(mode, fromGesture);
   };
 
   const src = stage === "static" ? BANNER_STATIC : BANNER_LOOP;
@@ -84,10 +304,12 @@ function PlaneBanner() {
   return (
     <div
       className={`hero-plane-banner${stage === "entrance" ? " hero-plane-banner-entrance-playing" : ""}`}
-      aria-hidden="true"
-      onAnimationEnd={handleEntranceEnd}
+      onAnimationEnd={(event) => {
+        if (event.currentTarget === event.target) handleEntranceEnd();
+      }}
       style={stage === "entrance" ? { animationDuration: `${BANNER_ENTRANCE_DURATION_MS}ms` } : undefined}
     >
+      {fireworkBurst && <BannerFireworks key={fireworkBurst.id} mode={fireworkBurst.mode} />}
       {stage === "entrance" && !windLoaded && (
         <Image
           src={BANNER_STATIC}
@@ -114,6 +336,15 @@ function PlaneBanner() {
         className={`hero-plane-banner-image${stage === "entrance" && !windLoaded ? " hero-plane-banner-image-loading" : ""}`}
         onLoad={handleWindLoad}
       />
+      {stage !== "entrance" && (
+        <button
+          type="button"
+          className="hero-banner-firework-trigger"
+          aria-label="Launch more sunrise fireworks"
+          title="Launch more fireworks"
+          onClick={() => launchFireworks("extra", true)}
+        />
+      )}
     </div>
   );
 }

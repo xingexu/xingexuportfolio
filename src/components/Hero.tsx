@@ -1,18 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { SITE } from "@/app/data";
 
 const NAME = "xinge xu";
+const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
+const BANNER_STATIC = "/xinge-plane-banner-static.png";
+const BANNER_ENTRANCE_DURATION_MS = 6000;
 
-/**
- * Hero. Minimal by design: name, one role line, one context line, links.
- *
- * SSR-safe: `typed` initializes to the full name so crawlers and no-JS
- * visitors always get "xinge xu" in the <h1>. The typing animation re-runs
- * client-side as progressive enhancement, stepped like a terminal.
- */
+type SkyPhase = "day" | "twilight" | "night";
+type BannerStage = "entrance" | "loop" | "static";
+
 type Particle = {
   color: string;
   delay: string;
@@ -39,7 +39,122 @@ const PARTICLE_COLORS = [
   "var(--confetti-4)",
 ];
 
-export default function Hero() {
+function subscribeToSkyPhase(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-sky-phase", "data-sky-override"],
+  });
+  return () => observer.disconnect();
+}
+
+function getSkyPhase(): SkyPhase {
+  const phase = document.documentElement.dataset.skyPhase;
+  return phase === "day" || phase === "twilight" || phase === "night" ? phase : "night";
+}
+
+/** Plays the one-shot plane entrance, then hands off to the seamless wind loop. */
+function PlaneBanner() {
+  const [stage, setStage] = useState<BannerStage>("entrance");
+  const [windLoaded, setWindLoaded] = useState(false);
+  const entranceFinished = useRef(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const frame = window.requestAnimationFrame(() => setStage("static"));
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, []);
+
+  const handleWindLoad = () => {
+    if (stage !== "entrance" || windLoaded) return;
+    setWindLoaded(true);
+    if (entranceFinished.current) setStage("loop");
+  };
+
+  const handleEntranceEnd = () => {
+    if (stage !== "entrance") return;
+
+    entranceFinished.current = true;
+    if (windLoaded) setStage("loop");
+  };
+
+  const src = stage === "static" ? BANNER_STATIC : BANNER_LOOP;
+
+  return (
+    <div
+      className={`hero-plane-banner${stage === "entrance" ? " hero-plane-banner-entrance-playing" : ""}`}
+      aria-hidden="true"
+      onAnimationEnd={handleEntranceEnd}
+      style={stage === "entrance" ? { animationDuration: `${BANNER_ENTRANCE_DURATION_MS}ms` } : undefined}
+    >
+      {stage === "entrance" && !windLoaded && (
+        <Image
+          src={BANNER_STATIC}
+          alt=""
+          width={1920}
+          height={540}
+          priority
+          unoptimized
+          draggable={false}
+          sizes="(max-width: 640px) 84vw, (max-width: 1200px) 78vw, 920px"
+          className="hero-plane-banner-image hero-plane-banner-entry-poster"
+        />
+      )}
+      <Image
+        key={src}
+        src={src}
+        alt=""
+        width={1920}
+        height={540}
+        priority
+        unoptimized
+        draggable={false}
+        sizes="(max-width: 640px) 84vw, (max-width: 1200px) 78vw, 920px"
+        className={`hero-plane-banner-image${stage === "entrance" && !windLoaded ? " hero-plane-banner-image-loading" : ""}`}
+        onLoad={handleWindLoad}
+      />
+    </div>
+  );
+}
+
+function SunriseHero() {
+  return (
+    <section className="hero-section">
+      <h1 className="sr-only">{NAME}</h1>
+
+      <div className="hero-stage">
+        <PlaneBanner />
+
+        <div className="hero-layout hero-layout-under-banner">
+          <div className="hero-copy">
+            <p className="step-in-2 hero-subtitle" style={{ fontSize: 14 }}>
+              {SITE.role.toLowerCase()}
+            </p>
+
+            <p className="step-in-2 hero-subtitle" style={{ fontSize: 12, marginTop: 7 }}>
+              western cs + ivey aeo &apos;30
+            </p>
+
+            <div
+              className="step-in-3"
+              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "14px 24px", marginTop: 32 }}
+            >
+              <Link href="/projects" className="px-btn">
+                see what i built! <span aria-hidden>→</span>
+              </Link>
+              <Link href="/resume" className="px-btn px-btn-secondary hero-resume-btn">
+                resume <span aria-hidden>→</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DefaultHero() {
   const [typed, setTyped] = useState(NAME);
   const [typing, setTyping] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -64,22 +179,25 @@ export default function Hero() {
   };
 
   useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    setTyped("");
-    setTyping(true);
-    let i = 0;
-    timer.current = setInterval(() => {
-      i++;
-      setTyped(NAME.slice(0, i));
-      if (i >= NAME.length) {
-        clearInterval(timer.current!);
-        setTyping(false);
-      }
-    }, 110);
+    const frame = window.requestAnimationFrame(() => {
+      setTyped("");
+      setTyping(true);
+      let index = 0;
+      timer.current = setInterval(() => {
+        index++;
+        setTyped(NAME.slice(0, index));
+        if (index >= NAME.length && timer.current) {
+          clearInterval(timer.current);
+          timer.current = null;
+          setTyping(false);
+        }
+      }, 110);
+    });
 
     return () => {
+      window.cancelAnimationFrame(frame);
       if (timer.current) clearInterval(timer.current);
     };
   }, []);
@@ -93,7 +211,7 @@ export default function Hero() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "96px 28px 96px",
+        padding: "96px 28px",
       }}
     >
       <div className="hero-layout" style={{ width: "100%", maxWidth: 1040 }}>
@@ -112,22 +230,22 @@ export default function Hero() {
             <span className="name-hover" onMouseEnter={burst}>{typed}</span>
             <span className="type-cursor" aria-hidden style={{ visibility: typing ? "visible" : "hidden" }} />
             <span aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}>
-              {particles.map((p) => (
+              {particles.map((particle) => (
                 <span
-                  key={p.id}
+                  key={particle.id}
                   className="name-particle"
                   style={
                     {
-                      "--name-drift": p.drift,
-                      "--name-drop": p.drop,
-                      "--name-spin": p.spin,
-                      animationDelay: p.delay,
-                      animationDuration: p.duration,
-                      background: p.color,
-                      height: p.size,
-                      left: p.left,
-                      top: p.top,
-                      width: p.size,
+                      "--name-drift": particle.drift,
+                      "--name-drop": particle.drop,
+                      "--name-spin": particle.spin,
+                      animationDelay: particle.delay,
+                      animationDuration: particle.duration,
+                      background: particle.color,
+                      height: particle.size,
+                      left: particle.left,
+                      top: particle.top,
+                      width: particle.size,
                     } as NameParticleStyle
                   }
                 />
@@ -155,8 +273,12 @@ export default function Hero() {
             </Link>
           </div>
         </div>
-
       </div>
     </section>
   );
+}
+
+export default function Hero() {
+  const phase = useSyncExternalStore(subscribeToSkyPhase, getSkyPhase, () => "night" as const);
+  return phase === "twilight" ? <SunriseHero /> : <DefaultHero />;
 }

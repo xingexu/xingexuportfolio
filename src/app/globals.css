@@ -133,6 +133,18 @@ body {
 
 .font-pixel { font-family: var(--font-pixel); }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 ::selection { background: var(--accent); color: var(--accent-ink); }
 
 ::-webkit-scrollbar { width: 10px; }
@@ -162,6 +174,88 @@ body {
 
 .hero-subtitle {
   color: #fff;
+}
+
+.hero-section {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: clip;
+  min-height: 100vh;
+  padding: 76px 28px 72px;
+}
+
+.hero-stage {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.hero-plane-banner {
+  --hero-banner-scroll-offset: 13.9583%;
+  --hero-plane-rest-x: calc(50% - 450px - var(--hero-banner-scroll-offset));
+  --hero-plane-entry-x: calc(50vw + 50%);
+  position: relative;
+  width: min(78vw, 920px);
+  aspect-ratio: 1920 / 540;
+  margin-inline: auto;
+  transform: translateX(var(--hero-plane-rest-x));
+  transform-origin: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+@keyframes heroPlaneApproach {
+  from {
+    transform: translateX(var(--hero-plane-entry-x));
+  }
+  to {
+    transform: translateX(var(--hero-plane-rest-x));
+  }
+}
+
+.hero-plane-banner-entrance-playing {
+  animation-name: heroPlaneApproach;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.hero-plane-banner-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  filter:
+    drop-shadow(0 0 3px rgba(76, 54, 91, 0.9))
+    drop-shadow(0 0 14px rgba(242, 164, 111, 0.24));
+}
+
+.hero-plane-banner-entry-poster {
+  position: absolute;
+  inset: 0;
+}
+
+.hero-plane-banner-image-loading {
+  opacity: 0;
+}
+
+@media (max-width: 956px) {
+  .hero-plane-banner {
+    --hero-plane-rest-x: calc(-50vw + 50% + 28px - var(--hero-banner-scroll-offset));
+  }
+}
+
+.hero-layout-under-banner {
+  width: 100%;
+  max-width: 900px;
+  margin: clamp(-52px, -4vw, -34px) auto 0;
+}
+
+:root[data-sky-phase="twilight"] .hero-plane-banner-image {
+  filter:
+    drop-shadow(0 0 3px rgba(71, 45, 84, 0.86))
+    drop-shadow(0 0 16px rgba(107, 64, 128, 0.3));
 }
 
 :root[data-theme="light"] .hero-subtitle {
@@ -1223,6 +1317,16 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 @media (max-width: 640px) {
+  .hero-section {
+    padding: 64px 20px;
+  }
+  .hero-plane-banner {
+    --hero-plane-rest-x: calc(-50vw + 50% + 20px - var(--hero-banner-scroll-offset));
+    width: 84vw;
+  }
+  .hero-layout-under-banner {
+    margin-top: -18px;
+  }
   .resume-page {
     padding: 64px 10px 76px;
   }

@@ -22,7 +22,6 @@ import { useEffect, useRef } from "react";
 const CELL = 5; // css px per sky pixel
 const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
 const SEED = 20260703;
-const SUN_ARC_DURATION = 180000;
 const TOP_BAR_HEIGHT = 54;
 const SKY_SAFE_TOP = Math.ceil(TOP_BAR_HEIGHT / CELL) + 4;
 
@@ -382,7 +381,6 @@ export default function Background() {
     let skylineTwilight: HTMLCanvasElement | null = null;
     let activePhase: SkyPhase | null = null;
     let scheduledPhase = getSkyPhase();
-    let sunArcProgress = 0;
 
     function getSkyOverride(): SkyPhase | null {
       const override = document.documentElement.dataset.skyOverride;
@@ -1105,24 +1103,17 @@ export default function Background() {
       if (sky) ctx!.drawImage(sky, 0, 0);
       stepPulse(dt);
 
-      if (twilight && !reduced) {
-        sunArcProgress = (sunArcProgress + Math.min(dt, 1000) / SUN_ARC_DURATION) % 1;
-      }
-      const horizonY = waterTop - Math.max(22, Math.floor(rows * 0.1));
       const peakY = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.08));
-      const sx = twilight
-        ? Math.round(cols * (0.06 + sunArcProgress * 0.78))
-        : Math.round(cols * 0.82);
-      const sy = twilight
-        ? Math.round(horizonY - Math.sin(Math.PI * sunArcProgress) * Math.max(0, horizonY - peakY))
-        : peakY;
-      halo(sx + 8, sy + 8, pal.sunRay, pulse, twilight ? 12 : 9);
-      const hot = pulse % 2 === 0;
-      sprite(SUN_MAP, sx, sy, {
-        1: hot ? pal.sunCoreHot : pal.sunCore,
-        3: hot ? pal.sunCoreHot : pal.sunRay,
-        4: hot ? pal.sunRay : pal.sunRim,
-      }, 1);
+      const sx = Math.round(cols * (twilight ? 0.5 : 0.82));
+      if (!twilight) {
+        halo(sx + 8, peakY + 8, pal.sunRay, pulse, 9);
+        const hot = pulse % 2 === 0;
+        sprite(SUN_MAP, sx, peakY, {
+          1: hot ? pal.sunCoreHot : pal.sunCore,
+          3: hot ? pal.sunCoreHot : pal.sunRay,
+          4: hot ? pal.sunRay : pal.sunRim,
+        }, 1);
+      }
 
       // clouds: drift + bob, back layer then front
       for (const c of clouds) {
@@ -1344,9 +1335,6 @@ export default function Background() {
       }
       const phase = getSkyOverride() ?? scheduledPhase;
       if (activePhase !== phase) {
-        if (phase !== "night" && (activePhase === null || activePhase === "night")) {
-          sunArcProgress = 0;
-        }
         activePhase = phase;
         document.documentElement.dataset.skyPhase = phase;
         document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";

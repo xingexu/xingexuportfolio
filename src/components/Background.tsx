@@ -225,13 +225,20 @@ function getSkyPhase(now = new Date()): SkyPhase {
   return "twilight";
 }
 
-const BIRD_FORMATION = [[0, 0], [-7, 3], [-6, -3]] as const;
-const BIRD_SCATTERED = [[8, -5], [-17, 9], [-14, -10]] as const;
+// Two neighboring flocks: a five-bird V followed by a smaller three-bird V.
+const BIRD_FORMATION = [
+  [0, 0], [-6, -3], [-6, 3], [-12, -6], [-12, 6],
+  [-23, 0], [-29, -3], [-29, 3],
+] as const;
+const BIRD_SCATTERED = [
+  [8, -7], [-12, -9], [-9, 11], [-23, -12], [-19, 15],
+  [-15, -3], [-39, -10], [-39, 12],
+] as const;
 const BIRD_JIGGLE = [
-  [[-1, -1], [1, 0], [0, 1]],
-  [[1, 0], [-1, 1], [1, -1]],
-  [[0, 1], [1, -1], [-1, 0]],
-  [[1, -1], [0, 1], [-1, 1]],
+  [[-1, -1], [1, 0], [0, 1], [-1, 0], [1, 1], [0, -1], [-1, 1], [1, -1]],
+  [[1, 0], [-1, 1], [1, -1], [0, 1], [-1, -1], [1, 1], [0, -1], [-1, 0]],
+  [[0, 1], [1, -1], [-1, 0], [1, 1], [0, -1], [-1, 1], [1, 0], [-1, -1]],
+  [[1, -1], [0, 1], [-1, 1], [1, 0], [-1, 0], [0, -1], [-1, -1], [1, 1]],
 ] as const;
 const BALLOON_SCALE = 1;
 
@@ -555,8 +562,8 @@ export default function Background() {
     const airTrafficOverlaps = (flockX: number, balloonX: number) => {
       // Conservative envelopes include fully scattered birds, balloon sway,
       // click jiggle, sprite widths, and a 3-cell visual safety gap.
-      const flockLeft = flockX - 23;
-      const flockRight = flockX + 13;
+      const flockLeft = flockX - 44;
+      const flockRight = flockX + 14;
       const balloonLeft = balloonX - 2;
       const balloonRight = balloonX + BALLOON[0].length * BALLOON_SCALE + 2;
       return flockRight + 3 >= balloonLeft && balloonRight + 3 >= flockLeft;
@@ -1166,7 +1173,8 @@ export default function Background() {
             flock.frame = flock.frame ? 0 : 1;
             const nextX = flock.x + 1;
             if (!balloon || !airTrafficOverlaps(nextX, balloon.x)) flock.x = nextX;
-            if (flock.x > cols + 8) flock = null;
+            // Keep drawing until the trailing three-bird group fully exits.
+            if (flock.x > cols + 44) flock = null;
           }
           if (flock) {
             for (const [dx, dy] of birdOffsets()) {

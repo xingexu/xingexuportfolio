@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { SITE } from "@/app/data";
+import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
 const NAME = "xinge xu";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
@@ -38,25 +39,6 @@ const SUNRISE_FIREWORK_SPARKS = [
   { x: "-64px", y: "-37px" },
   { x: "-37px", y: "-64px" },
 ];
-
-function createMobileAudioContext() {
-  if (typeof window === "undefined") return null;
-  const AudioContextConstructor = window.AudioContext ||
-    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextConstructor) return null;
-
-  try {
-    return new AudioContextConstructor();
-  } catch {
-    return null;
-  }
-}
-
-function resumeAudioContext(audio: AudioContext) {
-  if (audio.state !== "running" && audio.state !== "closed") {
-    void audio.resume().catch(() => undefined);
-  }
-}
 
 function createFireworkNoise(audio: AudioContext) {
   const length = Math.round(audio.sampleRate * 0.38);
@@ -243,10 +225,10 @@ function PlaneBanner() {
   useEffect(() => {
     const unlockAudio = () => {
       if (!audioContext.current || audioContext.current.state === "closed") {
-        audioContext.current = createMobileAudioContext();
+        audioContext.current = getSharedAudioContext();
         fireworkNoise.current = null;
       }
-      if (audioContext.current) resumeAudioContext(audioContext.current);
+      resumeSharedAudioContext(audioContext.current);
     };
 
     window.addEventListener("pointerdown", unlockAudio, { capture: true, once: true, passive: true });
@@ -257,7 +239,6 @@ function PlaneBanner() {
       window.removeEventListener("pointerdown", unlockAudio, true);
       window.removeEventListener("touchstart", unlockAudio, true);
       window.removeEventListener("keydown", unlockAudio, true);
-      void audioContext.current?.close();
       audioContext.current = null;
       fireworkNoise.current = null;
     };
@@ -280,14 +261,14 @@ function PlaneBanner() {
   const playFireworkSounds = (mode: FireworkMode, allowCreate: boolean) => {
     let audio = audioContext.current;
     if ((!audio || audio.state === "closed") && allowCreate) {
-      audio = createMobileAudioContext();
+      audio = getSharedAudioContext();
       audioContext.current = audio;
       fireworkNoise.current = null;
     }
     if (!audio || audio.state === "closed") return;
     if (audio.state !== "running") {
       if (!allowCreate) return;
-      resumeAudioContext(audio);
+      resumeSharedAudioContext(audio);
     }
 
     if (!fireworkNoise.current) fireworkNoise.current = createFireworkNoise(audio);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
 /**
  * Animated pixel scene: dithered sky + Toronto skyline + Lake Ontario.
@@ -366,14 +367,15 @@ export default function Background() {
     let glints: { x: number; y: number }[] = [];
     let flocks: Flock[] = [];
     const flockWait: Record<FlockKind, number> = { three: 0, five: 650 };
-    let audioContext: AudioContext | null = null;
     let plane: Plane | null = null;
     let planeSmoke: PlaneSmoke[] = [];
     let planeWait = 8000 + Math.random() * 10000;
+    let sunriseOpeningPlanePending = true;
+    let sunriseOpeningPlaneWait = 0;
     let satellite: { x: number; y: number; acc: number } | null = null;
     let satWait = 6000 + Math.random() * 8000;
     let balloon: Balloon | null = null;
-    let balloonWait = 4000 + Math.random() * 6000;
+    let balloonWait = 1300;
     let ferry: Ferry | null = null;
     let ferrySplashes: FerrySplash[] = [];
     let ferrySplashAcc = 0;
@@ -395,6 +397,8 @@ export default function Background() {
     let skylineTwilight: HTMLCanvasElement | null = null;
     let activePhase: SkyPhase | null = null;
     let scheduledPhase = getSkyPhase();
+    let sunriseBannerTopCell = 0;
+    let sunriseBannerMeasured = false;
 
     function getSkyOverride(): SkyPhase | null {
       const override = document.documentElement.dataset.skyOverride;
@@ -406,24 +410,7 @@ export default function Background() {
     }
 
     function getAudioContext() {
-      if (audioContext) {
-        if (audioContext.state !== "running" && audioContext.state !== "closed") {
-          void audioContext.resume().catch(() => undefined);
-        }
-        return audioContext;
-      }
-      const AudioContextConstructor = window.AudioContext ||
-        (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextConstructor) return null;
-      try {
-        audioContext = new AudioContextConstructor();
-        if (audioContext.state !== "running") {
-          void audioContext.resume().catch(() => undefined);
-        }
-      } catch {
-        audioContext = null;
-      }
-      return audioContext;
+      return resumeSharedAudioContext(getSharedAudioContext());
     }
 
     function playChirp() {
@@ -462,6 +449,59 @@ export default function Background() {
       oscillator.connect(volume).connect(audio.destination);
       oscillator.start(now);
       oscillator.stop(now + 0.38);
+    }
+
+    function playPlaneFlyby() {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const now = audio.currentTime;
+      const master = audio.createGain();
+      const engineFilter = audio.createBiquadFilter();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.058, now + 0.035);
+      master.gain.exponentialRampToValueAtTime(0.048, now + 0.58);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + 1.08);
+      engineFilter.type = "bandpass";
+      engineFilter.frequency.setValueAtTime(1400, now);
+      engineFilter.frequency.exponentialRampToValueAtTime(4600, now + 0.72);
+      engineFilter.frequency.exponentialRampToValueAtTime(3000, now + 1.08);
+      engineFilter.Q.setValueAtTime(0.8, now);
+      engineFilter.connect(master).connect(audio.destination);
+
+      for (const [type, start, peak, end] of [
+        ["triangle", 320, 1100, 920],
+        ["sine", 640, 2200, 1760],
+      ] as const) {
+        const oscillator = audio.createOscillator();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(start, now);
+        oscillator.frequency.exponentialRampToValueAtTime(peak, now + 0.72);
+        oscillator.frequency.exponentialRampToValueAtTime(end, now + 1.08);
+        oscillator.connect(engineFilter);
+        oscillator.start(now);
+        oscillator.stop(now + 1.1);
+      }
+
+      const noise = audio.createBufferSource();
+      const noiseFilter = audio.createBiquadFilter();
+      const noiseVolume = audio.createGain();
+      const buffer = audio.createBuffer(1, Math.ceil(audio.sampleRate * 1.08), audio.sampleRate);
+      const samples = buffer.getChannelData(0);
+      for (let index = 0; index < samples.length; index += 1) {
+        samples[index] = Math.random() * 2 - 1;
+      }
+      noise.buffer = buffer;
+      noiseFilter.type = "bandpass";
+      noiseFilter.frequency.setValueAtTime(2300, now);
+      noiseFilter.frequency.exponentialRampToValueAtTime(6800, now + 0.72);
+      noiseFilter.frequency.exponentialRampToValueAtTime(4200, now + 1.08);
+      noiseFilter.Q.setValueAtTime(0.55, now);
+      noiseVolume.gain.setValueAtTime(0.0001, now);
+      noiseVolume.gain.exponentialRampToValueAtTime(0.034, now + 0.045);
+      noiseVolume.gain.exponentialRampToValueAtTime(0.0001, now + 1.06);
+      noise.connect(noiseFilter).connect(noiseVolume).connect(audio.destination);
+      noise.start(now);
+      noise.stop(now + 1.08);
     }
 
     function playFerryHorn() {
@@ -526,7 +566,7 @@ export default function Background() {
       if (!plane) return false;
       const x = clientX / CELL;
       const y = clientY / CELL;
-      return x >= plane.x - 1 && x <= plane.x + 4 &&
+      return x >= plane.x - 2 && x <= plane.x + 6 &&
         y >= plane.y - 2 && y <= plane.y + 2;
     }
 
@@ -566,25 +606,27 @@ export default function Background() {
       return { x: 0, y: 0 };
     }
 
-    // These lanes include the full scatter/jiggle extents and keep every
-    // moving sprite below the fixed top bar's exclusion zone.
+    // Sunrise traffic is vertically stacked above the banner. The lower
+    // flock keeps enough headroom for its full click-dispersion range.
     const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
     const birdLaneY = (kind: FlockKind) => {
-      const threeBirdLane = Math.max(airplaneLaneY() + 12, Math.floor(rows * 0.18));
+      const defaultThreeBirdLane = Math.max(airplaneLaneY() + 12, Math.floor(rows * 0.18));
+      if (sunriseBannerTopCell) {
+        const fiveBirdLane = sunriseBannerTopCell - 19;
+        const threeBirdLane = Math.max(
+          SKY_SAFE_TOP + 5,
+          Math.min(defaultThreeBirdLane, fiveBirdLane - 9),
+        );
+        return kind === "three" ? threeBirdLane : fiveBirdLane;
+      }
+
       return kind === "three"
-        ? threeBirdLane
-        : Math.max(threeBirdLane + 20, Math.floor(rows * 0.31));
+        ? defaultThreeBirdLane
+        : Math.max(defaultThreeBirdLane + 40, Math.floor(rows * 0.39));
     };
-    const balloonLaneY = () => birdLaneY("five");
-    const airTrafficOverlaps = (flockX: number, balloonX: number) => {
-      // The balloon shares the lower five-bird lane. Include the flock's
-      // full scatter, balloon sway, and a 3-cell visual safety gap.
-      const flockLeft = flockX - 28;
-      const flockRight = flockX + 13;
-      const balloonLeft = balloonX - 2;
-      const balloonRight = balloonX + BALLOON[0].length * BALLOON_SCALE + 2;
-      return flockRight + 3 >= balloonLeft && balloonRight + 3 >= flockLeft;
-    };
+    const balloonLaneY = () => Math.round(
+      (birdLaneY("three") + birdLaneY("five") - BALLOON.length * BALLOON_SCALE) / 2,
+    );
     const cnTowerX = () => Math.floor(cols * 0.22);
     const towerDims = () => {
       const h = Math.min(Math.floor(rows * 0.46), 64);
@@ -595,6 +637,20 @@ export default function Background() {
     const landmarkZone = () => ({ from: cnTowerX() - 12, to: cnTowerX() + 46 });
 
     /* ── static layers ── */
+
+    function measureSunriseAirTrafficLanes() {
+      const sunriseBanner = document.querySelector<HTMLElement>(".hero-plane-banner");
+      if (!sunriseBanner) {
+        sunriseBannerTopCell = 0;
+        sunriseBannerMeasured = false;
+        return;
+      }
+
+      sunriseBannerTopCell = Math.floor(sunriseBanner.getBoundingClientRect().top / CELL);
+      sunriseBannerMeasured = true;
+      for (const flock of flocks) flock.y = birdLaneY(flock.kind);
+      if (balloon) balloon.y = balloonLaneY();
+    }
 
     /** Sky gradient rendered as full noise-dither: no visible band edges,
      *  every row is a probabilistic blend of its two nearest band colors. */
@@ -776,6 +832,8 @@ export default function Background() {
       cols = Math.ceil(canvas!.width / CELL);
       rows = Math.ceil(canvas!.height / CELL);
       waterTop = rows - 6;
+      sunriseBannerMeasured = false;
+      measureSunriseAirTrafficLanes();
 
       if (plane) plane.y = airplaneLaneY();
       for (const flock of flocks) flock.y = birdLaneY(flock.kind);
@@ -962,7 +1020,13 @@ export default function Background() {
       }
     }
 
-    function drawPlane(dt: number, bodyColor: string, tailColor: string, tailFin: boolean) {
+    function drawPlane(
+      dt: number,
+      bodyColor: string,
+      tailColor: string,
+      tailFin: boolean,
+      sunriseOpening = false,
+    ) {
       planeSmoke = planeSmoke.filter((puff) => {
         puff.ttl -= dt;
         return puff.ttl > 0;
@@ -985,7 +1049,7 @@ export default function Background() {
           plane.blink = !plane.blink;
           if (boosted) {
             planeSmoke.push({
-              x: plane.x + 4,
+              x: plane.x + 6,
               y: plane.y + (plane.x % 2 === 0 ? 0 : 1),
               ttl: 900,
             });
@@ -996,18 +1060,41 @@ export default function Background() {
       }
 
       if (plane) {
+        // A slightly larger 5×3 silhouette that keeps the chunky pixel scale.
+        cell(plane.x - 1, plane.y, bodyColor, 0.95);
         cell(plane.x, plane.y, bodyColor, 0.95);
         cell(plane.x + 1, plane.y, bodyColor, 0.95);
         cell(plane.x + 2, plane.y, tailColor, 0.95);
-        if (tailFin) cell(plane.x + 2, plane.y - 1, tailColor, 0.95);
-        if (plane.blink) cell(plane.x + 3, plane.y, NIGHT.beacon, 0.95);
+        cell(plane.x + 3, plane.y, tailColor, 0.95);
+        cell(plane.x + 1, plane.y + 1, bodyColor, 0.95);
+        if (tailFin) {
+          cell(plane.x + 1, plane.y - 1, bodyColor, 0.95);
+          cell(plane.x + 2, plane.y - 1, tailColor, 0.95);
+        }
+        if (plane.blink) cell(plane.x + 4, plane.y, NIGHT.beacon, 0.95);
+        return;
+      }
+
+      if (sunriseOpening && sunriseOpeningPlanePending) {
+        sunriseOpeningPlaneWait -= dt;
+        if (sunriseOpeningPlaneWait <= 0) {
+          plane = {
+            x: cols + 1,
+            y: airplaneLaneY(),
+            acc: 0,
+            blink: false,
+            boostRemaining: 0,
+          };
+          sunriseOpeningPlanePending = false;
+          planeWait = 16000 + Math.random() * 18000;
+        }
         return;
       }
 
       planeWait -= dt;
       if (planeWait <= 0) {
         plane = {
-          x: cols + 4,
+          x: cols + 1,
           y: airplaneLaneY(),
           acc: 0,
           blink: false,
@@ -1135,6 +1222,7 @@ export default function Background() {
     /* ── daylight + shared sunrise/sunset scene ── */
 
     function drawDayScene(dt: number, pal: typeof DAY | typeof TWILIGHT, twilight: boolean) {
+      if (twilight && !sunriseBannerMeasured) measureSunriseAirTrafficLanes();
       const sky = twilight ? skyTwilight : skyDay;
       if (sky) ctx!.drawImage(sky, 0, 0);
       stepPulse(dt);
@@ -1187,13 +1275,11 @@ export default function Background() {
             if (flock.scatterElapsed >= 960) flock.scatterElapsed = null;
           }
 
-          const stepMs = flock.kind === "three" ? 140 : 190;
+          const stepMs = flock.kind === "three" ? 145 : 200;
           if (flock.acc >= stepMs) {
             flock.acc -= stepMs;
             flock.frame = flock.frame ? 0 : 1;
-            const nextX = flock.x + 1;
-            const blockedByBalloon = flock.kind === "five" && balloon && airTrafficOverlaps(nextX, balloon.x);
-            if (!blockedByBalloon) flock.x = nextX;
+            flock.x += 1;
           }
         }
 
@@ -1220,13 +1306,9 @@ export default function Background() {
           flockWait[kind] -= dt;
           if (flockWait[kind] > 0) continue;
 
-          const spawnX = -2;
-          const blockedByBalloon = kind === "five" && balloon && airTrafficOverlaps(spawnX, balloon.x);
-          if (blockedByBalloon) continue;
-
           flocks.push({
             kind,
-            x: spawnX,
+            x: -2,
             y: birdLaneY(kind),
             frame: 0,
             acc: 0,
@@ -1240,7 +1322,7 @@ export default function Background() {
         // hot-air balloon: slow drift with stepped sway
         if (balloon) {
           balloon.acc += dt;
-          if (balloon.acc >= 600) {
+          if (balloon.acc >= 540) {
             balloon.acc = 0;
             balloon.x += 1;
             balloon.sway = balloon.sway === 0 ? 1 : 0;
@@ -1268,25 +1350,21 @@ export default function Background() {
         } else {
           balloonWait -= dt;
           if (balloonWait <= 0) {
-            const spawnX = -BALLOON[0].length * BALLOON_SCALE;
-            const lowerFlock = flocks.find((candidate) => candidate.kind === "five");
-            if (!lowerFlock || !airTrafficOverlaps(lowerFlock.x, spawnX)) {
-              balloon = {
-                x: spawnX,
-                y: balloonLaneY(),
-                sway: 0,
-                bob: 0,
-                acc: 0,
-                yAcc: 0,
-                jiggleElapsed: null,
-              };
-              balloonWait = 18000 + Math.random() * 16000;
-            }
+            balloon = {
+              x: -2,
+              y: balloonLaneY(),
+              sway: 0,
+              bob: 0,
+              acc: 0,
+              yAcc: 0,
+              jiggleElapsed: null,
+            };
+            balloonWait = 18000 + Math.random() * 16000;
           }
         }
 
         // plane crosses by day too
-        drawPlane(dt, pal.planeBody, pal.planeTail, true);
+        drawPlane(dt, pal.planeBody, pal.planeTail, true, twilight);
       }
 
       const skyline = twilight ? skylineTwilight : skylineDay;
@@ -1387,6 +1465,7 @@ export default function Background() {
       const phase = getSkyOverride() ?? scheduledPhase;
       if (activePhase !== phase) {
         activePhase = phase;
+        if (phase === "twilight") sunriseBannerMeasured = false;
         document.documentElement.dataset.skyPhase = phase;
         document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";
       }
@@ -1416,6 +1495,7 @@ export default function Background() {
         playChirp();
       } else if (clickedPlane(event.clientX, event.clientY)) {
         if (plane) plane.boostRemaining = 2000;
+        playPlaneFlyby();
       }
     };
 
@@ -1445,7 +1525,6 @@ export default function Background() {
       cancelAnimationFrame(raf);
       window.clearInterval(clockTimer);
       window.removeEventListener("pointerdown", onPointerDown);
-      void audioContext?.close();
       window.removeEventListener("resize", onResize);
       phaseObserver.disconnect();
     };

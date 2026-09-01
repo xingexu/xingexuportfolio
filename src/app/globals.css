@@ -1967,11 +1967,20 @@ a.project-card:hover .project-title { color: var(--accent); }
     min-width: 0;
   }
   .hero-layout {
+    align-items: center;
+    justify-content: center;
     gap: 24px;
+    text-align: center;
+  }
+  .hero-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
   }
   .hero-copy h1 {
     max-width: 100%;
-    font-size: clamp(34px, 14vw, 48px) !important;
+    font-size: clamp(34px, 10vw, 64px) !important;
     overflow-wrap: anywhere;
   }
   .hero-education {
@@ -1982,9 +1991,11 @@ a.project-card:hover .project-title { color: var(--accent); }
   }
   .hero-copy > .step-in-3 {
     display: grid !important;
-    width: 100%;
+    width: min(88vw, 420px);
     grid-template-columns: minmax(0, 1fr);
     gap: 16px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
     margin-top: 28px !important;
   }
   .hero-cta-btn {
@@ -1999,13 +2010,15 @@ a.project-card:hover .project-title { color: var(--accent); }
     overflow-wrap: anywhere;
   }
   .hero-plane-banner {
-    --hero-plane-rest-x: calc(-50vw + 50% + 8px);
+    --hero-plane-rest-x: 0px;
     top: 0;
-    width: min(94vw, 500px);
+    width: min(92vw, 620px);
   }
   .hero-layout-under-banner {
-    max-width: min(94vw, 500px);
+    max-width: min(92vw, 620px);
     margin-top: clamp(12px, 4vw, 22px);
+    margin-right: auto;
+    margin-left: auto;
     padding-left: 0;
   }
   :root[data-sky-phase="twilight"] .hero-section {
@@ -2014,22 +2027,22 @@ a.project-card:hover .project-title { color: var(--accent); }
     padding-bottom: clamp(24px, 4svh, 38px) !important;
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
-    width: min(58vw, 240px);
-    gap: 10px !important;
-    margin-right: 0;
-    margin-left: auto;
-    margin-top: 20px !important;
+    width: min(72vw, 320px);
+    gap: 12px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    margin-top: 22px !important;
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-cta-btn {
-    min-height: 44px;
-    gap: 8px;
-    padding: 8px 10px;
-    font-size: clamp(10px, 3vw, 11px);
+    min-height: 50px;
+    gap: 10px;
+    padding: 11px 14px;
+    font-size: clamp(12px, 3.2vw, 14px);
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .pixel-arrow {
-    flex-basis: 20px;
-    width: 20px;
-    transform: scale(0.84);
+    flex-basis: 22px;
+    width: 22px;
+    transform: scale(0.92);
     transform-origin: right center;
   }
 
@@ -2068,24 +2081,25 @@ a.project-card:hover .project-title { color: var(--accent); }
     overflow: visible;
   }
   .resume-stage {
-    width: 100%;
-    max-width: 560px;
+    width: min(94vw, 640px);
+    max-width: 640px;
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: 20px;
   }
   .resume-document-wrap {
     order: 1;
     flex: 0 0 auto;
-    width: min(82vw, 460px);
-    max-width: calc(100% - 24px);
+    width: min(88vw, 600px);
+    max-width: 100%;
     align-self: center;
   }
   .resume-stage > .resume-side-back {
     order: 2;
-    width: 100%;
+    width: min(88vw, 600px);
     min-height: 54px;
     height: auto;
+    align-self: center;
     padding: 14px 18px;
     font-size: 14px;
   }
@@ -2101,39 +2115,49 @@ a.project-card:hover .project-title { color: var(--accent); }
     overflow: visible;
   }
   .resume-editor-stage {
-    width: 100%;
-    max-width: 100%;
+    width: min(94vw, 720px);
+    max-width: 720px;
     height: auto;
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: 16px;
   }
   .resume-editor-stage > .resume-side-back {
     order: 2;
-    width: 100%;
+    width: min(92vw, 680px);
     min-height: 54px;
     height: auto;
+    align-self: center;
     padding: 14px 18px;
     font-size: 14px;
   }
   .resume-editor-document {
     order: 1;
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 100%;
+    width: min(92vw, 680px);
+    max-width: 680px;
     height: max(520px, calc(100svh - 170px));
   }
 
   .site-footer-inner {
-    flex-direction: column;
-    justify-content: center;
-    padding: 20px 16px;
-    text-align: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px 12px;
+    text-align: left;
   }
   .site-footer-inner > nav {
+    flex: 0 0 auto;
     max-width: 100%;
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: clamp(6px, 2vw, 14px) !important;
+  }
+  .site-footer-copyright {
+    flex: 0 1 auto;
+    font-size: clamp(9px, 2.5vw, 12px);
+    white-space: nowrap;
   }
   .resume-shell {
     padding: 20px;

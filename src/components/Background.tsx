@@ -23,6 +23,7 @@ import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 const CELL = 5; // css px per sky pixel
 const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
 const SEED = 20260703;
+const MOBILE_LAYOUT_MAX_WIDTH = 820;
 const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const SUNRISE_SKYLINE_GLOW_DURATION_MS = 1600;
@@ -1413,8 +1414,15 @@ export default function Background() {
       }
 
       if (!reduced) {
-        // Independent bird flocks: three enter immediately on the upper lane,
-        // then five follow shortly afterward on a lower, slightly slower path.
+        const activeFlockKinds: readonly FlockKind[] =
+          window.innerWidth <= MOBILE_LAYOUT_MAX_WIDTH ? ["three"] : ["three", "five"];
+
+        // Mobile keeps the scene clear with one three-bird flock. Desktop
+        // retains the second, five-bird formation on its lower lane.
+        if (!activeFlockKinds.includes("five")) {
+          flocks = flocks.filter((flock) => flock.kind !== "five");
+        }
+
         for (const flock of flocks) {
           flock.acc += dt;
           if (flock.scatterElapsed !== null) {
@@ -1448,7 +1456,7 @@ export default function Background() {
           }
         }
 
-        for (const kind of ["three", "five"] as const) {
+        for (const kind of activeFlockKinds) {
           if (flocks.some((flock) => flock.kind === kind)) continue;
           flockWait[kind] -= dt;
           if (flockWait[kind] > 0) continue;

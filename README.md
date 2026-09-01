@@ -4,4 +4,4 @@ You can call me **Zinger**. I'm a first-year student at Western University (UWO)
 
 Welcome to my portfolio! This is where I share the projects I'm building :D
 
-Feel free to explore my work or reach out at [xingexu1107@gmail.com](mailto:xingexu1107@gmail.com). I'd be happy to connect!
+Feel free to explore my work or reach out at [xingexu1107@gmail.com](mailto:xingexu1107@gmail.com or xxu767@uwo.ca). I'd be happy to connect!

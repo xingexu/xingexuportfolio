@@ -447,6 +447,75 @@ body {
   animation: particleDrop 1s steps(11, end) both;
 }
 
+.name-hover {
+  display: inline-block;
+  transition: text-shadow 140ms steps(2, end);
+}
+
+:root[data-theme="dark"] .name-hover {
+  text-shadow:
+    2px 0 0 rgba(255, 210, 74, 0.46),
+    -2px 0 0 rgba(255, 210, 74, 0.46),
+    0 2px 0 rgba(255, 210, 74, 0.46),
+    0 -2px 0 rgba(255, 210, 74, 0.46),
+    5px 5px 0 rgba(255, 210, 74, 0.22),
+    -5px 5px 0 rgba(255, 210, 74, 0.22),
+    5px -5px 0 rgba(255, 210, 74, 0.22),
+    -5px -5px 0 rgba(255, 210, 74, 0.22),
+    9px 0 0 rgba(159, 196, 240, 0.15),
+    -9px 0 0 rgba(159, 196, 240, 0.15),
+    0 9px 0 rgba(159, 196, 240, 0.15),
+    0 -9px 0 rgba(159, 196, 240, 0.15);
+}
+
+:root[data-theme="dark"] .name-hover:hover {
+  text-shadow:
+    3px 0 0 rgba(255, 210, 74, 0.64),
+    -3px 0 0 rgba(255, 210, 74, 0.64),
+    0 3px 0 rgba(255, 210, 74, 0.64),
+    0 -3px 0 rgba(255, 210, 74, 0.64),
+    7px 7px 0 rgba(255, 210, 74, 0.32),
+    -7px 7px 0 rgba(255, 210, 74, 0.32),
+    7px -7px 0 rgba(255, 210, 74, 0.32),
+    -7px -7px 0 rgba(255, 210, 74, 0.32),
+    13px 0 0 rgba(159, 196, 240, 0.24),
+    -13px 0 0 rgba(159, 196, 240, 0.24),
+    0 13px 0 rgba(159, 196, 240, 0.24),
+    0 -13px 0 rgba(159, 196, 240, 0.24);
+}
+
+:root[data-theme="light"] .name-hover {
+  text-shadow:
+    2px 0 0 rgba(255, 255, 255, 0.78),
+    -2px 0 0 rgba(255, 255, 255, 0.78),
+    0 2px 0 rgba(255, 255, 255, 0.78),
+    0 -2px 0 rgba(255, 255, 255, 0.78),
+    5px 5px 0 rgba(77, 131, 180, 0.22),
+    -5px 5px 0 rgba(77, 131, 180, 0.22),
+    5px -5px 0 rgba(77, 131, 180, 0.22),
+    -5px -5px 0 rgba(77, 131, 180, 0.22),
+    9px 0 0 rgba(29, 92, 168, 0.14),
+    -9px 0 0 rgba(29, 92, 168, 0.14),
+    0 9px 0 rgba(29, 92, 168, 0.14),
+    0 -9px 0 rgba(29, 92, 168, 0.14);
+}
+
+:root[data-theme="light"] .name-hover:hover {
+  text-shadow:
+    3px 0 0 rgba(255, 255, 255, 0.96),
+    -3px 0 0 rgba(255, 255, 255, 0.96),
+    0 3px 0 rgba(255, 255, 255, 0.96),
+    0 -3px 0 rgba(255, 255, 255, 0.96),
+    7px 7px 0 rgba(77, 131, 180, 0.32),
+    -7px 7px 0 rgba(77, 131, 180, 0.32),
+    7px -7px 0 rgba(77, 131, 180, 0.32),
+    -7px -7px 0 rgba(77, 131, 180, 0.32),
+    13px 0 0 rgba(29, 92, 168, 0.22),
+    -13px 0 0 rgba(29, 92, 168, 0.22),
+    0 13px 0 rgba(29, 92, 168, 0.22),
+    0 -13px 0 rgba(29, 92, 168, 0.22);
+}
+
 .type-cursor {
   display: inline-block;
   width: 0.55em;

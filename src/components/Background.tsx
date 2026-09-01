@@ -291,7 +291,7 @@ type SleepyZ = {
   direction: -1 | 1;
   drift: number;
   ferryOffsetX?: number;
-  trailLength: 1 | 3;
+  trailLength: 1 | 2 | 3;
   x: number;
   y: number;
 };
@@ -997,30 +997,19 @@ export default function Background() {
         null,
       );
       const buildingZs: SleepyZ[] = sleepyBuildings
-        .flatMap((building, index) => {
+        .map((building, index) => {
           const sourceX = building.x + Math.floor(building.w / 2);
           const sourceY = waterTop - building.h - building.antenna - 3;
           const isTallest = building === tallestSleepyBuilding;
-          const primary: SleepyZ = {
+          const hasDoubleTrail = building.h >= 16 && index % 2 === 0;
+          return {
             delay: (index * 47) % 360,
             direction: 1,
             drift: (index % 3) - 1,
-            trailLength: isTallest ? 3 : 1,
+            trailLength: isTallest ? 3 : hasDoubleTrail ? 2 : 1,
             x: sourceX - 1,
             y: sourceY,
           };
-          if (isTallest || building.h < 16 || index % 2 !== 0) return [primary];
-          return [
-            primary,
-            {
-              delay: 180 + (index * 53) % 360,
-              direction: 1,
-              drift: 1,
-              trailLength: 1,
-              x: sourceX + 2,
-              y: sourceY + 3,
-            },
-          ];
         });
 
       const rogersCentreZs: SleepyZ[] = [
@@ -1534,38 +1523,50 @@ export default function Background() {
         const glyphs = sleepyZ.trailLength === 3
           ? [
               { delay: 0, offsetX: 0, offsetY: 0, pixelSize: 1 },
-              { delay: 70, offsetX: sleepyZ.direction * 14, offsetY: -16, pixelSize: 2 },
-              { delay: 140, offsetX: sleepyZ.direction * 32, offsetY: -36, pixelSize: 3 },
+              { delay: 60, offsetX: sleepyZ.direction * 8, offsetY: -12, pixelSize: 2 },
+              { delay: 120, offsetX: sleepyZ.direction * 20, offsetY: -31, pixelSize: 3 },
             ]
-          : [{ delay: 0, offsetX: 0, offsetY: 0, pixelSize: 2 }];
+          : sleepyZ.trailLength === 2
+            ? [
+                { delay: 0, offsetX: 0, offsetY: 0, pixelSize: 1 },
+                { delay: 70, offsetX: sleepyZ.direction * 9, offsetY: -13, pixelSize: 2 },
+              ]
+            : [{ delay: 0, offsetX: 0, offsetY: 0, pixelSize: 2 }];
+
+        const placement = Array.from({ length: 10 }, (_, index) => {
+          const shiftX = index * 9;
+          const shiftY = -index * 11;
+          const glyphBounds = glyphs.map((glyph) => getRotatedPixelZBounds(
+            baseX + glyph.offsetX + shiftX,
+            baseY + glyph.offsetY + shiftY,
+            glyph.pixelSize,
+            sleepyZ.direction,
+          ));
+          return {
+            bounds: {
+              bottom: Math.max(...glyphBounds.map((bounds) => bounds.bottom)),
+              left: Math.min(...glyphBounds.map((bounds) => bounds.left)),
+              right: Math.max(...glyphBounds.map((bounds) => bounds.right)),
+              top: Math.min(...glyphBounds.map((bounds) => bounds.top)),
+            },
+            shiftX,
+            shiftY,
+          };
+        }).find(({ bounds }) => !occupiedBounds.some((occupied) => (
+          bounds.left < occupied.right &&
+          bounds.right > occupied.left &&
+          bounds.top < occupied.bottom &&
+          bounds.bottom > occupied.top
+        )));
+        if (!placement) return;
+        occupiedBounds.push(placement.bounds);
 
         glyphs.forEach((glyph) => {
           if (localElapsed < glyph.delay) return;
           const glyphAlpha = alpha * Math.min(1, (localElapsed - glyph.delay + 40) / 120);
-          const initialX = baseX + glyph.offsetX;
-          const initialY = baseY + glyph.offsetY;
-          const placement = Array.from({ length: 10 }, (_, index) => ({
-            x: initialX + index * 9,
-            y: initialY - index * 11,
-          })).find(({ x, y }) => {
-            const bounds = getRotatedPixelZBounds(x, y, glyph.pixelSize, sleepyZ.direction);
-            return !occupiedBounds.some((occupied) => (
-              bounds.left < occupied.right &&
-              bounds.right > occupied.left &&
-              bounds.top < occupied.bottom &&
-              bounds.bottom > occupied.top
-            ));
-          });
-          if (!placement) return;
-          occupiedBounds.push(getRotatedPixelZBounds(
-            placement.x,
-            placement.y,
-            glyph.pixelSize,
-            sleepyZ.direction,
-          ));
           drawRotatedPixelZ(
-            placement.x,
-            placement.y,
+            baseX + glyph.offsetX + placement.shiftX,
+            baseY + glyph.offsetY + placement.shiftY,
             glyph.pixelSize,
             sleepyZ.direction,
             color,

@@ -703,7 +703,68 @@ body {
   border-color: var(--accent);
 }
 
+.hero-cta-btn {
+  --hero-cta-glow: color-mix(in srgb, var(--accent) 56%, transparent);
+  gap: 18px;
+  padding: 15px 22px;
+  font-size: clamp(15px, 1.45vw, 17px);
+  letter-spacing: 0.035em;
+  text-shadow:
+    2px 0 0 color-mix(in srgb, currentColor 30%, transparent),
+    -2px 0 0 color-mix(in srgb, currentColor 30%, transparent),
+    0 0 8px color-mix(in srgb, currentColor 60%, transparent);
+  box-shadow:
+    5px 5px 0 var(--shadow),
+    0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 20px var(--hero-cta-glow);
+  transition:
+    box-shadow 120ms steps(2, end),
+    transform 120ms steps(2, end);
+}
+
+.hero-cta-btn.px-btn-secondary {
+  --hero-cta-glow: color-mix(in srgb, var(--text) 38%, transparent);
+}
+
+.hero-cta-btn:hover {
+  box-shadow:
+    7px 7px 0 var(--shadow),
+    0 0 0 4px color-mix(in srgb, var(--accent) 36%, transparent),
+    0 0 28px var(--hero-cta-glow);
+}
+
+.pixel-arrow {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 20px;
+  color: currentColor;
+  filter: drop-shadow(0 0 5px currentColor);
+  image-rendering: pixelated;
+}
+
+.pixel-arrow::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  box-shadow:
+    4px 0 0 currentColor,
+    8px 0 0 currentColor,
+    12px 0 0 currentColor,
+    20px 0 0 currentColor,
+    12px -8px 0 currentColor,
+    16px -4px 0 currentColor,
+    16px 4px 0 currentColor,
+    12px 8px 0 currentColor;
+}
+
 :root[data-sky-phase="twilight"] .hero-resume-btn {
+  --hero-cta-glow: rgba(255, 225, 161, 0.66);
   color: #4a2b39;
   background: #f4d79a;
   border-color: #d6a66f;
@@ -769,20 +830,32 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   color: var(--nav-accent);
   background: var(--nav-control);
   border: 2px solid var(--nav-border);
   cursor: pointer;
-  box-shadow: 3px 3px 0 var(--nav-shadow);
+  box-shadow:
+    3px 3px 0 var(--nav-shadow),
+    0 0 0 2px color-mix(in srgb, var(--nav-accent) 26%, transparent),
+    0 0 14px color-mix(in srgb, var(--nav-accent) 48%, transparent);
+}
+.theme-toggle svg {
+  display: block;
+  shape-rendering: crispEdges;
+  filter: drop-shadow(0 0 4px currentColor);
+  image-rendering: pixelated;
 }
 .theme-toggle:hover {
   color: var(--nav-accent-ink);
   background: var(--nav-accent);
   border-color: var(--nav-accent);
   transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--nav-shadow);
+  box-shadow:
+    4px 4px 0 var(--nav-shadow),
+    0 0 0 3px color-mix(in srgb, var(--nav-accent) 34%, transparent),
+    0 0 20px color-mix(in srgb, var(--nav-accent) 66%, transparent);
 }
 .theme-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--nav-shadow); }
 
@@ -872,14 +945,30 @@ body {
 
 .nav-link {
   font-family: var(--font-pixel);
-  font-size: 12px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
   text-transform: lowercase;
   color: var(--nav-muted);
   text-decoration: none;
-  padding: 6px 10px;
+  padding: 8px 11px;
   border: 2px solid transparent;
+  text-shadow:
+    2px 0 0 color-mix(in srgb, currentColor 26%, transparent),
+    -2px 0 0 color-mix(in srgb, currentColor 26%, transparent),
+    0 0 8px color-mix(in srgb, currentColor 54%, transparent);
+  transition:
+    color 120ms steps(2, end),
+    text-shadow 120ms steps(2, end),
+    transform 120ms steps(2, end);
 }
-.nav-link:hover { color: var(--nav-text); }
+.nav-link:hover {
+  color: var(--nav-text);
+  transform: translateY(-1px);
+  text-shadow:
+    2px 0 0 color-mix(in srgb, currentColor 42%, transparent),
+    -2px 0 0 color-mix(in srgb, currentColor 42%, transparent),
+    0 0 13px color-mix(in srgb, currentColor 78%, transparent);
+}
 .nav-link[aria-current="page"] {
   color: var(--nav-accent);
   border-color: var(--nav-border);

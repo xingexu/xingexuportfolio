@@ -55,22 +55,27 @@ export default function ThemeToggle() {
 }
 
 const iconProps = {
-  width: 20,
-  height: 20,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
+  width: 24,
+  height: 24,
+  viewBox: "0 0 16 16",
+  fill: "currentColor",
+  shapeRendering: "crispEdges" as const,
   "aria-hidden": true,
 };
 
 function SunIcon() {
   return (
     <svg {...iconProps}>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" />
+      <rect x="6" y="4" width="4" height="8" />
+      <rect x="4" y="6" width="8" height="4" />
+      <rect x="7" y="0" width="2" height="3" />
+      <rect x="7" y="13" width="2" height="3" />
+      <rect x="0" y="7" width="3" height="2" />
+      <rect x="13" y="7" width="3" height="2" />
+      <rect x="2" y="2" width="2" height="2" />
+      <rect x="12" y="2" width="2" height="2" />
+      <rect x="2" y="12" width="2" height="2" />
+      <rect x="12" y="12" width="2" height="2" />
     </svg>
   );
 }
@@ -78,7 +83,7 @@ function SunIcon() {
 function MoonIcon() {
   return (
     <svg {...iconProps}>
-      <path d="M20.7 14.2A8.5 8.5 0 0 1 9.8 3.3 8.5 8.5 0 1 0 20.7 14.2Z" />
+      <path d="M6 1h5v2H8v2H6v6h2v2h3v2H6v-2H3v-2H1V5h2V3h3V1Z" />
     </svg>
   );
 }
@@ -86,9 +91,12 @@ function MoonIcon() {
 function SunriseIcon() {
   return (
     <svg {...iconProps}>
-      <path d="M4 18a8 8 0 0 1 16 0Z" fill="currentColor" stroke="none" />
-      <path d="M2.5 18h19" strokeWidth="1.25" />
-      <path d="M2.9 12.8l1.4 .8M6.8 8.9l.8 1.4M12 7.5V9M17.2 8.9l-.8 1.4M21.1 12.8l-1.4 .8" strokeWidth="1.35" />
+      <rect x="1" y="13" width="14" height="2" />
+      <rect x="4" y="9" width="8" height="4" />
+      <rect x="6" y="7" width="4" height="2" />
+      <rect x="7" y="2" width="2" height="3" />
+      <rect x="2" y="5" width="2" height="2" />
+      <rect x="12" y="5" width="2" height="2" />
     </svg>
   );
 }

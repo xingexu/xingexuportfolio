@@ -205,6 +205,10 @@ const PARTICLE_COLORS = [
   "var(--confetti-4)",
 ];
 
+function PixelArrow() {
+  return <span className="pixel-arrow" aria-hidden="true" />;
+}
+
 function subscribeToSkyPhase(onChange: () => void) {
   const observer = new MutationObserver(onChange);
   observer.observe(document.documentElement, {
@@ -464,18 +468,18 @@ function SunriseHero() {
         <div className="hero-layout hero-layout-under-banner">
           <div className="hero-copy">
             <p className="step-in-2 hero-subtitle hero-education font-pixel">
-              western cs + ivey aeo &apos;31
+              western computer science + ivey aeo &apos;31
             </p>
 
             <div
               className="step-in-3"
               style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "14px 24px", marginTop: 32 }}
             >
-              <Link href="/projects" className="px-btn">
-                see what i built! <span aria-hidden>→</span>
+              <Link href="/projects" className="px-btn hero-cta-btn">
+                see what i built! <PixelArrow />
               </Link>
-              <Link href="/resume" className="px-btn px-btn-secondary hero-resume-btn">
-                resume <span aria-hidden>→</span>
+              <Link href="/resume" className="px-btn px-btn-secondary hero-cta-btn hero-resume-btn">
+                resume <PixelArrow />
               </Link>
             </div>
           </div>
@@ -602,18 +606,18 @@ function DefaultHero() {
           </h1>
 
           <p className="step-in-2 hero-subtitle hero-education font-pixel">
-            western cs + ivey aeo &apos;31
+            western computer science + ivey aeo &apos;31
           </p>
 
           <div
             className="step-in-3"
             style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "16px 28px", marginTop: 40 }}
           >
-            <Link href="/projects" className="px-btn">
-              see what i built! <span aria-hidden>→</span>
+            <Link href="/projects" className="px-btn hero-cta-btn">
+              see what i built! <PixelArrow />
             </Link>
-            <Link href="/resume" className="px-btn px-btn-secondary hero-resume-btn">
-              resume <span aria-hidden>→</span>
+            <Link href="/resume" className="px-btn px-btn-secondary hero-cta-btn hero-resume-btn">
+              resume <PixelArrow />
             </Link>
           </div>
         </div>

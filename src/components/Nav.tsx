@@ -19,13 +19,13 @@ export default function Nav() {
           display: "flex",
           alignItems: "center",
           justifyContent: "flex-end",
-          height: 54,
+          height: 60,
           maxWidth: 1040,
           margin: "0 auto",
           padding: "0 20px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <Link href="/projects" aria-current={pathname === "/projects" ? "page" : undefined} className="nav-link">
             projects
           </Link>

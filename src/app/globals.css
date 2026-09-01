@@ -644,15 +644,10 @@ body {
 }
 
 .midnight-fireworks-name {
-  appearance: none;
   position: relative;
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  padding: 0;
-  color: inherit;
-  background: transparent;
-  border: 0;
   line-height: 0;
   cursor: pointer;
   isolation: isolate;
@@ -661,8 +656,25 @@ body {
 
 .midnight-fireworks-name-glowing {
   filter:
-    drop-shadow(0 0 10px rgba(255, 240, 187, 0.94))
-    drop-shadow(0 0 24px rgba(159, 196, 240, 0.72));
+    drop-shadow(0 0 6px rgba(255, 240, 187, 0.86))
+    drop-shadow(0 0 14px rgba(159, 196, 240, 0.52));
+}
+
+.midnight-fullscreen-fireworks {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.midnight-fullscreen-fireworks-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  object-position: center;
+  image-rendering: pixelated;
 }
 
 .midnight-fireworks-name-image,
@@ -716,7 +728,7 @@ body {
 }
 
 :root[data-sky-phase="night"] .midnight-supporting-copy-visible {
-  animation: midnightSupportingCopyReveal 700ms steps(7, end) both;
+  animation: midnightSupportingCopyReveal 600ms steps(6, end) both;
 }
 
 @keyframes midnightFinalFrameReveal {
@@ -2328,6 +2340,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   .hero-banner-fireworks,
+  .midnight-fullscreen-fireworks,
   .hero-banner-speed-particles,
   .hero-banner-plane-smoke,
   .resume-animation-frames,

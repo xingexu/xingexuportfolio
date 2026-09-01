@@ -27,6 +27,17 @@ const MOBILE_LAYOUT_MAX_WIDTH = 820;
 const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const SUNRISE_SKYLINE_GLOW_DURATION_MS = 1600;
+const MIDNIGHT_WINDOW_FLASH_DURATION_MS = 320;
+const MIDNIGHT_BUILDING_SLEEP_DURATION_MS = 2000;
+const MIDNIGHT_FERRY_PAUSE_DURATION_MS = 1500;
+const SLEEPY_Z_MAP = [
+  [1, 1, 1, 1, 1],
+  [0, 0, 0, 1, 1],
+  [0, 0, 1, 1, 0],
+  [0, 1, 1, 0, 0],
+  [1, 1, 0, 0, 0],
+  [1, 1, 1, 1, 1],
+];
 const SKYLINE_GLOW_FAR_OFFSETS = [
   [-4, 0], [4, 0], [0, -4], [0, 4],
   [-4, -4], [4, -4], [-4, 4], [4, 4],
@@ -275,6 +286,15 @@ type Building = {
   x: number; w: number; h: number; near: boolean; shade: number; antenna: number;
   roof: "flat" | "tank" | "ac"; setback: number; windows: { wx: number; wy: number }[];
 };
+type SleepyZ = {
+  delay: number;
+  direction: -1 | 1;
+  drift: number;
+  ferryOffsetX?: number;
+  trailLength: 1 | 3;
+  x: number;
+  y: number;
+};
 type Trail = { x: number; y: number }[];
 type SkyPhase = "day" | "twilight" | "night";
 
@@ -416,6 +436,10 @@ export default function Background() {
     let nameStarGlowActive = false;
     let sunriseSkylineGlowRemaining = 0;
     let sunriseSkylineGlowResetTimer = 0;
+    let midnightBuildingEffectElapsed = -1;
+    let midnightBuildingSleepTimer = 0;
+    let midnightBuildingResetTimer = 0;
+    let sleepyZs: SleepyZ[] = [];
     let clouds: Cloud[] = [];
     let buildings: Building[] = [];
     let litWindows = new Set<string>();
@@ -433,6 +457,7 @@ export default function Background() {
     let balloon: Balloon | null = null;
     let balloonWait = 1300;
     let ferry: Ferry | null = null;
+    let ferryPauseRemaining = 0;
     let ferrySplashes: FerrySplash[] = [];
     let ferrySplashAcc = 0;
     let shooting: { cells: Trail; acc: number } | null = null;
@@ -498,8 +523,64 @@ export default function Background() {
       }
     };
 
+    const startMidnightBuildingSleep = () => {
+      if (getVisibleSkyPhase() !== "night") return;
+      window.clearTimeout(midnightBuildingSleepTimer);
+      window.clearTimeout(midnightBuildingResetTimer);
+      midnightBuildingEffectElapsed = 0;
+      ferryPauseRemaining = MIDNIGHT_FERRY_PAUSE_DURATION_MS;
+      sleepyZs = createSleepyZs();
+      drawCurrentScene(reduced ? TICK : 0);
+      playBuildingSnore();
+
+      if (reduced) {
+        midnightBuildingSleepTimer = window.setTimeout(() => {
+          midnightBuildingEffectElapsed = MIDNIGHT_WINDOW_FLASH_DURATION_MS;
+          drawCurrentScene(0);
+        }, MIDNIGHT_WINDOW_FLASH_DURATION_MS);
+        midnightBuildingResetTimer = window.setTimeout(() => {
+          midnightBuildingEffectElapsed = -1;
+          drawCurrentScene(0);
+        }, MIDNIGHT_WINDOW_FLASH_DURATION_MS + MIDNIGHT_BUILDING_SLEEP_DURATION_MS);
+      }
+    };
+
     function getAudioContext() {
       return resumeSharedAudioContext(getSharedAudioContext());
+    }
+
+    function playBuildingSnore() {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const start = audio.currentTime + MIDNIGHT_WINDOW_FLASH_DURATION_MS / 1000;
+
+      [0, 0.47].forEach((offset, index) => {
+        const snoreAt = start + offset;
+        const oscillator = audio.createOscillator();
+        const filter = audio.createBiquadFilter();
+        const volume = audio.createGain();
+        const vibrato = audio.createOscillator();
+        const vibratoDepth = audio.createGain();
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(220 - index * 24, snoreAt);
+        oscillator.frequency.exponentialRampToValueAtTime(145 - index * 10, snoreAt + 0.36);
+        vibrato.type = "sine";
+        vibrato.frequency.setValueAtTime(7.5, snoreAt);
+        vibratoDepth.gain.setValueAtTime(5, snoreAt);
+        vibrato.connect(vibratoDepth).connect(oscillator.frequency);
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(680, snoreAt);
+        filter.frequency.exponentialRampToValueAtTime(360, snoreAt + 0.4);
+        volume.gain.setValueAtTime(0.0001, snoreAt);
+        volume.gain.exponentialRampToValueAtTime(0.022, snoreAt + 0.06);
+        volume.gain.setValueAtTime(0.016, snoreAt + 0.23);
+        volume.gain.exponentialRampToValueAtTime(0.0001, snoreAt + 0.42);
+        oscillator.connect(filter).connect(volume).connect(audio.destination);
+        vibrato.start(snoreAt);
+        oscillator.start(snoreAt);
+        vibrato.stop(snoreAt + 0.44);
+        oscillator.stop(snoreAt + 0.44);
+      });
     }
 
     function playChirp() {
@@ -651,6 +732,18 @@ export default function Background() {
       const ferryY = waterTop - 5 + ferry.bob;
       return x >= ferry.x && x <= ferry.x + FERRY[0].length &&
         y >= ferryY && y <= ferryY + FERRY.length;
+    }
+
+    function clickedBuilding(clientX: number, clientY: number) {
+      if (getVisibleSkyPhase() !== "night") return false;
+      const x = clientX / CELL;
+      const y = clientY / CELL;
+      return buildings.some((building) => (
+        x >= building.x &&
+        x <= building.x + building.w &&
+        y >= waterTop - building.h - building.antenna &&
+        y <= waterTop
+      ));
     }
 
     function clickedPlane(clientX: number, clientY: number) {
@@ -888,14 +981,72 @@ export default function Background() {
       skylineTwilightGlow = renderSkylineGlowMask(skylineTwilight);
     }
 
-    function renderSkylineGlowMask(source: HTMLCanvasElement) {
+    function createSleepyZs(): SleepyZ[] {
+      const towerX = cnTowerX();
+      const rogersCentreRight = towerX + 8 + 30;
+      const candidates = buildings
+        .filter((building) => {
+          if (!building.near || building.windows.length === 0) return false;
+          const sourceX = building.x + Math.floor(building.w / 2);
+          return sourceX < towerX - 5 || sourceX > rogersCentreRight;
+        })
+        .sort((a, b) => a.x - b.x);
+      const buildingZs: SleepyZ[] = candidates
+        .filter((_, index) => index % 2 === 0)
+        .map((building, index) => {
+          const sourceX = building.x + Math.floor(building.w / 2);
+          const sourceY = waterTop - building.h - building.antenna - 3;
+          return {
+            delay: (index * 47) % 360,
+            direction: 1,
+            drift: (index % 3) - 1,
+            trailLength: 1,
+            x: sourceX - 1,
+            y: sourceY,
+          };
+        });
+
+      const ferryZs: SleepyZ[] = ferry ? [
+        {
+          delay: 80,
+          direction: 1,
+          drift: -1,
+          ferryOffsetX: 4,
+          trailLength: 1,
+          x: ferry.x + 4,
+          y: waterTop - 8 + ferry.bob,
+        },
+        {
+          delay: 300,
+          direction: 1,
+          drift: -1,
+          ferryOffsetX: 12,
+          trailLength: 1,
+          x: ferry.x + 12,
+          y: waterTop - 8 + ferry.bob,
+        },
+        {
+          delay: 630,
+          direction: 1,
+          drift: 1,
+          ferryOffsetX: 19,
+          trailLength: 1,
+          x: ferry.x + 19,
+          y: waterTop - 8 + ferry.bob,
+        },
+      ] : [];
+
+      return [...buildingZs, ...ferryZs];
+    }
+
+    function renderSkylineGlowMask(source: HTMLCanvasElement, color = "#ffd889") {
       const off = document.createElement("canvas");
       off.width = source.width;
       off.height = source.height;
       const o = off.getContext("2d")!;
       o.drawImage(source, 0, 0);
       o.globalCompositeOperation = "source-in";
-      o.fillStyle = "#ffd889";
+      o.fillStyle = color;
       o.fillRect(0, 0, off.width, off.height);
       return off;
     }
@@ -1274,8 +1425,103 @@ export default function Background() {
       }
     }
 
+    function drawRotatedPixelZ(
+      x: number,
+      y: number,
+      pixelSize: number,
+      direction: -1 | 1,
+      color: string,
+      alpha: number,
+    ) {
+      const angle = direction * -14 * Math.PI / 180;
+      const cosine = Math.cos(angle);
+      const sine = Math.sin(angle);
+      const centerX = (SLEEPY_Z_MAP[0].length - 1) / 2;
+      const centerY = (SLEEPY_Z_MAP.length - 1) / 2;
+
+      for (let row = 0; row < SLEEPY_Z_MAP.length; row += 1) {
+        for (let column = 0; column < SLEEPY_Z_MAP[row].length; column += 1) {
+          if (!SLEEPY_Z_MAP[row][column]) continue;
+          const relativeX = column - centerX;
+          const relativeY = row - centerY;
+          const rotatedX = Math.round(relativeX * cosine - relativeY * sine);
+          const rotatedY = Math.round(relativeX * sine + relativeY * cosine);
+          const pixelX = x + rotatedX * pixelSize;
+          const pixelY = y + rotatedY * pixelSize;
+          ctx!.globalAlpha = alpha * 0.64;
+          ctx!.fillStyle = "#1a2136";
+          ctx!.fillRect(pixelX + 1, pixelY + 1, pixelSize, pixelSize);
+          ctx!.globalAlpha = alpha;
+          ctx!.fillStyle = color;
+          ctx!.fillRect(pixelX, pixelY, pixelSize, pixelSize);
+        }
+      }
+    }
+
+    function drawSleepyZs(sleepElapsed: number) {
+      sleepyZs.forEach((sleepyZ) => {
+        const localElapsed = sleepElapsed - sleepyZ.delay;
+        if (localElapsed < 0) return;
+        const availableDuration = MIDNIGHT_BUILDING_SLEEP_DURATION_MS - sleepyZ.delay;
+        const progress = Math.min(1, localElapsed / availableDuration);
+        const rise = Math.floor(progress * 24);
+        const drift = sleepyZ.drift * Math.floor(progress * 6);
+        const jigglePattern = [0, 1, 0, -1, 0, 1, 0];
+        const jiggle = jigglePattern[Math.floor(localElapsed / 85) % jigglePattern.length];
+        const verticalJiggle = [0, 0, -1, 0][Math.floor(localElapsed / 110) % 4];
+        const alpha = progress < 0.72 ? 0.92 : Math.max(0, (1 - progress) / 0.28);
+        const color = "#dce9ff";
+        const sourceX = sleepyZ.ferryOffsetX !== undefined && ferry
+          ? ferry.x + sleepyZ.ferryOffsetX
+          : sleepyZ.x;
+        const sourceY = sleepyZ.ferryOffsetX !== undefined && ferry
+          ? waterTop - 8 + ferry.bob
+          : sleepyZ.y;
+        const baseX = sourceX * CELL + drift + jiggle;
+        const baseY = sourceY * CELL - rise + verticalJiggle;
+        const glyphs = sleepyZ.trailLength === 3
+          ? [
+              { delay: 0, offsetX: 0, offsetY: 0, pixelSize: 1 },
+              { delay: 70, offsetX: sleepyZ.direction * 14, offsetY: -16, pixelSize: 2 },
+              { delay: 140, offsetX: sleepyZ.direction * 32, offsetY: -36, pixelSize: 3 },
+            ]
+          : [{ delay: 0, offsetX: 0, offsetY: 0, pixelSize: 2 }];
+
+        glyphs.forEach((glyph) => {
+          if (localElapsed < glyph.delay) return;
+          const glyphAlpha = alpha * Math.min(1, (localElapsed - glyph.delay + 40) / 120);
+          drawRotatedPixelZ(
+            baseX + glyph.offsetX,
+            baseY + glyph.offsetY,
+            glyph.pixelSize,
+            sleepyZ.direction,
+            color,
+            glyphAlpha,
+          );
+        });
+        ctx!.globalAlpha = 1;
+      });
+    }
+
     function drawLitWindows(dt: number) {
-      if (!reduced) {
+      if (!reduced && midnightBuildingEffectElapsed >= 0) {
+        midnightBuildingEffectElapsed += dt;
+        if (
+          midnightBuildingEffectElapsed >=
+          MIDNIGHT_WINDOW_FLASH_DURATION_MS + MIDNIGHT_BUILDING_SLEEP_DURATION_MS
+        ) {
+          midnightBuildingEffectElapsed = -1;
+        }
+      }
+
+      const buildingStage = midnightBuildingEffectElapsed < 0
+        ? "normal"
+        : midnightBuildingEffectElapsed < MIDNIGHT_WINDOW_FLASH_DURATION_MS
+          ? "flash"
+          : "sleep";
+      canvas!.dataset.buildingLights = buildingStage;
+
+      if (!reduced && buildingStage === "normal") {
         windowAcc += dt;
         if (windowAcc >= 700) {
           windowAcc = 0;
@@ -1292,26 +1538,39 @@ export default function Background() {
       for (const b of buildings) {
         if (!b.near) continue;
         for (let i = 0; i < b.windows.length; i++) {
-          if (!litWindows.has(`${b.x}:${i}`)) continue;
+          if (buildingStage === "sleep" || !litWindows.has(`${b.x}:${i}`)) continue;
           const w = b.windows[i];
-          cell(b.x + w.wx, waterTop - b.h + w.wy, NIGHT.window, 0.95);
+          cell(
+            b.x + w.wx,
+            waterTop - b.h + w.wy,
+            buildingStage === "flash" ? "#fffdf0" : NIGHT.window,
+            buildingStage === "flash" ? 1 : 0.95,
+          );
         }
       }
       // CN Tower pod lights + blinking aviation beacon
       const { tx, top, podY } = towerDims();
-      for (const dx of [-5, -3, -1, 1, 3, 5]) cell(tx + dx, podY + 1, NIGHT.window, 0.9);
-      if (!reduced) {
+      if (buildingStage !== "sleep") {
+        for (const dx of [-5, -3, -1, 1, 3, 5]) {
+          cell(tx + dx, podY + 1, buildingStage === "flash" ? "#fffdf0" : NIGHT.window, 0.9);
+        }
+      }
+      if (!reduced && buildingStage === "normal") {
         beaconAcc += dt;
         if (beaconAcc >= 900) {
           beaconAcc = 0;
           beaconOn = !beaconOn;
         }
       }
-      if (beaconOn) {
+      if (beaconOn && buildingStage !== "sleep") {
         cell(tx, top, NIGHT.beacon, 0.95);
         cell(tx, top, NIGHT.beacon, 0.95);
         cell(tx - 1, top, NIGHT.beacon, 0.2);
         cell(tx + 1, top, NIGHT.beacon, 0.2);
+      }
+
+      if (buildingStage === "sleep") {
+        drawSleepyZs(midnightBuildingEffectElapsed - MIDNIGHT_WINDOW_FLASH_DURATION_MS);
       }
     }
 
@@ -1774,8 +2033,11 @@ export default function Background() {
     function drawFerry(dt: number, night: boolean) {
       if (!ferry) return;
 
-      const boosted = !reduced && ferry.boostRemaining > 0;
-      if (!reduced) {
+      const paused = !reduced && ferryPauseRemaining > 0;
+      if (paused) ferryPauseRemaining = Math.max(0, ferryPauseRemaining - dt);
+      canvas!.dataset.ferryPaused = paused ? "true" : "false";
+      const boosted = !reduced && !paused && ferry.boostRemaining > 0;
+      if (!reduced && !paused) {
         ferry.boostRemaining = Math.max(0, ferry.boostRemaining - dt);
         ferry.acc += dt;
         const moveEvery = boosted ? 330 / 4 : 330;
@@ -1794,6 +2056,10 @@ export default function Background() {
 
       const ferryY = waterTop - 5 + ferry.bob;
       const foam = night ? "#90abc7" : "#eef9ff";
+      const ferryLightsOff = night &&
+        midnightBuildingEffectElapsed >= 0 &&
+        midnightBuildingEffectElapsed < MIDNIGHT_BUILDING_SLEEP_DURATION_MS;
+      canvas!.dataset.ferryLights = ferryLightsOff ? "off" : "normal";
 
       if (boosted) {
         ferrySplashAcc += dt;
@@ -1833,7 +2099,7 @@ export default function Background() {
         1: night ? "#d7e2ec" : "#f7fbff",
         2: night ? "#c44843" : "#df5148",
         3: night ? "#71869c" : "#dbe9f4",
-        4: night ? NIGHT.window : "#245278",
+        4: night ? (ferryLightsOff ? "#304258" : NIGHT.window) : "#245278",
         5: night ? "#f0c75e" : "#e9a824",
         6: night ? "#17283c" : "#315777",
       }, 1);
@@ -1859,6 +2125,7 @@ export default function Background() {
           sunriseSunJourneyElapsed = 0;
         }
         else sunriseSkylineGlowRemaining = 0;
+        if (phase !== "night") midnightBuildingEffectElapsed = -1;
         document.documentElement.dataset.skyPhase = phase;
         document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";
       }
@@ -1899,6 +2166,8 @@ export default function Background() {
       } else if (clickedPlane(event.clientX, event.clientY)) {
         if (plane) plane.boostRemaining = 2000;
         playPlaneFlyby();
+      } else if (clickedBuilding(event.clientX, event.clientY)) {
+        startMidnightBuildingSleep();
       }
     };
 
@@ -1930,6 +2199,8 @@ export default function Background() {
       cancelAnimationFrame(raf);
       window.clearInterval(clockTimer);
       window.clearTimeout(sunriseSkylineGlowResetTimer);
+      window.clearTimeout(midnightBuildingSleepTimer);
+      window.clearTimeout(midnightBuildingResetTimer);
       window.clearTimeout(moonPhasePreviewTimer);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener(NAME_STAR_GLOW_EVENT, onNameStarGlow);
@@ -1939,6 +2210,9 @@ export default function Background() {
       delete canvas.dataset.moonPhase;
       delete canvas.dataset.moonPhaseSource;
       delete canvas.dataset.moonDateToronto;
+      delete canvas.dataset.buildingLights;
+      delete canvas.dataset.ferryPaused;
+      delete canvas.dataset.ferryLights;
       phaseObserver.disconnect();
     };
   }, []);

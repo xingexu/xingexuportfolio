@@ -10,11 +10,13 @@ const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
 const BANNER_STATIC = "/xinge-plane-banner-static.png";
-const MIDNIGHT_FIREWORKS_NAME = "/xinge-fireworks-transparent.png";
-const MIDNIGHT_FIREWORKS_FINAL = "/xinge-fireworks-final.png";
-const MIDNIGHT_FIREWORKS_DURATION_MS = 11_850;
-const MIDNIGHT_FIREWORKS_REVEAL_MS = 11_150;
-const MIDNIGHT_STAR_GLOW_DURATION_MS = 1_900;
+const MIDNIGHT_FIREWORKS_NAME = "/newfireworks.png";
+const MIDNIGHT_FIREWORKS_FINAL = "/newfireworks-final.png";
+const MIDNIGHT_FULLSCREEN_FIREWORKS = "/fullscreenfireworks.png";
+const MIDNIGHT_FIREWORKS_DURATION_MS = 8_950;
+const MIDNIGHT_FULLSCREEN_FIREWORKS_DURATION_MS = 4_000;
+const MIDNIGHT_FIREWORKS_REVEAL_MS = 8_250;
+const MIDNIGHT_SUPPORTING_REVEAL_MS = 7_400;
 const BANNER_ENTRANCE_DURATION_MS = 4200;
 const BANNER_PARTICLE_REMOVAL_INTERVAL_MS = 1000;
 const SUNRISE_TRANSIENT_PARTICLE_COUNT = 21;
@@ -268,7 +270,7 @@ function BannerFireworks({ mode }: { mode: FireworkMode }) {
   const fireworks = mode === "extra" ? SUNRISE_CLICK_FIREWORKS : SUNRISE_LANDING_FIREWORKS;
 
   return (
-    <div className="hero-banner-fireworks" aria-hidden="true">
+    <span className="hero-banner-fireworks" aria-hidden="true">
       {fireworks.map((firework, fireworkIndex) => (
         <span
           className="hero-banner-firework"
@@ -305,7 +307,7 @@ function BannerFireworks({ mode }: { mode: FireworkMode }) {
           </span>
         </span>
       ))}
-    </div>
+    </span>
   );
 }
 
@@ -577,9 +579,12 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
   const [midnightIntroPlaying, setMidnightIntroPlaying] = useState(phase === "night");
   const [midnightIntroReady, setMidnightIntroReady] = useState(false);
   const [midnightNameVisible, setMidnightNameVisible] = useState(false);
+  const [midnightSupportingVisible, setMidnightSupportingVisible] = useState(false);
   const [midnightGlowActive, setMidnightGlowActive] = useState(false);
+  const [midnightFullscreenFireworksId, setMidnightFullscreenFireworksId] = useState(0);
+  const midnightFullscreenFireworksTimer = useRef<number | null>(null);
+  const midnightFireworkNoise = useRef<AudioBuffer | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const midnightGlowTimer = useRef<number | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   const pid = useRef(0);
 
@@ -609,26 +614,60 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
     dispatchNameStarGlow(false);
   };
 
-  const handleMidnightNameClick = () => {
+  const handleMidnightNameMouseEnter = () => {
+    if (!midnightNameVisible) return;
     burst();
-    if (midnightGlowTimer.current) window.clearTimeout(midnightGlowTimer.current);
     setMidnightGlowActive(true);
-    dispatchNameStarGlow(true);
-    midnightGlowTimer.current = window.setTimeout(() => {
-      setMidnightGlowActive(false);
-      dispatchNameStarGlow(false);
-      midnightGlowTimer.current = null;
-    }, MIDNIGHT_STAR_GLOW_DURATION_MS);
+  };
+
+  const handleMidnightNameMouseLeave = () => {
+    setMidnightGlowActive(false);
+  };
+
+  const handleMidnightNameClick = () => {
+    if (phase !== "night" || !midnightNameVisible) return;
+    setMidnightFullscreenFireworksId((current) => current + 1);
+    if (midnightFullscreenFireworksTimer.current) {
+      window.clearTimeout(midnightFullscreenFireworksTimer.current);
+    }
+    midnightFullscreenFireworksTimer.current = window.setTimeout(() => {
+      setMidnightFullscreenFireworksId(0);
+      midnightFullscreenFireworksTimer.current = null;
+    }, MIDNIGHT_FULLSCREEN_FIREWORKS_DURATION_MS);
+    const audio = resumeSharedAudioContext(getSharedAudioContext());
+    if (!audio || audio.state === "closed") return;
+    if (!midnightFireworkNoise.current) midnightFireworkNoise.current = createFireworkNoise(audio);
+    scheduleFireworkSounds(audio, midnightFireworkNoise.current, "extra");
   };
 
   useEffect(() => () => {
-    if (midnightGlowTimer.current) window.clearTimeout(midnightGlowTimer.current);
+    if (midnightFullscreenFireworksTimer.current) {
+      window.clearTimeout(midnightFullscreenFireworksTimer.current);
+    }
+    midnightFireworkNoise.current = null;
     dispatchNameStarGlow(false);
   }, []);
 
   useEffect(() => {
+    if (phase === "night") {
+      const preload = new window.Image();
+      preload.src = MIDNIGHT_FULLSCREEN_FIREWORKS;
+      return;
+    }
+    if (midnightFullscreenFireworksTimer.current) {
+      window.clearTimeout(midnightFullscreenFireworksTimer.current);
+      midnightFullscreenFireworksTimer.current = null;
+    }
+    setMidnightFullscreenFireworksId(0);
+  }, [phase]);
+
+  useEffect(() => {
     if (phase !== "night" || !midnightIntroPlaying || !midnightIntroReady) return;
 
+    const supportingTimer = window.setTimeout(
+      () => setMidnightSupportingVisible(true),
+      MIDNIGHT_SUPPORTING_REVEAL_MS,
+    );
     const revealTimer = window.setTimeout(
       () => setMidnightNameVisible(true),
       MIDNIGHT_FIREWORKS_REVEAL_MS,
@@ -638,6 +677,7 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
       MIDNIGHT_FIREWORKS_DURATION_MS,
     );
     return () => {
+      window.clearTimeout(supportingTimer);
       window.clearTimeout(revealTimer);
       window.clearTimeout(introTimer);
     };
@@ -677,7 +717,7 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
   }, [phase]);
 
   const midnightSupportingCopyClass = phase === "night"
-    ? ` midnight-supporting-copy${midnightNameVisible ? " midnight-supporting-copy-visible" : ""}`
+    ? ` midnight-supporting-copy${midnightSupportingVisible ? " midnight-supporting-copy-visible" : ""}`
     : "";
 
   return (
@@ -693,6 +733,19 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
         padding: "96px 28px",
       }}
     >
+      {phase === "night" && midnightFullscreenFireworksId > 0 && (
+        <span className="midnight-fullscreen-fireworks" aria-hidden="true">
+          <Image
+            key={midnightFullscreenFireworksId}
+            src={`${MIDNIGHT_FULLSCREEN_FIREWORKS}#play-${midnightFullscreenFireworksId}`}
+            alt=""
+            fill
+            sizes="100vw"
+            unoptimized
+            className="midnight-fullscreen-fireworks-image"
+          />
+        </span>
+      )}
       <div className="hero-layout" style={{ width: "100%", maxWidth: 1040 }}>
         <div className="hero-copy">
           <h1
@@ -707,12 +760,21 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
             }}
           >
             {phase === "night" ? (
-              <button
-                type="button"
+              <span
                 className={`midnight-fireworks-name${midnightGlowActive ? " midnight-fireworks-name-glowing" : ""}`}
+                aria-label={midnightNameVisible ? "Xinge Xu — launch fullscreen fireworks" : undefined}
+                role={midnightNameVisible ? "button" : undefined}
+                tabIndex={midnightNameVisible ? 0 : -1}
+                onPointerDown={(event) => event.stopPropagation()}
                 onClick={handleMidnightNameClick}
-                aria-label="Light up every star around Xinge Xu"
-                title="Click to light up the stars"
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  handleMidnightNameClick();
+                }}
+                onMouseEnter={handleMidnightNameMouseEnter}
+                onMouseLeave={handleMidnightNameMouseLeave}
+                title={midnightNameVisible ? "Click for fullscreen fireworks and sound" : undefined}
               >
                 <span className="sr-only">{NAME}</span>
                 {midnightIntroPlaying && (
@@ -740,7 +802,7 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
                   aria-hidden
                   className={`midnight-fireworks-name-still${midnightNameVisible ? " midnight-fireworks-name-still-visible" : ""}`}
                 />
-              </button>
+              </span>
             ) : (
               <span>
                 <span

@@ -38,12 +38,12 @@
   --nav-accent: #ffd24a;
   --nav-accent-ink: #0a0f1c;
   --nav-shadow: #000914;
-  --nav-pixel-1: #172641;
-  --nav-pixel-2: #263b60;
-  --nav-pixel-3: #6f8fbd;
-  --chrome-pixel-1: #111d33;
-  --chrome-pixel-2: #223251;
-  --chrome-pixel-3: #ffd24a;
+  --nav-pixel-1: #101c30;
+  --nav-pixel-2: #172641;
+  --nav-pixel-3: #203653;
+  --chrome-pixel-1: #0e192c;
+  --chrome-pixel-2: #172641;
+  --chrome-pixel-3: #203653;
   --confetti-1: #ffd24a;
   --confetti-2: #9fc4f0;
   --confetti-3: #e9eff8;
@@ -79,12 +79,12 @@
   --nav-accent: #b86628;
   --nav-accent-ink: #fffaf1;
   --nav-shadow: #bea98f;
-  --nav-pixel-1: #e8d7bd;
-  --nav-pixel-2: #d1b38e;
-  --nav-pixel-3: #b86628;
-  --chrome-pixel-1: #dcecf8;
-  --chrome-pixel-2: #b9d5ea;
-  --chrome-pixel-3: #d97706;
+  --nav-pixel-1: #eee2cf;
+  --nav-pixel-2: #e3cfb3;
+  --nav-pixel-3: #d8bc99;
+  --chrome-pixel-1: #dfeefa;
+  --chrome-pixel-2: #c9e0f2;
+  --chrome-pixel-3: #afd1e9;
   --confetti-1: #d97706;
   --confetti-2: #4d83b4;
   --confetti-3: #ffffff;
@@ -120,12 +120,12 @@
   --nav-accent: #684a9b;
   --nav-accent-ink: #fffaf1;
   --nav-shadow: #51356f;
-  --nav-pixel-1: #c49ed6;
-  --nav-pixel-2: #8d62aa;
-  --nav-pixel-3: #ffd889;
-  --chrome-pixel-1: #3c2748;
-  --chrome-pixel-2: #704862;
-  --chrome-pixel-3: #ffd889;
+  --nav-pixel-1: #b889cc;
+  --nav-pixel-2: #9b6bb4;
+  --nav-pixel-3: #c49ed6;
+  --chrome-pixel-1: #382442;
+  --chrome-pixel-2: #4c304f;
+  --chrome-pixel-3: #68425c;
   --confetti-1: #ffd889;
   --confetti-2: #fff0cf;
   --confetti-3: #ef7f7d;
@@ -587,46 +587,14 @@ body {
 
 .nav-bar {
   background-color: var(--nav-bg);
-  background-image:
-    linear-gradient(
-      90deg,
-      transparent 0 7px,
-      var(--nav-pixel-1) 7px 13px,
-      transparent 13px 27px,
-      var(--nav-pixel-2) 27px 36px,
-      transparent 36px 55px,
-      var(--nav-pixel-3) 55px 59px,
-      transparent 59px 76px,
-      var(--nav-pixel-1) 76px 84px,
-      transparent 84px 100%
-    ),
-    linear-gradient(
-      90deg,
-      transparent 0 18px,
-      var(--nav-pixel-2) 18px 25px,
-      transparent 25px 48px,
-      var(--nav-pixel-1) 48px 60px,
-      transparent 60px 87px,
-      var(--nav-pixel-3) 87px 92px,
-      transparent 92px 100%
-    ),
-    linear-gradient(
-      90deg,
-      transparent 0 32px,
-      var(--nav-pixel-1) 32px 37px,
-      transparent 37px 69px,
-      var(--nav-pixel-2) 69px 76px,
-      transparent 76px 100%
-    );
-  background-position:
-    0 5px,
-    29px calc(100% - 7px),
-    11px 26px;
-  background-repeat: repeat-x;
-  background-size:
-    96px 5px,
-    137px 4px,
-    173px 3px;
+  background-image: conic-gradient(
+    from 90deg,
+    var(--nav-pixel-1) 0 25%,
+    var(--nav-bg) 0 50%,
+    var(--nav-pixel-2) 0 75%,
+    var(--nav-pixel-3) 0
+  );
+  background-size: 16px 16px;
   border-bottom: 2px solid var(--nav-border);
   box-shadow: 0 2px 0 var(--nav-shadow);
 }
@@ -653,55 +621,14 @@ body {
   position: relative;
   z-index: 10;
   background-color: var(--chrome-solid);
-  background-image:
-    linear-gradient(
-      90deg,
-      var(--chrome-pixel-2) 0 8px,
-      transparent 8px 17px,
-      var(--chrome-pixel-1) 17px 31px,
-      transparent 31px 46px,
-      var(--chrome-pixel-3) 46px 51px,
-      transparent 51px 73px,
-      var(--chrome-pixel-2) 73px 86px,
-      transparent 86px 100%
-    ),
-    linear-gradient(
-      90deg,
-      transparent 0 11px,
-      var(--chrome-pixel-1) 11px 24px,
-      transparent 24px 39px,
-      var(--chrome-pixel-2) 39px 47px,
-      transparent 47px 68px,
-      var(--chrome-pixel-3) 68px 72px,
-      transparent 72px 100%
-    ),
-    linear-gradient(
-      90deg,
-      transparent 0 27px,
-      var(--chrome-pixel-2) 27px 35px,
-      transparent 35px 61px,
-      var(--chrome-pixel-1) 61px 77px,
-      transparent 77px 100%
-    ),
-    linear-gradient(
-      90deg,
-      transparent 0 43px,
-      var(--chrome-pixel-1) 43px 49px,
-      transparent 49px 91px,
-      var(--chrome-pixel-2) 91px 98px,
-      transparent 98px 100%
-    );
-  background-position:
-    0 0,
-    23px 7px,
-    51px 13px,
-    7px calc(100% - 7px);
-  background-repeat: repeat-x;
-  background-size:
-    112px 5px,
-    131px 5px,
-    157px 4px,
-    181px 3px;
+  background-image: conic-gradient(
+    from 90deg,
+    var(--chrome-pixel-1) 0 25%,
+    var(--chrome-solid) 0 50%,
+    var(--chrome-pixel-2) 0 75%,
+    var(--chrome-pixel-3) 0
+  );
+  background-size: 16px 16px;
   border-top: 2px solid var(--chrome-border);
   box-shadow: inset 0 2px 0 var(--chrome-shadow);
 }

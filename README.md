@@ -1,6 +1,6 @@
 # Hey everyone, I'm Xinge Xu!
 
-You can call me **Zinger**. I'm an incoming first-year student at Western University (UWO), where I'll be studying Computer Science.
+You can call me **Zinger**. I'm a first-year student at Western University (UWO), studying Computer Science.
 
 Welcome to my portfolio! This is where I share the projects I'm building :D
 

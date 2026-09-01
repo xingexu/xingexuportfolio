@@ -599,6 +599,36 @@ body {
   margin: clamp(-52px, -4vw, -34px) auto 0;
 }
 
+@media (min-width: 821px) {
+  :root[data-sky-phase="twilight"] .hero-stage {
+    transform: translateY(-42px);
+  }
+
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner {
+    margin-top: clamp(-78px, -5.4vw, -52px);
+  }
+
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-education {
+    font-size: clamp(16px, 1.3vw, 19px);
+  }
+
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
+    gap: 18px 26px !important;
+    margin-top: 20px !important;
+  }
+
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-cta-btn {
+    min-width: 320px;
+    min-height: 78px;
+    padding: 19px 28px;
+    font-size: clamp(17px, 1.3vw, 20px);
+  }
+
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-resume-btn {
+    min-width: 248px;
+  }
+}
+
 :root[data-sky-phase="twilight"] .hero-plane-banner-image {
   filter:
     drop-shadow(0 0 3px rgba(71, 45, 84, 0.86))
@@ -633,12 +663,104 @@ body {
   animation: particleDrop 1s steps(11, end) both;
 }
 
+.hero-default-section {
+  overflow-x: clip;
+}
+
+.day-planes-heading {
+  display: block !important;
+  width: min(125vw, 2050px);
+  max-width: none !important;
+  aspect-ratio: 1440 / 280;
+  margin: 0 0 clamp(-150px, -8.4vw, -44px);
+  line-height: 0 !important;
+  transform: translateX(-20.972%);
+}
+
+.day-planes-name {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+}
+
+.day-planes-name-window {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: clip;
+  pointer-events: none;
+}
+
+.day-planes-name-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: translateY(-25.333%);
+  image-rendering: pixelated;
+}
+
+.day-planes-name-animation {
+  z-index: 1;
+  filter:
+    drop-shadow(0 0 3px rgba(37, 72, 112, 0.42))
+    drop-shadow(0 0 12px rgba(255, 255, 255, 0.24));
+}
+
+.day-planes-name-final {
+  z-index: 2;
+  opacity: 0;
+  filter:
+    drop-shadow(0 0 2px rgba(255, 255, 255, 0.96))
+    drop-shadow(0 0 8px rgba(233, 248, 255, 0.78))
+    drop-shadow(0 0 20px rgba(55, 126, 186, 0.58));
+}
+
+.day-planes-name-complete .day-planes-name-final {
+  opacity: 1;
+}
+
+.day-planes-name-complete:hover .day-planes-name-final {
+  filter:
+    drop-shadow(0 0 3px rgba(255, 255, 255, 1))
+    drop-shadow(0 0 11px rgba(233, 248, 255, 0.9))
+    drop-shadow(0 0 25px rgba(55, 126, 186, 0.72));
+}
+
+:root[data-sky-phase="day"] .hero-default-section .hero-copy > .step-in-3 {
+  gap: 22px 32px !important;
+  margin-top: 22px !important;
+}
+
+:root[data-sky-phase="day"] .hero-default-section .hero-cta-btn {
+  min-width: 340px;
+  min-height: 82px;
+  padding: 20px 30px;
+  font-size: clamp(17px, 1.3vw, 20px);
+}
+
+:root[data-sky-phase="day"] .hero-default-section .hero-resume-btn {
+  min-width: 260px;
+}
+
+:root[data-sky-phase="day"] .hero-default-section .hero-education {
+  font-size: clamp(16px, 1.35vw, 19px);
+}
+
+:root[data-sky-phase="day"] .hero-default-section .hero-copy {
+  transform: translateY(-78px);
+}
+
 .midnight-fireworks-heading {
   display: block !important;
-  width: min(90vw, 980px);
+  width: min(94vw, 1120px);
   max-width: 100%;
   aspect-ratio: 16 / 9;
-  margin: 0 0 -198px;
+  margin: 0 0 -226px;
   line-height: 0 !important;
   transform: translate(-8.5%, 8px);
 }
@@ -715,11 +837,27 @@ body {
 }
 
 :root[data-sky-phase="night"] .hero-default-section .hero-copy {
-  transform: translateY(-94px);
+  transform: translateY(-128px);
 }
 
 :root[data-sky-phase="night"] .hero-default-section .hero-copy > .step-in-3 {
-  margin-top: 24px !important;
+  gap: 20px 28px !important;
+  margin-top: 16px !important;
+}
+
+:root[data-sky-phase="night"] .hero-default-section .hero-education {
+  font-size: clamp(15px, 1.25vw, 18px);
+}
+
+:root[data-sky-phase="night"] .hero-default-section .hero-cta-btn {
+  min-width: 300px;
+  min-height: 76px;
+  padding: 19px 28px;
+  font-size: clamp(16px, 1.2vw, 19px);
+}
+
+:root[data-sky-phase="night"] .hero-default-section .hero-resume-btn {
+  min-width: 230px;
 }
 
 :root[data-sky-phase="night"] .midnight-supporting-copy {
@@ -2129,6 +2267,39 @@ a.project-card:hover .project-title { color: var(--accent); }
     font-size: clamp(34px, 10vw, 64px) !important;
     overflow-wrap: anywhere;
   }
+  .day-planes-heading {
+    width: min(205vw, 940px);
+    max-width: none !important;
+    margin-bottom: clamp(-64px, -13vw, -42px);
+    transform: translateX(12%);
+  }
+  :root[data-sky-phase="day"] .hero-default-section .hero-copy > .step-in-3 {
+    width: min(92vw, 440px);
+    gap: 12px !important;
+    margin-top: 18px !important;
+  }
+  :root[data-sky-phase="day"] .hero-default-section .hero-cta-btn,
+  :root[data-sky-phase="day"] .hero-default-section .hero-resume-btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 66px;
+    padding: 16px 20px;
+    font-size: clamp(14px, 4.2vw, 17px);
+  }
+  :root[data-sky-phase="day"] .hero-default-section .hero-copy {
+    transform: translateY(-48px);
+  }
+  :root[data-sky-phase="day"] .hero-default-section .hero-education {
+    font-size: clamp(13px, 4vw, 16px);
+  }
+  :root[data-sky-phase="night"] .hero-default-section .hero-cta-btn,
+  :root[data-sky-phase="night"] .hero-default-section .hero-resume-btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 60px;
+    padding: 15px 18px;
+    font-size: clamp(13px, 4vw, 16px);
+  }
   .midnight-fireworks-heading {
     width: 100%;
     margin-bottom: -62px;
@@ -2167,7 +2338,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   }
   .hero-layout-under-banner {
     max-width: min(92vw, 620px);
-    margin-top: clamp(12px, 4vw, 22px);
+    margin-top: clamp(-18px, -3vw, -8px);
     margin-right: auto;
     margin-left: auto;
     padding-left: 0;
@@ -2177,18 +2348,21 @@ a.project-card:hover .project-title { color: var(--accent); }
     padding-top: 92px !important;
     padding-bottom: clamp(24px, 4svh, 38px) !important;
   }
+  :root[data-sky-phase="twilight"] .hero-stage {
+    transform: translateY(-20px);
+  }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
-    width: min(72vw, 320px);
+    width: min(84vw, 380px);
     gap: 12px !important;
     margin-right: auto !important;
     margin-left: auto !important;
-    margin-top: 22px !important;
+    margin-top: 16px !important;
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-cta-btn {
-    min-height: 50px;
-    gap: 10px;
-    padding: 11px 14px;
-    font-size: clamp(12px, 3.2vw, 14px);
+    min-height: 58px;
+    gap: 12px;
+    padding: 14px 18px;
+    font-size: clamp(13px, 3.8vw, 16px);
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .pixel-arrow {
     flex-basis: 22px;

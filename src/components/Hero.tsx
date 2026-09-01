@@ -10,13 +10,16 @@ const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
 const BANNER_STATIC = "/xinge-plane-banner-static.png";
+const DAY_PLANES_ANIMATION = "/planesanimation.png";
+const DAY_PLANES_FINAL = "/planesanimation-final.png";
+const DAY_PLANES_DURATION_MS = 6_000;
 const MIDNIGHT_FIREWORKS_NAME = "/newfireworks.png";
 const MIDNIGHT_FIREWORKS_FINAL = "/newfireworks-final.png";
 const MIDNIGHT_FULLSCREEN_FIREWORKS = "/fullscreenfireworks.png";
-const MIDNIGHT_FIREWORKS_DURATION_MS = 8_950;
+const MIDNIGHT_FIREWORKS_DURATION_MS = 7_200;
 const MIDNIGHT_FULLSCREEN_FIREWORKS_DURATION_MS = 4_000;
-const MIDNIGHT_FIREWORKS_REVEAL_MS = 8_250;
-const MIDNIGHT_SUPPORTING_REVEAL_MS = 7_400;
+const MIDNIGHT_FIREWORKS_REVEAL_MS = 6_500;
+const MIDNIGHT_SUPPORTING_REVEAL_MS = 4_900;
 const BANNER_ENTRANCE_DURATION_MS = 4200;
 const BANNER_PARTICLE_REMOVAL_INTERVAL_MS = 1000;
 const SUNRISE_TRANSIENT_PARTICLE_COUNT = 21;
@@ -574,8 +577,7 @@ function SunriseHero() {
 }
 
 function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
-  const [typed, setTyped] = useState("");
-  const [typing, setTyping] = useState(false);
+  const [dayAnimationComplete, setDayAnimationComplete] = useState(phase !== "day");
   const [midnightIntroPlaying, setMidnightIntroPlaying] = useState(phase === "night");
   const [midnightIntroReady, setMidnightIntroReady] = useState(false);
   const [midnightNameVisible, setMidnightNameVisible] = useState(false);
@@ -584,7 +586,7 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
   const [midnightFullscreenFireworksId, setMidnightFullscreenFireworksId] = useState(0);
   const midnightFullscreenFireworksTimer = useRef<number | null>(null);
   const midnightFireworkNoise = useRef<AudioBuffer | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dayAnimationTimer = useRef<number | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   const pid = useRef(0);
 
@@ -614,6 +616,17 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
     dispatchNameStarGlow(false);
   };
 
+  const handleDayAnimationLoad = () => {
+    if (phase !== "day" || dayAnimationComplete || dayAnimationTimer.current) return;
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? 0
+      : DAY_PLANES_DURATION_MS;
+    dayAnimationTimer.current = window.setTimeout(() => {
+      setDayAnimationComplete(true);
+      dayAnimationTimer.current = null;
+    }, duration);
+  };
+
   const handleMidnightNameMouseEnter = () => {
     if (!midnightNameVisible) return;
     burst();
@@ -641,6 +654,9 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
   };
 
   useEffect(() => () => {
+    if (dayAnimationTimer.current) {
+      window.clearTimeout(dayAnimationTimer.current);
+    }
     if (midnightFullscreenFireworksTimer.current) {
       window.clearTimeout(midnightFullscreenFireworksTimer.current);
     }
@@ -649,16 +665,9 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
   }, []);
 
   useEffect(() => {
-    if (phase === "night") {
-      const preload = new window.Image();
-      preload.src = MIDNIGHT_FULLSCREEN_FIREWORKS;
-      return;
-    }
-    if (midnightFullscreenFireworksTimer.current) {
-      window.clearTimeout(midnightFullscreenFireworksTimer.current);
-      midnightFullscreenFireworksTimer.current = null;
-    }
-    setMidnightFullscreenFireworksId(0);
+    if (phase !== "night") return;
+    const preload = new window.Image();
+    preload.src = MIDNIGHT_FULLSCREEN_FIREWORKS;
   }, [phase]);
 
   useEffect(() => {
@@ -682,39 +691,6 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
       window.clearTimeout(introTimer);
     };
   }, [midnightIntroPlaying, midnightIntroReady, phase]);
-
-  useEffect(() => {
-    if (phase === "night") {
-      setTyped("");
-      setTyping(false);
-      return;
-    }
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setTyped(NAME);
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      setTyped("");
-      setTyping(true);
-      let index = 0;
-      timer.current = setInterval(() => {
-        index++;
-        setTyped(NAME.slice(0, index));
-        if (index >= NAME.length && timer.current) {
-          clearInterval(timer.current);
-          timer.current = null;
-          setTyping(false);
-        }
-      }, 110);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [phase]);
 
   const midnightSupportingCopyClass = phase === "night"
     ? ` midnight-supporting-copy${midnightSupportingVisible ? " midnight-supporting-copy-visible" : ""}`
@@ -749,7 +725,7 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
       <div className="hero-layout" style={{ width: "100%", maxWidth: 1040 }}>
         <div className="hero-copy">
           <h1
-            className={`font-pixel${phase === "night" ? " midnight-fireworks-heading" : ""}`}
+            className={`font-pixel${phase === "night" ? " midnight-fireworks-heading" : " day-planes-heading"}`}
             style={{
               display: "inline-block",
               fontSize: "clamp(40px, 8vw, 88px)",
@@ -804,15 +780,40 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
                 />
               </span>
             ) : (
-              <span>
-                <span
-                  className="name-hover"
-                  onMouseEnter={handleNameMouseEnter}
-                  onMouseLeave={handleNameMouseLeave}
-                >
-                  {typed}
+              <span
+                className={`day-planes-name${dayAnimationComplete ? " day-planes-name-complete" : ""}`}
+                onMouseEnter={handleNameMouseEnter}
+                onMouseLeave={handleNameMouseLeave}
+              >
+                <span className="sr-only">{NAME}</span>
+                <span className="day-planes-name-window" aria-hidden="true">
+                  {!dayAnimationComplete && (
+                    <Image
+                      src={DAY_PLANES_ANIMATION}
+                      alt=""
+                      width={1440}
+                      height={900}
+                      priority
+                      unoptimized
+                      draggable={false}
+                      sizes="(max-width: 820px) 190vw, 1800px"
+                      className="day-planes-name-image day-planes-name-animation"
+                      onLoad={handleDayAnimationLoad}
+                      onError={() => setDayAnimationComplete(true)}
+                    />
+                  )}
+                  <Image
+                    src={DAY_PLANES_FINAL}
+                    alt=""
+                    width={1440}
+                    height={900}
+                    priority
+                    unoptimized
+                    draggable={false}
+                    sizes="(max-width: 820px) 190vw, 1800px"
+                    className="day-planes-name-image day-planes-name-final"
+                  />
                 </span>
-                <span className="type-cursor" aria-hidden style={{ visibility: typing ? "visible" : "hidden" }} />
               </span>
             )}
             <span

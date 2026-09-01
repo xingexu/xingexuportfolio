@@ -1458,7 +1458,49 @@ export default function Background() {
       }
     }
 
+    function getRotatedPixelZBounds(
+      x: number,
+      y: number,
+      pixelSize: number,
+      direction: -1 | 1,
+    ) {
+      const angle = direction * -14 * Math.PI / 180;
+      const cosine = Math.cos(angle);
+      const sine = Math.sin(angle);
+      const centerX = (SLEEPY_Z_MAP[0].length - 1) / 2;
+      const centerY = (SLEEPY_Z_MAP.length - 1) / 2;
+      let left = Number.POSITIVE_INFINITY;
+      let right = Number.NEGATIVE_INFINITY;
+      let top = Number.POSITIVE_INFINITY;
+      let bottom = Number.NEGATIVE_INFINITY;
+
+      for (let row = 0; row < SLEEPY_Z_MAP.length; row += 1) {
+        for (let column = 0; column < SLEEPY_Z_MAP[row].length; column += 1) {
+          if (!SLEEPY_Z_MAP[row][column]) continue;
+          const relativeX = column - centerX;
+          const relativeY = row - centerY;
+          const rotatedX = Math.round(relativeX * cosine - relativeY * sine);
+          const rotatedY = Math.round(relativeX * sine + relativeY * cosine);
+          const pixelX = x + rotatedX * pixelSize;
+          const pixelY = y + rotatedY * pixelSize;
+          left = Math.min(left, pixelX);
+          right = Math.max(right, pixelX + pixelSize + 1);
+          top = Math.min(top, pixelY);
+          bottom = Math.max(bottom, pixelY + pixelSize + 1);
+        }
+      }
+
+      const clearance = 3;
+      return {
+        bottom: bottom + clearance,
+        left: left - clearance,
+        right: right + clearance,
+        top: top - clearance,
+      };
+    }
+
     function drawSleepyZs(sleepElapsed: number) {
+      const occupiedBounds: ReturnType<typeof getRotatedPixelZBounds>[] = [];
       sleepyZs.forEach((sleepyZ) => {
         const localElapsed = sleepElapsed - sleepyZ.delay;
         if (localElapsed < 0) return;
@@ -1490,9 +1532,30 @@ export default function Background() {
         glyphs.forEach((glyph) => {
           if (localElapsed < glyph.delay) return;
           const glyphAlpha = alpha * Math.min(1, (localElapsed - glyph.delay + 40) / 120);
+          const initialX = baseX + glyph.offsetX;
+          const initialY = baseY + glyph.offsetY;
+          const placement = Array.from({ length: 10 }, (_, index) => ({
+            x: initialX + index * 9,
+            y: initialY - index * 11,
+          })).find(({ x, y }) => {
+            const bounds = getRotatedPixelZBounds(x, y, glyph.pixelSize, sleepyZ.direction);
+            return !occupiedBounds.some((occupied) => (
+              bounds.left < occupied.right &&
+              bounds.right > occupied.left &&
+              bounds.top < occupied.bottom &&
+              bounds.bottom > occupied.top
+            ));
+          });
+          if (!placement) return;
+          occupiedBounds.push(getRotatedPixelZBounds(
+            placement.x,
+            placement.y,
+            glyph.pixelSize,
+            sleepyZ.direction,
+          ));
           drawRotatedPixelZ(
-            baseX + glyph.offsetX,
-            baseY + glyph.offsetY,
+            placement.x,
+            placement.y,
             glyph.pixelSize,
             sleepyZ.direction,
             color,

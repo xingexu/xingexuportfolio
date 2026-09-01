@@ -764,14 +764,18 @@ body {
 }
 
 :root[data-sky-phase="twilight"] .hero-resume-btn {
-  --hero-cta-glow: rgba(255, 225, 161, 0.66);
-  color: #4a2b39;
+  --hero-cta-glow: rgba(112, 54, 132, 0.5);
+  color: #5d2f70;
   background: #f4d79a;
   border-color: #d6a66f;
+  text-shadow:
+    2px 0 0 rgba(112, 54, 132, 0.28),
+    -2px 0 0 rgba(112, 54, 132, 0.28),
+    0 0 10px rgba(112, 54, 132, 0.58);
 }
 
 :root[data-sky-phase="twilight"] .hero-resume-btn:hover {
-  color: #4a2b39;
+  color: #51265f;
   background: #f8e4b5;
   border-color: #dfb47d;
 }
@@ -859,6 +863,38 @@ body {
 }
 .theme-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--nav-shadow); }
 
+:root[data-sky-phase="twilight"] .theme-toggle {
+  color: #f58a3f;
+  box-shadow:
+    3px 3px 0 var(--nav-shadow),
+    0 0 0 2px rgba(245, 138, 63, 0.32),
+    0 0 16px rgba(245, 138, 63, 0.72);
+}
+
+:root[data-sky-phase="twilight"] .theme-toggle svg {
+  filter:
+    drop-shadow(2px 0 0 rgba(255, 188, 91, 0.38))
+    drop-shadow(-2px 0 0 rgba(255, 188, 91, 0.38))
+    drop-shadow(0 0 6px rgba(255, 143, 58, 0.92));
+}
+
+:root[data-sky-phase="twilight"] .theme-toggle:hover {
+  color: #ff9f4d;
+  background: #5a376a;
+  border-color: #f58a3f;
+  box-shadow:
+    4px 4px 0 var(--nav-shadow),
+    0 0 0 3px rgba(245, 138, 63, 0.38),
+    0 0 22px rgba(245, 138, 63, 0.8);
+}
+
+:root[data-sky-phase="twilight"] .theme-toggle:active {
+  transform: translate(1px, 1px);
+  box-shadow:
+    1px 1px 0 var(--nav-shadow),
+    0 0 10px rgba(245, 138, 63, 0.64);
+}
+
 /* ── Nav ── */
 
 .nav-bar {
@@ -945,7 +981,7 @@ body {
 
 .nav-link {
   font-family: var(--font-pixel);
-  font-size: 14px;
+  font-size: clamp(15px, 1.25vw, 17px);
   letter-spacing: 0.04em;
   text-transform: lowercase;
   color: var(--nav-muted);

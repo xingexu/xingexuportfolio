@@ -49,6 +49,12 @@
   --confetti-2: #9fc4f0;
   --confetti-3: #e9eff8;
   --confetti-4: #6f8fbd;
+  --resume-confetti-1: #ffd24a;
+  --resume-confetti-2: #9fc4f0;
+  --resume-confetti-3: #e9eff8;
+  --resume-confetti-4: #6f8fbd;
+  --resume-confetti-5: #fff0a8;
+  --resume-confetti-glow: rgba(159, 196, 240, 0.72);
 }
 
 :root[data-theme="light"] {
@@ -91,6 +97,12 @@
   --confetti-2: #4d83b4;
   --confetti-3: #ffffff;
   --confetti-4: #ffd24a;
+  --resume-confetti-1: #d97706;
+  --resume-confetti-2: #1d5ca8;
+  --resume-confetti-3: #ffffff;
+  --resume-confetti-4: #7fa9d2;
+  --resume-confetti-5: #ffd24a;
+  --resume-confetti-glow: rgba(77, 131, 180, 0.62);
 }
 
 :root[data-sky-phase="twilight"] {
@@ -133,6 +145,12 @@
   --confetti-2: #fff0cf;
   --confetti-3: #ef7f7d;
   --confetti-4: #a878c2;
+  --resume-confetti-1: #6f3f7c;
+  --resume-confetti-2: #a878c2;
+  --resume-confetti-3: #ffd889;
+  --resume-confetti-4: #ef7f7d;
+  --resume-confetti-5: #fff0cf;
+  --resume-confetti-glow: rgba(255, 216, 137, 0.76);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1454,6 +1472,9 @@ a.project-card:hover .project-title { color: var(--accent); }
     14px 0 0 currentColor,
     0 14px 0 currentColor,
     -14px 0 0 currentColor;
+  filter:
+    drop-shadow(0 0 4px currentColor)
+    drop-shadow(0 0 9px var(--resume-confetti-glow));
   opacity: 0;
 }
 
@@ -1521,6 +1542,10 @@ a.project-card:hover .project-title { color: var(--accent); }
 .resume-falling-particle {
   position: absolute;
   opacity: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 28%, transparent);
+  filter:
+    drop-shadow(0 0 4px currentColor)
+    drop-shadow(0 0 9px var(--resume-confetti-glow));
   image-rendering: pixelated;
 }
 
@@ -1529,20 +1554,8 @@ a.project-card:hover .project-title { color: var(--accent); }
     0 -10px 0 currentColor,
     10px 0 0 currentColor,
     0 10px 0 currentColor,
-    -10px 0 0 currentColor;
-}
-
-.resume-falling-particle.is-comet::after {
-  content: "";
-  position: absolute;
-  top: -18px;
-  left: 50%;
-  width: 2px;
-  height: 12px;
-  background: currentColor;
-  box-shadow: 0 -6px 0 currentColor;
-  opacity: 0.5;
-  transform: translateX(-50%);
+    -10px 0 0 currentColor,
+    0 0 0 2px color-mix(in srgb, currentColor 28%, transparent);
 }
 
 .resume-celebration.is-visible .resume-falling-particle {

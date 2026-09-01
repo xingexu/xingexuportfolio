@@ -3,12 +3,75 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
 const resumeFrames = Array.from(
   { length: 16 },
   (_, index) => `/resume-frames/frame-${String(index + 1).padStart(2, "0")}.png`,
 );
-const celebrationColors = ["#ffffff", "#ffd24a", "#9fc4f0", "#6ecbff", "#ff8a3d"];
+const celebrationColors = [
+  "var(--resume-confetti-1)",
+  "var(--resume-confetti-2)",
+  "var(--resume-confetti-3)",
+  "var(--resume-confetti-4)",
+  "var(--resume-confetti-5)",
+];
+
+async function playResumeCelebrationSound() {
+  const audio = getSharedAudioContext();
+  if (!audio || audio.state === "closed") return false;
+  resumeSharedAudioContext(audio);
+  if (audio.state !== "running") {
+    try {
+      await audio.resume();
+    } catch {
+      return false;
+    }
+  }
+  if (audio.state !== "running") return false;
+
+  const start = audio.currentTime + 0.025;
+  const notes = [659.25, 783.99, 987.77, 1174.66, 1318.51];
+
+  notes.forEach((frequency, index) => {
+    const noteStart = start + index * 0.055;
+    const oscillator = audio.createOscillator();
+    const volume = audio.createGain();
+    oscillator.type = index % 2 === 0 ? "square" : "triangle";
+    oscillator.frequency.setValueAtTime(frequency, noteStart);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.045, noteStart + 0.12);
+    volume.gain.setValueAtTime(0.0001, noteStart);
+    volume.gain.exponentialRampToValueAtTime(0.026, noteStart + 0.012);
+    volume.gain.exponentialRampToValueAtTime(0.0001, noteStart + 0.18);
+    oscillator.connect(volume).connect(audio.destination);
+    oscillator.start(noteStart);
+    oscillator.stop(noteStart + 0.2);
+  });
+
+  const noiseLength = Math.round(audio.sampleRate * 0.32);
+  const noiseBuffer = audio.createBuffer(1, noiseLength, audio.sampleRate);
+  const noise = noiseBuffer.getChannelData(0);
+  for (let index = 0; index < noiseLength; index += 1) {
+    const fade = 1 - index / noiseLength;
+    noise[index] = (Math.random() * 2 - 1) * fade;
+  }
+
+  const burst = audio.createBufferSource();
+  const burstFilter = audio.createBiquadFilter();
+  const burstVolume = audio.createGain();
+  burst.buffer = noiseBuffer;
+  burstFilter.type = "bandpass";
+  burstFilter.frequency.setValueAtTime(2400, start);
+  burstFilter.frequency.exponentialRampToValueAtTime(920, start + 0.28);
+  burstFilter.Q.setValueAtTime(0.8, start);
+  burstVolume.gain.setValueAtTime(0.0001, start);
+  burstVolume.gain.exponentialRampToValueAtTime(0.042, start + 0.014);
+  burstVolume.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+  burst.connect(burstFilter).connect(burstVolume).connect(audio.destination);
+  burst.start(start);
+  burst.stop(start + 0.32);
+  return true;
+}
 
 function seededUnit(index: number, salt: number) {
   let value = Math.imul(index + 1, 0x45d9f3b) ^ Math.imul(salt + 1, 0x119de1f3);
@@ -52,7 +115,7 @@ const resumeSparkles = Array.from({ length: 52 }, (_, index) => {
   };
 });
 
-const fallingParticles = Array.from({ length: 112 }, (_, index) => {
+const fallingParticles = Array.from({ length: 96 }, (_, index) => {
   const origin = perimeterOrigin(index, 8);
   const burst = outwardVector(index, origin.edge, 9, 72, 148);
 
@@ -63,10 +126,9 @@ const fallingParticles = Array.from({ length: 112 }, (_, index) => {
     delay: `${Math.round(seededUnit(index, 12) * 980)}ms`,
     drift: `${Math.round((seededUnit(index, 13) - 0.5) * 310)}px`,
     duration: `${2350 + Math.round(seededUnit(index, 14) * 2100)}ms`,
-    isComet: index % 5 === 0 || index % 11 === 0,
-    isStar: index % 5 === 0 || index % 13 === 0,
+    isStar: index % 7 === 0 || index % 13 === 0,
     left: origin.left,
-    size: 5 + Math.floor(seededUnit(index, 15) * 11),
+    size: 4 + Math.floor(seededUnit(index, 15) * 7),
     spin: `${240 + Math.round(seededUnit(index, 16) * 1080)}deg`,
     sway: `${Math.round((seededUnit(index, 17) - 0.5) * 230)}px`,
     top: origin.top,
@@ -89,8 +151,21 @@ type FallingParticleStyle = CSSProperties & {
 
 export default function Resume() {
   const loadedFrames = useRef(new Set<string>());
+  const celebrationSoundPlayed = useRef(false);
+  const celebrationSoundPending = useRef(false);
   const [animationReady, setAnimationReady] = useState(false);
   const [activeFrame, setActiveFrame] = useState(0);
+
+  useEffect(() => {
+    const unlockAudio = () => resumeSharedAudioContext(getSharedAudioContext());
+    window.addEventListener("pointerdown", unlockAudio, { capture: true, once: true, passive: true });
+    window.addEventListener("keydown", unlockAudio, { capture: true, once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio, true);
+      window.removeEventListener("keydown", unlockAudio, true);
+    };
+  }, []);
 
   useEffect(() => {
     if (!animationReady) return;
@@ -111,6 +186,31 @@ export default function Resume() {
 
     return () => window.clearInterval(playbackTimer);
   }, [animationReady]);
+
+  useEffect(() => {
+    if (activeFrame !== -1 || celebrationSoundPlayed.current) return;
+
+    let cancelled = false;
+    const tryCelebrationSound = () => {
+      if (celebrationSoundPlayed.current || celebrationSoundPending.current) return;
+      celebrationSoundPending.current = true;
+      void playResumeCelebrationSound().then((played) => {
+        if (cancelled) return;
+        celebrationSoundPending.current = false;
+        celebrationSoundPlayed.current = played;
+      });
+    };
+
+    tryCelebrationSound();
+    window.addEventListener("pointerdown", tryCelebrationSound, { capture: true, passive: true });
+    window.addEventListener("keydown", tryCelebrationSound, { capture: true });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pointerdown", tryCelebrationSound, true);
+      window.removeEventListener("keydown", tryCelebrationSound, true);
+    };
+  }, [activeFrame]);
 
   function handleFrameLoad(src: string) {
     loadedFrames.current.add(src);
@@ -206,7 +306,7 @@ export default function Resume() {
           >
             {fallingParticles.map((particle, index) => (
               <span
-                className={`resume-falling-particle${particle.isStar ? " is-star" : ""}${particle.isComet ? " is-comet" : ""}`}
+                className={`resume-falling-particle${particle.isStar ? " is-star" : ""}`}
                 key={index}
                 style={
                   {

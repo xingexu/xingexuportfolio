@@ -580,13 +580,85 @@ body {
 /* ── Nav ── */
 
 .nav-bar {
-  background: linear-gradient(
-    180deg,
-    var(--nav-gradient-start) 0%,
-    var(--nav-gradient-end) 100%
-  );
+  --bar-gradient-start: var(--nav-gradient-start);
+  --bar-gradient-end: var(--nav-gradient-end);
   border-bottom: 2px solid var(--nav-border);
   box-shadow: 0 2px 0 var(--nav-shadow);
+}
+
+/* Six opaque rows form a dithered gradient from solid pixel blocks. */
+.nav-bar,
+.site-footer {
+  --bar-step-1: color-mix(in srgb, var(--bar-gradient-start) 80%, var(--bar-gradient-end) 20%);
+  --bar-step-2: color-mix(in srgb, var(--bar-gradient-start) 64%, var(--bar-gradient-end) 36%);
+  --bar-step-3: color-mix(in srgb, var(--bar-gradient-start) 48%, var(--bar-gradient-end) 52%);
+  --bar-step-4: color-mix(in srgb, var(--bar-gradient-start) 32%, var(--bar-gradient-end) 68%);
+  --bar-step-5: color-mix(in srgb, var(--bar-gradient-start) 16%, var(--bar-gradient-end) 84%);
+  background-color: var(--bar-gradient-end);
+  background-image:
+    linear-gradient(
+      90deg,
+      var(--bar-gradient-start) 0 12px,
+      var(--bar-step-1) 12px 20px,
+      var(--bar-gradient-start) 20px 36px,
+      var(--bar-step-1) 36px 44px,
+      var(--bar-gradient-start) 44px 56px,
+      var(--bar-step-1) 56px 64px
+    ),
+    linear-gradient(
+      90deg,
+      var(--bar-step-1) 0 8px,
+      var(--bar-step-2) 8px 20px,
+      var(--bar-step-1) 20px 32px,
+      var(--bar-step-2) 32px 40px,
+      var(--bar-step-1) 40px 56px,
+      var(--bar-step-2) 56px 64px
+    ),
+    linear-gradient(
+      90deg,
+      var(--bar-step-2) 0 16px,
+      var(--bar-step-3) 16px 24px,
+      var(--bar-step-2) 24px 36px,
+      var(--bar-step-3) 36px 48px,
+      var(--bar-step-2) 48px 56px,
+      var(--bar-step-3) 56px 64px
+    ),
+    linear-gradient(
+      90deg,
+      var(--bar-step-3) 0 8px,
+      var(--bar-step-4) 8px 24px,
+      var(--bar-step-3) 24px 32px,
+      var(--bar-step-4) 32px 44px,
+      var(--bar-step-3) 44px 56px,
+      var(--bar-step-4) 56px 64px
+    ),
+    linear-gradient(
+      90deg,
+      var(--bar-step-4) 0 12px,
+      var(--bar-step-5) 12px 28px,
+      var(--bar-step-4) 28px 36px,
+      var(--bar-step-5) 36px 52px,
+      var(--bar-step-4) 52px 60px,
+      var(--bar-step-5) 60px 64px
+    ),
+    linear-gradient(
+      90deg,
+      var(--bar-step-5) 0 8px,
+      var(--bar-gradient-end) 8px 24px,
+      var(--bar-step-5) 24px 32px,
+      var(--bar-gradient-end) 32px 48px,
+      var(--bar-step-5) 48px 56px,
+      var(--bar-gradient-end) 56px 64px
+    );
+  background-position:
+    0 0,
+    13px 20%,
+    5px 40%,
+    29px 60%,
+    17px 80%,
+    37px 100%;
+  background-repeat: repeat-x;
+  background-size: 64px 16.6667%;
 }
 
 .nav-link {
@@ -608,13 +680,10 @@ body {
 /* ── Footer ── */
 
 .site-footer {
+  --bar-gradient-start: var(--chrome-gradient-start);
+  --bar-gradient-end: var(--chrome-gradient-end);
   position: relative;
   z-index: 10;
-  background: linear-gradient(
-    180deg,
-    var(--chrome-gradient-start) 0%,
-    var(--chrome-gradient-end) 100%
-  );
   border-top: 2px solid var(--chrome-border);
   box-shadow: inset 0 2px 0 var(--chrome-shadow);
 }

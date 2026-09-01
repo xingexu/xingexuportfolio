@@ -250,6 +250,13 @@ body {
   padding: 76px 28px 72px;
 }
 
+.hero-preload-shell {
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
 .hero-stage {
   width: 100%;
   max-width: 1200px;
@@ -1922,7 +1929,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 820px) {
   /* Mobile layout rule: text and interactive elements stay in normal flow,
      wrap within the viewport, and never overlap neighboring content. */
   .nav-bar > nav {
@@ -2000,21 +2007,22 @@ a.project-card:hover .project-title { color: var(--accent); }
     padding-left: 0;
   }
   :root[data-sky-phase="twilight"] .hero-section {
-    padding-top: clamp(148px, 22svh, 196px) !important;
-    padding-bottom: 32px !important;
+    align-items: flex-end;
+    padding-top: 92px !important;
+    padding-bottom: clamp(24px, 4svh, 38px) !important;
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
-    width: min(64vw, 260px);
-    gap: 12px !important;
+    width: min(58vw, 240px);
+    gap: 10px !important;
     margin-right: 0;
     margin-left: auto;
-    margin-top: 24px !important;
+    margin-top: 20px !important;
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-cta-btn {
-    min-height: 46px;
-    gap: 9px;
-    padding: 9px 12px;
-    font-size: clamp(10px, 3.2vw, 12px);
+    min-height: 44px;
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: clamp(10px, 3vw, 11px);
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .pixel-arrow {
     flex-basis: 20px;

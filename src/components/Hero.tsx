@@ -247,6 +247,18 @@ function getSkyPhase(): SkyPhase {
   return phase === "day" || phase === "twilight" || phase === "night" ? phase : "night";
 }
 
+function subscribeToHydration() {
+  return () => undefined;
+}
+
+function getHydratedSnapshot() {
+  return true;
+}
+
+function getServerHydratedSnapshot() {
+  return false;
+}
+
 function BannerFireworks({ mode }: { mode: FireworkMode }) {
   const fireworks = mode === "extra" ? SUNRISE_CLICK_FIREWORKS : SUNRISE_LANDING_FIREWORKS;
 
@@ -555,7 +567,7 @@ function SunriseHero() {
 }
 
 function DefaultHero() {
-  const [typed, setTyped] = useState(NAME);
+  const [typed, setTyped] = useState("");
   const [typing, setTyping] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
@@ -590,7 +602,10 @@ function DefaultHero() {
   useEffect(() => () => dispatchNameStarGlow(false), []);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setTyped(NAME);
+      return;
+    }
 
     const frame = window.requestAnimationFrame(() => {
       setTyped("");
@@ -693,6 +708,20 @@ function DefaultHero() {
 }
 
 export default function Hero() {
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getHydratedSnapshot,
+    getServerHydratedSnapshot,
+  );
   const phase = useSyncExternalStore(subscribeToSkyPhase, getSkyPhase, () => "night" as const);
+
+  if (!hydrated) {
+    return (
+      <section className="hero-preload-shell">
+        <h1 className="sr-only">{NAME}</h1>
+      </section>
+    );
+  }
+
   return phase === "twilight" ? <SunriseHero /> : <DefaultHero />;
 }

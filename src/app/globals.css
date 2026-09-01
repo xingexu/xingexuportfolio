@@ -1933,11 +1933,13 @@ a.project-card:hover .project-title { color: var(--accent); }
   /* Mobile layout rule: text and interactive elements stay in normal flow,
      wrap within the viewport, and never overlap neighboring content. */
   .nav-bar > nav {
+    justify-content: center !important;
     padding-inline: 10px !important;
   }
   .nav-bar > nav > div {
-    width: 100%;
-    justify-content: flex-end;
+    width: auto;
+    max-width: 100%;
+    justify-content: center;
     gap: clamp(4px, 2.5vw, 10px) !important;
   }
   .nav-link {

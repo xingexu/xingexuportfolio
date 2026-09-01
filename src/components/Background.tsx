@@ -23,6 +23,7 @@ import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 const CELL = 5; // css px per sky pixel
 const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
 const SEED = 20260703;
+const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const TOP_BAR_HEIGHT = 54;
 const SKY_SAFE_TOP = Math.ceil(TOP_BAR_HEIGHT / CELL) + 4;
 const AIR_TRAFFIC_STAGGER = 3; // 15 CSS px between successive entrances
@@ -225,7 +226,7 @@ type Balloon = {
 };
 type Ferry = { x: number; acc: number; bob: number; bobAcc: number; boostRemaining: number; frame: number };
 type Plane = { x: number; y: number; acc: number; boostRemaining: number };
-type PlaneSmoke = { x: number; y: number; ttl: number };
+type PlaneSmoke = { x: number; y: number; ttl: number; maxTtl: number; size: number };
 type Building = {
   x: number; w: number; h: number; near: boolean; shade: number; antenna: number;
   roof: "flat" | "tank" | "ac"; setback: number; windows: { wx: number; wy: number }[];
@@ -368,6 +369,7 @@ export default function Background() {
     let stars: Star[] = [];
     let sparkles: Sparkle[] = [];
     let sparkleAcc = 0;
+    let nameStarGlowActive = false;
     let clouds: Cloud[] = [];
     let buildings: Building[] = [];
     let litWindows = new Set<string>();
@@ -425,6 +427,12 @@ export default function Background() {
     function getVisibleSkyPhase() {
       return getSkyOverride() ?? getSkyPhase();
     }
+
+    const onNameStarGlow = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return;
+      nameStarGlowActive = event.detail === true;
+      if (activePhase === "night") drawCurrentScene(0);
+    };
 
     function getAudioContext() {
       return resumeSharedAudioContext(getSharedAudioContext());
@@ -1096,24 +1104,40 @@ export default function Background() {
         return puff.ttl > 0;
       });
       for (const puff of planeSmoke) {
-        const alpha = Math.min(0.72, puff.ttl / 900);
-        cell(puff.x, puff.y, PLANE_SMOKE, alpha);
-        if (puff.ttl < 620) cell(puff.x + 1, puff.y - 1, PLANE_SMOKE, alpha * 0.38);
+        const age = puff.maxTtl - puff.ttl;
+        const drift = Math.floor(age / 260);
+        const rise = Math.floor(age / 430);
+        const px = puff.x + drift;
+        const py = puff.y - rise;
+        const smokeColor = sunriseOpening ? "#fff0e6" : PLANE_SMOKE;
+        const alpha = Math.min(0.78, puff.ttl / puff.maxTtl);
+
+        cell(px, py, smokeColor, alpha);
+        cell(px + 1, py, smokeColor, alpha * 0.46);
+        cell(px, py - 1, smokeColor, alpha * 0.34);
+        if (puff.size > 1 || age > 360) {
+          cell(px + 1, py - 1, smokeColor, alpha * 0.28);
+          cell(px + 2, py, smokeColor, alpha * 0.16);
+          cell(px, py + 1, smokeColor, alpha * 0.18);
+        }
       }
 
       if (plane) {
         const boosted = plane.boostRemaining > 0;
         plane.boostRemaining = Math.max(0, plane.boostRemaining - dt);
         planeSmokeAcc += dt;
-        const smokeEvery = boosted ? 55 : 190;
+        const smokeEvery = boosted ? 55 : sunriseOpening ? 110 : 190;
         while (planeSmokeAcc >= smokeEvery) {
           planeSmokeAcc -= smokeEvery;
+          const ttl = boosted ? 1450 : sunriseOpening ? 1250 : 950;
           planeSmoke.push({
             x: plane.x + PLANE_WIDTH_CELLS + (boosted ? Math.floor(Math.random() * 2) : 0),
-            y: plane.y + (Math.random() < 0.5 ? 0 : 1),
-            ttl: boosted ? 1050 : 820,
+            y: plane.y + Math.floor(Math.random() * 3) - 1,
+            ttl,
+            maxTtl: ttl,
+            size: boosted || sunriseOpening || Math.random() < 0.35 ? 2 : 1,
           });
-          if (planeSmoke.length > 80) planeSmoke.shift();
+          if (planeSmoke.length > 110) planeSmoke.shift();
         }
 
         plane.acc += dt;
@@ -1191,7 +1215,19 @@ export default function Background() {
           }
         }
         const alpha = [0.1, 0.32, 0.58, 0.95][s.level];
-        cell(s.x, s.y, s.color, alpha);
+        if (nameStarGlowActive) {
+          const glowAlpha = [0.1, 0.16, 0.23, 0.16][pulse];
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+            cell(s.x + dx, s.y + dy, s.color, glowAlpha);
+          }
+          for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]] as const) {
+            cell(s.x + dx, s.y + dy, s.color, glowAlpha * 0.46);
+          }
+          for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]] as const) {
+            cell(s.x + dx, s.y + dy, s.color, glowAlpha * 0.28);
+          }
+        }
+        cell(s.x, s.y, s.color, nameStarGlowActive ? Math.max(alpha, 0.82) : alpha);
         if (s.big && s.level >= 2) {
           cell(s.x + 1, s.y, s.color, alpha * 0.4);
           cell(s.x - 1, s.y, s.color, alpha * 0.4);
@@ -1574,6 +1610,7 @@ export default function Background() {
 
     build();
     window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener(NAME_STAR_GLOW_EVENT, onNameStarGlow);
 
     let clockTimer = 0;
     if (reduced) {
@@ -1598,6 +1635,7 @@ export default function Background() {
       cancelAnimationFrame(raf);
       window.clearInterval(clockTimer);
       window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener(NAME_STAR_GLOW_EVENT, onNameStarGlow);
       window.removeEventListener("resize", onResize);
       planeSprite.removeEventListener("load", onPlaneSpriteLoad);
       phaseObserver.disconnect();

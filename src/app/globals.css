@@ -242,6 +242,7 @@ body {
   --hero-plane-rest-x: calc(50% - 450px - var(--hero-banner-scroll-offset));
   --hero-plane-entry-x: calc(50vw + 50%);
   position: relative;
+  top: -28px;
   width: min(78vw, 920px);
   aspect-ratio: 1920 / 540;
   margin-inline: auto;
@@ -267,6 +268,8 @@ body {
 }
 
 .hero-plane-banner-image {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: auto;
@@ -285,9 +288,113 @@ body {
   opacity: 0;
 }
 
+.hero-banner-speed-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero-banner-speed-particle {
+  position: absolute;
+  background: #ffffff;
+  box-shadow:
+    -9px 0 0 rgba(255, 240, 207, 0.74),
+    -17px 0 0 rgba(255, 255, 255, 0.34);
+  opacity: 0;
+  image-rendering: pixelated;
+  animation-name: heroBannerSpeedParticle;
+  animation-timing-function: steps(7, end);
+  animation-iteration-count: infinite;
+}
+
+@keyframes heroBannerSpeedParticle {
+  0% {
+    opacity: 0;
+    transform: translate3d(-28px, 0, 0);
+  }
+  12% { opacity: 0.96; }
+  68% { opacity: 0.76; }
+  100% {
+    opacity: 0;
+    transform: translate3d(54px, 0, 0);
+  }
+}
+
+.hero-banner-speed-particles-settled .hero-banner-speed-particle {
+  animation-name: heroBannerWindParticle;
+  animation-timing-function: steps(6, end);
+}
+
+.hero-banner-speed-particles-inside {
+  z-index: 2;
+}
+
+.hero-banner-speed-particles-inside .hero-banner-speed-particle {
+  background: #fffdf8;
+  box-shadow:
+    -9px 0 0 rgba(255, 240, 207, 0.88),
+    -17px 0 0 rgba(255, 255, 255, 0.46),
+    2px 2px 0 rgba(83, 55, 95, 0.28),
+    -7px 2px 0 rgba(83, 55, 95, 0.2);
+}
+
+@keyframes heroBannerWindParticle {
+  0% {
+    opacity: 0;
+    transform: translate3d(-16px, 0, 0);
+  }
+  18% { opacity: 0.72; }
+  62% { opacity: 0.54; }
+  100% {
+    opacity: 0;
+    transform: translate3d(32px, 0, 0);
+  }
+}
+
+.hero-banner-plane-smoke {
+  position: absolute;
+  z-index: 2;
+  top: 43%;
+  left: 8.4%;
+  width: 92px;
+  height: 54px;
+  pointer-events: none;
+}
+
+.hero-banner-plane-smoke-puff {
+  position: absolute;
+  top: 44%;
+  left: 0;
+  background: #fff8ed;
+  box-shadow:
+    5px 0 0 rgba(255, 240, 207, 0.72),
+    0 -5px 0 rgba(255, 255, 255, 0.42),
+    5px -5px 0 rgba(231, 162, 176, 0.2);
+  opacity: 0;
+  image-rendering: pixelated;
+  animation: heroBannerPlaneSmoke 1160ms steps(8, end) infinite;
+}
+
+.hero-banner-plane-smoke-puff:nth-child(3n + 2) { top: 34%; }
+.hero-banner-plane-smoke-puff:nth-child(3n) { top: 55%; }
+
+@keyframes heroBannerPlaneSmoke {
+  0% {
+    opacity: 0.82;
+    transform: translate3d(0, 0, 0) scale(0.72);
+  }
+  48% { opacity: 0.5; }
+  100% {
+    opacity: 0;
+    transform: translate3d(64px, -13px, 0) scale(1.5);
+  }
+}
+
 .hero-banner-firework-trigger {
   position: absolute;
-  z-index: 3;
+  z-index: 5;
   top: 18%;
   right: 0;
   bottom: 15%;
@@ -312,7 +419,7 @@ body {
 .hero-banner-fireworks {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 4;
   overflow: visible;
   pointer-events: none;
 }
@@ -1662,6 +1769,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   }
   .hero-plane-banner {
     --hero-plane-rest-x: calc(-50vw + 50% + 8px);
+    top: -18px;
     width: 84vw;
   }
   .hero-layout-under-banner {
@@ -1696,6 +1804,8 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   .hero-banner-fireworks,
+  .hero-banner-speed-particles,
+  .hero-banner-plane-smoke,
   .resume-animation-frames,
   .resume-sparkles,
   .resume-celebration {

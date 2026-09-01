@@ -6,9 +6,10 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties }
 import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
 const NAME = "xinge xu";
+const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
 const BANNER_STATIC = "/xinge-plane-banner-static.png";
-const BANNER_ENTRANCE_DURATION_MS = 6000;
+const BANNER_ENTRANCE_DURATION_MS = 4200;
 const SUNRISE_FIREWORK_COLORS = ["#ffd889", "#fff0cf", "#ef7f7d", "#a878c2"];
 
 const SUNRISE_LANDING_FIREWORKS = [
@@ -38,6 +39,64 @@ const SUNRISE_FIREWORK_SPARKS = [
   { x: "-64px", y: "-37px" },
   { x: "-37px", y: "-64px" },
 ];
+
+const SUNRISE_PARTICLE_PATH = [
+  { left: "24%", top: "20%" },
+  { left: "30%", top: "17%" },
+  { left: "36%", top: "14%" },
+  { left: "42%", top: "17%" },
+  { left: "48%", top: "23%" },
+  { left: "54%", top: "19%" },
+  { left: "60%", top: "17%" },
+  { left: "66%", top: "14%" },
+  { left: "72%", top: "19%" },
+  { left: "78%", top: "22%" },
+  { left: "84%", top: "18%" },
+  { left: "90%", top: "19%" },
+  { left: "95%", top: "18%" },
+  { left: "24%", top: "81%" },
+  { left: "30%", top: "79%" },
+  { left: "36%", top: "77%" },
+  { left: "42%", top: "82%" },
+  { left: "48%", top: "85%" },
+  { left: "54%", top: "81%" },
+  { left: "60%", top: "79%" },
+  { left: "66%", top: "77%" },
+  { left: "72%", top: "81%" },
+  { left: "78%", top: "84%" },
+  { left: "84%", top: "81%" },
+  { left: "90%", top: "82%" },
+  { left: "95%", top: "82%" },
+];
+
+const SUNRISE_SETTLED_PARTICLE_INDEXES = new Set([1, 4, 7, 10, 14, 17, 20, 23]);
+
+const SUNRISE_SPEED_PARTICLES = SUNRISE_PARTICLE_PATH.map((position, index) => ({
+  ...position,
+  delay: `${-((index * 113) % 880)}ms`,
+  duration: `${560 + (index % 4) * 80}ms`,
+  height: index % 3 === 0 ? 6 : 4,
+  persistent: SUNRISE_SETTLED_PARTICLE_INDEXES.has(index),
+  width: 8 + (index % 3) * 4,
+}));
+
+const SUNRISE_INSIDE_SPEED_PARTICLES = [
+  { delay: "-120ms", height: 4, left: "32%", persistent: true, top: "33%", width: 12 },
+  { delay: "-410ms", height: 6, left: "43%", persistent: false, top: "68%", width: 8 },
+  { delay: "-690ms", height: 4, left: "53%", persistent: true, top: "32%", width: 16 },
+  { delay: "-260ms", height: 4, left: "64%", persistent: true, top: "69%", width: 12 },
+  { delay: "-790ms", height: 6, left: "75%", persistent: false, top: "33%", width: 8 },
+  { delay: "-520ms", height: 4, left: "87%", persistent: false, top: "68%", width: 16 },
+];
+
+const SUNRISE_PLANE_SMOKE_PUFFS = Array.from({ length: 8 }, (_, index) => ({
+  delay: `${-(index * 145)}ms`,
+  size: 5 + (index % 3) * 2,
+}));
+
+function dispatchNameStarGlow(active: boolean) {
+  window.dispatchEvent(new CustomEvent<boolean>(NAME_STAR_GLOW_EVENT, { detail: active }));
+}
 
 function createFireworkNoise(audio: AudioContext) {
   const length = Math.round(audio.sampleRate * 0.38);
@@ -280,6 +339,14 @@ function PlaneBanner() {
   };
 
   const src = stage === "static" ? BANNER_STATIC : BANNER_LOOP;
+  const speedParticles =
+    stage === "loop"
+      ? SUNRISE_SPEED_PARTICLES.filter((particle) => particle.persistent)
+      : SUNRISE_SPEED_PARTICLES;
+  const insideSpeedParticles =
+    stage === "loop"
+      ? SUNRISE_INSIDE_SPEED_PARTICLES.filter((particle) => particle.persistent)
+      : SUNRISE_INSIDE_SPEED_PARTICLES;
 
   return (
     <div
@@ -290,6 +357,63 @@ function PlaneBanner() {
       style={stage === "entrance" ? { animationDuration: `${BANNER_ENTRANCE_DURATION_MS}ms` } : undefined}
     >
       {fireworkBurst && <BannerFireworks key={fireworkBurst.id} mode={fireworkBurst.mode} />}
+      {stage !== "static" ? (
+        <div
+          className={`hero-banner-speed-particles${stage === "loop" ? " hero-banner-speed-particles-settled" : ""}`}
+          aria-hidden="true"
+        >
+          {speedParticles.map((particle) => (
+            <span
+              className="hero-banner-speed-particle"
+              key={`${particle.left}-${particle.top}`}
+              style={{
+                animationDelay: particle.delay,
+                animationDuration: stage === "loop" ? "1480ms" : particle.duration,
+                height: particle.height,
+                left: particle.left,
+                top: particle.top,
+                width: particle.width,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+      {stage !== "static" ? (
+        <div
+          className={`hero-banner-speed-particles hero-banner-speed-particles-inside${stage === "loop" ? " hero-banner-speed-particles-settled" : ""}`}
+          aria-hidden="true"
+        >
+          {insideSpeedParticles.map((particle) => (
+            <span
+              className="hero-banner-speed-particle"
+              key={`${particle.left}-${particle.top}`}
+              style={{
+                animationDelay: particle.delay,
+                animationDuration: stage === "loop" ? "1580ms" : "680ms",
+                height: particle.height,
+                left: particle.left,
+                top: particle.top,
+                width: particle.width,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+      {stage !== "static" ? (
+        <div className="hero-banner-plane-smoke" aria-hidden="true">
+          {SUNRISE_PLANE_SMOKE_PUFFS.map((puff, index) => (
+            <span
+              className="hero-banner-plane-smoke-puff"
+              key={index}
+              style={{
+                animationDelay: puff.delay,
+                height: puff.size,
+                width: puff.size,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
       {stage === "entrance" && !windLoaded && (
         <Image
           src={BANNER_STATIC}
@@ -385,6 +509,17 @@ function DefaultHero() {
     setParticles((current) => [...current, ...next].slice(-112));
   };
 
+  const handleNameMouseEnter = () => {
+    burst();
+    dispatchNameStarGlow(true);
+  };
+
+  const handleNameMouseLeave = () => {
+    dispatchNameStarGlow(false);
+  };
+
+  useEffect(() => () => dispatchNameStarGlow(false), []);
+
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
@@ -434,7 +569,13 @@ function DefaultHero() {
               position: "relative",
             }}
           >
-            <span className="name-hover" onMouseEnter={burst}>{typed}</span>
+            <span
+              className="name-hover"
+              onMouseEnter={handleNameMouseEnter}
+              onMouseLeave={handleNameMouseLeave}
+            >
+              {typed}
+            </span>
             <span className="type-cursor" aria-hidden style={{ visibility: typing ? "visible" : "hidden" }} />
             <span aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}>
               {particles.map((particle) => (

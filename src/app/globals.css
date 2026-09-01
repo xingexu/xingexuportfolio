@@ -1923,31 +1923,206 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 @media (max-width: 640px) {
+  /* Mobile layout rule: text and interactive elements stay in normal flow,
+     wrap within the viewport, and never overlap neighboring content. */
+  .nav-bar > nav {
+    padding-inline: 10px !important;
+  }
+  .nav-bar > nav > div {
+    width: 100%;
+    justify-content: flex-end;
+    gap: clamp(4px, 2.5vw, 10px) !important;
+  }
+  .nav-link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 6px clamp(5px, 2vw, 8px);
+    font-size: clamp(12px, 4vw, 14px);
+    letter-spacing: 0.01em;
+  }
+  .theme-toggle {
+    flex: 0 0 40px;
+  }
+
+  .hero-default-section,
   .hero-section {
-    padding: 64px 20px;
+    min-height: 100svh !important;
+    padding: 86px 16px 54px !important;
+    overflow-x: clip;
+  }
+  .hero-stage,
+  .hero-layout,
+  .hero-copy {
+    width: 100%;
+    min-width: 0;
+  }
+  .hero-layout {
+    gap: 24px;
+  }
+  .hero-copy h1 {
+    max-width: 100%;
+    font-size: clamp(34px, 14vw, 48px) !important;
+    overflow-wrap: anywhere;
+  }
+  .hero-education {
+    max-width: 100%;
+    font-size: clamp(12px, 3.8vw, 14px);
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+  }
+  .hero-copy > .step-in-3 {
+    display: grid !important;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px !important;
+    margin-top: 28px !important;
+  }
+  .hero-cta-btn {
+    display: flex;
+    width: 100%;
+    min-height: 54px;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 16px;
+    font-size: clamp(12px, 4vw, 15px);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
   .hero-plane-banner {
     --hero-plane-rest-x: calc(-50vw + 50% + 8px);
-    top: -18px;
-    width: 84vw;
+    top: 0;
+    width: min(94vw, 500px);
   }
   .hero-layout-under-banner {
-    margin-top: -18px;
-    padding-left: calc(11.725vw - 12px);
+    max-width: min(94vw, 500px);
+    margin-top: clamp(12px, 4vw, 22px);
+    padding-left: 0;
   }
+  :root[data-sky-phase="twilight"] .hero-section {
+    padding-top: clamp(148px, 22svh, 196px) !important;
+    padding-bottom: 32px !important;
+  }
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
+    width: min(64vw, 260px);
+    gap: 12px !important;
+    margin-right: 0;
+    margin-left: auto;
+    margin-top: 24px !important;
+  }
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-cta-btn {
+    min-height: 46px;
+    gap: 9px;
+    padding: 9px 12px;
+    font-size: clamp(10px, 3.2vw, 12px);
+  }
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .pixel-arrow {
+    flex-basis: 20px;
+    width: 20px;
+    transform: scale(0.84);
+    transform-origin: right center;
+  }
+
+  .projects-page > div {
+    width: 100%;
+    padding: 104px 16px 64px !important;
+    overflow-wrap: anywhere;
+  }
+  .projects-page h1 {
+    margin-bottom: 30px !important;
+  }
+  .drift-showcase,
+  .drift-preview-stack,
+  .drift-info-stack,
+  .drift-info-card {
+    width: 100%;
+    min-width: 0;
+  }
+  .drift-info-card {
+    padding: 14px;
+  }
+  .drift-brick-title,
+  .drift-card-date {
+    white-space: normal;
+  }
+  .drift-info-stack .back-home {
+    min-height: 52px;
+    justify-content: center;
+  }
+
   .resume-page {
-    padding: 64px 10px 76px;
+    height: auto;
+    min-height: 100svh;
+    padding: 76px 12px 32px;
+    place-items: start center;
+    overflow: visible;
+  }
+  .resume-stage {
+    width: 100%;
+    max-width: 560px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+  }
+  .resume-document-wrap {
+    order: 1;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+  }
+  .resume-stage > .resume-side-back {
+    order: 2;
+    width: 100%;
+    min-height: 54px;
+    height: auto;
+    padding: 14px 18px;
+    font-size: 14px;
   }
   .resume-preview-shell,
   .resume-editor-document {
     box-shadow: 0 0 0 2px var(--shadow);
   }
   .resume-editor-page {
-    padding: 64px 8px 76px;
+    height: auto;
+    min-height: 100svh;
+    padding: 76px 12px 32px;
+    place-items: start center;
+    overflow: visible;
   }
   .resume-editor-stage {
-    width: calc(100vw - 12px);
-    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .resume-editor-stage > .resume-side-back {
+    order: 2;
+    width: 100%;
+    min-height: 54px;
+    height: auto;
+    padding: 14px 18px;
+    font-size: 14px;
+  }
+  .resume-editor-document {
+    order: 1;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    height: max(520px, calc(100svh - 170px));
+  }
+
+  .site-footer-inner {
+    flex-direction: column;
+    justify-content: center;
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .site-footer-inner > nav {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
   }
   .resume-shell {
     padding: 20px;

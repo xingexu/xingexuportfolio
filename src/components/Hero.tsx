@@ -615,6 +615,7 @@ function DefaultHero() {
 
   return (
     <section
+      className="hero-default-section"
       style={{
         position: "relative",
         zIndex: 10,

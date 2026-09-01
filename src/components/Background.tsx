@@ -482,8 +482,8 @@ export default function Background() {
     let skylineTwilightGlow: HTMLCanvasElement | null = null;
     let activePhase: SkyPhase | null = null;
     let scheduledPhase = getSkyPhase();
-    let sunriseBannerTopCell = 0;
-    let sunriseBannerMeasured = false;
+    let heroAirTrafficTopCell = 0;
+    let heroAirTrafficMeasured = false;
     const planeSprite = new window.Image();
     let planeSpriteReady = false;
     const onPlaneSpriteLoad = () => {
@@ -835,7 +835,7 @@ export default function Background() {
       const baseX = balloon.x + balloon.sway + jiggle.x;
       const baseY = balloon.y + balloon.bob + jiggle.y;
       const xCandidates = [...new Set([balloon.trafficOffset, 0, -4, 4, -8, 8, -12, 12])];
-      const maxBalloonY = (sunriseBannerTopCell || waterTop) - BALLOON.length - 3;
+      const maxBalloonY = (heroAirTrafficTopCell || waterTop) - BALLOON.length - 3;
       const yCandidates = [...new Set([balloon.trafficYOffset, 0])];
       for (let distance = 4; distance <= Math.max(24, rows); distance += 4) {
         yCandidates.push(-distance, distance);
@@ -863,16 +863,17 @@ export default function Background() {
       return { visible: false, x: balloon.trafficOffset, y: balloon.trafficYOffset };
     }
 
-    // Sunrise traffic is vertically stacked above the banner. The lower
-    // flock keeps enough headroom for its full click-dispersion range.
+    // Air traffic is vertically stacked above the active theme's name art.
+    // The lower flock keeps enough headroom for its full click-dispersion
+    // range, so no bird can pass behind the name while flying or scattering.
     const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
     const birdLaneY = (kind: FlockKind) => {
       const defaultThreeBirdLane = Math.max(airplaneLaneY() + 12, Math.floor(rows * 0.18));
-      if (sunriseBannerTopCell) {
-        const fiveBirdLane = sunriseBannerTopCell - 19;
+      if (heroAirTrafficTopCell) {
+        const fiveBirdLane = Math.max(SKY_SAFE_TOP + 11, heroAirTrafficTopCell - 20);
         const threeBirdLane = Math.max(
-          SKY_SAFE_TOP + 5,
-          Math.min(defaultThreeBirdLane, fiveBirdLane - 9),
+          SKY_SAFE_TOP + 11,
+          Math.min(defaultThreeBirdLane, fiveBirdLane - 18),
         );
         return kind === "three" ? threeBirdLane : fiveBirdLane;
       }
@@ -895,16 +896,22 @@ export default function Background() {
 
     /* ── static layers ── */
 
-    function measureSunriseAirTrafficLanes() {
-      const sunriseBanner = document.querySelector<HTMLElement>(".hero-plane-banner");
-      if (!sunriseBanner) {
-        sunriseBannerTopCell = 0;
-        sunriseBannerMeasured = false;
+    function measureHeroAirTrafficLanes(phase = getSkyOverride() ?? scheduledPhase) {
+      const heroSelector = phase === "twilight"
+        ? ".hero-plane-banner"
+        : phase === "day"
+          ? ".day-planes-heading"
+          : ".midnight-fireworks-heading";
+      const heroName = document.querySelector<HTMLElement>(heroSelector);
+      if (!heroName) {
+        heroAirTrafficTopCell = 0;
+        heroAirTrafficMeasured = false;
         return;
       }
 
-      sunriseBannerTopCell = Math.floor(sunriseBanner.getBoundingClientRect().top / CELL);
-      sunriseBannerMeasured = true;
+      const safeGapPx = Math.max(16, CELL * 4);
+      heroAirTrafficTopCell = Math.floor((heroName.getBoundingClientRect().top - safeGapPx) / CELL);
+      heroAirTrafficMeasured = true;
       for (const flock of flocks) flock.y = birdLaneY(flock.kind);
       if (balloon) balloon.y = balloonLaneY();
     }
@@ -1159,8 +1166,8 @@ export default function Background() {
       cols = Math.ceil(canvas!.width / CELL);
       rows = Math.ceil(canvas!.height / CELL);
       waterTop = rows - 6;
-      sunriseBannerMeasured = false;
-      measureSunriseAirTrafficLanes();
+      heroAirTrafficMeasured = false;
+      measureHeroAirTrafficLanes();
 
       if (plane) plane.y = airplaneLaneY();
       for (const flock of flocks) flock.y = birdLaneY(flock.kind);
@@ -1893,7 +1900,7 @@ export default function Background() {
     /* ── daylight + shared sunrise/sunset scene ── */
 
     function drawDayScene(dt: number, pal: typeof DAY | typeof TWILIGHT, twilight: boolean) {
-      if (twilight && !sunriseBannerMeasured) measureSunriseAirTrafficLanes();
+      if (!heroAirTrafficMeasured) measureHeroAirTrafficLanes(twilight ? "twilight" : "day");
       const sky = twilight ? skyTwilight : skyDay;
       if (sky) ctx!.drawImage(sky, 0, 0);
       stepPulse(dt);
@@ -2194,8 +2201,8 @@ export default function Background() {
       const phase = getSkyOverride() ?? scheduledPhase;
       if (activePhase !== phase) {
         activePhase = phase;
+        heroAirTrafficMeasured = false;
         if (phase === "twilight") {
-          sunriseBannerMeasured = false;
           sunriseSunJourneyElapsed = 0;
         }
         else sunriseSkylineGlowRemaining = 0;
@@ -2203,6 +2210,7 @@ export default function Background() {
         document.documentElement.dataset.skyPhase = phase;
         document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";
       }
+      if (!heroAirTrafficMeasured) measureHeroAirTrafficLanes(phase);
       if (phase === "day") drawDay(dt);
       else if (phase === "twilight") drawTwilight(dt);
       else drawNight(dt);

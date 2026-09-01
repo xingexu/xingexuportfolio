@@ -601,32 +601,37 @@ body {
 
 @media (min-width: 821px) {
   :root[data-sky-phase="twilight"] .hero-stage {
-    transform: translateY(-42px);
+    transform: translateY(-50px);
   }
 
   :root[data-sky-phase="twilight"] .hero-layout-under-banner {
-    margin-top: clamp(-78px, -5.4vw, -52px);
+    margin-top: clamp(-92px, -6.2vw, -62px);
   }
 
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-education {
-    font-size: clamp(16px, 1.3vw, 19px);
+    font-size: clamp(18px, 1.45vw, 21px);
   }
 
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
     gap: 18px 26px !important;
-    margin-top: 20px !important;
+    margin-top: 14px !important;
   }
 
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-cta-btn {
-    min-width: 320px;
-    min-height: 78px;
-    padding: 19px 28px;
-    font-size: clamp(17px, 1.3vw, 20px);
+    min-width: 360px;
+    min-height: 88px;
+    padding: 22px 32px;
+    font-size: clamp(19px, 1.5vw, 22px);
   }
 
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-resume-btn {
-    min-width: 248px;
+    min-width: 280px;
   }
+}
+
+:root[data-sky-phase="twilight"] .hero-layout-under-banner .step-in-2,
+:root[data-sky-phase="twilight"] .hero-layout-under-banner .step-in-3 {
+  animation-delay: 1.5s;
 }
 
 :root[data-sky-phase="twilight"] .hero-plane-banner-image {
@@ -669,10 +674,10 @@ body {
 
 .day-planes-heading {
   display: block !important;
-  width: min(125vw, 2050px);
+  width: min(142vw, 2320px);
   max-width: none !important;
   aspect-ratio: 1440 / 280;
-  margin: 0 0 clamp(-150px, -8.4vw, -44px);
+  margin: 0 0 clamp(-210px, -11.4vw, -84px);
   line-height: 0 !important;
   transform: translateX(-20.972%);
 }
@@ -733,26 +738,27 @@ body {
 
 :root[data-sky-phase="day"] .hero-default-section .hero-copy > .step-in-3 {
   gap: 22px 32px !important;
-  margin-top: 22px !important;
+  margin-top: 14px !important;
 }
 
 :root[data-sky-phase="day"] .hero-default-section .hero-cta-btn {
-  min-width: 340px;
-  min-height: 82px;
-  padding: 20px 30px;
-  font-size: clamp(17px, 1.3vw, 20px);
+  min-width: 380px;
+  min-height: 94px;
+  padding: 24px 34px;
+  font-size: clamp(19px, 1.5vw, 22px);
 }
 
 :root[data-sky-phase="day"] .hero-default-section .hero-resume-btn {
-  min-width: 260px;
+  min-width: 300px;
 }
 
 :root[data-sky-phase="day"] .hero-default-section .hero-education {
-  font-size: clamp(16px, 1.35vw, 19px);
+  margin-top: 8px;
+  font-size: clamp(18px, 1.5vw, 22px);
 }
 
 :root[data-sky-phase="day"] .hero-default-section .hero-copy {
-  transform: translateY(-78px);
+  transform: translateY(-96px);
 }
 
 .midnight-fireworks-heading {
@@ -2268,9 +2274,9 @@ a.project-card:hover .project-title { color: var(--accent); }
     overflow-wrap: anywhere;
   }
   .day-planes-heading {
-    width: min(205vw, 940px);
+    width: min(228vw, 1050px);
     max-width: none !important;
-    margin-bottom: clamp(-64px, -13vw, -42px);
+    margin-bottom: clamp(-76px, -15vw, -50px);
     transform: translateX(12%);
   }
   :root[data-sky-phase="day"] .hero-default-section .hero-copy > .step-in-3 {
@@ -2282,15 +2288,16 @@ a.project-card:hover .project-title { color: var(--accent); }
   :root[data-sky-phase="day"] .hero-default-section .hero-resume-btn {
     width: 100%;
     min-width: 0;
-    min-height: 66px;
-    padding: 16px 20px;
-    font-size: clamp(14px, 4.2vw, 17px);
+    min-height: 72px;
+    padding: 18px 22px;
+    font-size: clamp(15px, 4.5vw, 18px);
   }
   :root[data-sky-phase="day"] .hero-default-section .hero-copy {
-    transform: translateY(-48px);
+    transform: translateY(-58px);
   }
   :root[data-sky-phase="day"] .hero-default-section .hero-education {
-    font-size: clamp(13px, 4vw, 16px);
+    margin-top: 6px;
+    font-size: clamp(14px, 4.2vw, 17px);
   }
   :root[data-sky-phase="night"] .hero-default-section .hero-cta-btn,
   :root[data-sky-phase="night"] .hero-default-section .hero-resume-btn {
@@ -2352,17 +2359,17 @@ a.project-card:hover .project-title { color: var(--accent); }
     transform: translateY(-20px);
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
-    width: min(84vw, 380px);
+    width: min(88vw, 410px);
     gap: 12px !important;
     margin-right: auto !important;
     margin-left: auto !important;
-    margin-top: 16px !important;
+    margin-top: 12px !important;
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-cta-btn {
-    min-height: 58px;
+    min-height: 64px;
     gap: 12px;
-    padding: 14px 18px;
-    font-size: clamp(13px, 3.8vw, 16px);
+    padding: 16px 20px;
+    font-size: clamp(14px, 4vw, 17px);
   }
   :root[data-sky-phase="twilight"] .hero-layout-under-banner .pixel-arrow {
     flex-basis: 22px;

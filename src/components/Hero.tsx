@@ -7,6 +7,7 @@ import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
 const NAME = "xinge xu";
 const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
+const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
 const BANNER_STATIC = "/xinge-plane-banner-static.png";
 const BANNER_ENTRANCE_DURATION_MS = 4200;
@@ -342,6 +343,11 @@ function PlaneBanner() {
     playFireworkSounds(mode, fromGesture);
   };
 
+  const illuminateToronto = () => {
+    window.dispatchEvent(new Event(SUNRISE_SKYLINE_GLOW_EVENT));
+    launchFireworks("extra", true);
+  };
+
   const src = stage === "static" ? BANNER_STATIC : BANNER_LOOP;
   const speedParticles =
     stage === "loop"
@@ -448,9 +454,9 @@ function PlaneBanner() {
         <button
           type="button"
           className="hero-banner-firework-trigger"
-          aria-label="Launch more sunrise fireworks"
-          title="Launch more fireworks"
-          onClick={() => launchFireworks("extra", true)}
+          aria-label="Illuminate the Toronto skyline and launch sunrise fireworks"
+          title="Light up Toronto"
+          onClick={illuminateToronto}
         />
       )}
     </div>

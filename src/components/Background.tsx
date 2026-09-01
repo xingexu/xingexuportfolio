@@ -24,6 +24,20 @@ const CELL = 5; // css px per sky pixel
 const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
 const SEED = 20260703;
 const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
+const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
+const SUNRISE_SKYLINE_GLOW_DURATION_MS = 1600;
+const SKYLINE_GLOW_FAR_OFFSETS = [
+  [-4, 0], [4, 0], [0, -4], [0, 4],
+  [-4, -4], [4, -4], [-4, 4], [4, 4],
+];
+const SKYLINE_GLOW_OUTER_OFFSETS = [
+  [-2, 0], [2, 0], [0, -2], [0, 2],
+  [-2, -2], [2, -2], [-2, 2], [2, 2],
+];
+const SKYLINE_GLOW_INNER_OFFSETS = [
+  [-1, 0], [1, 0], [0, -1], [0, 1],
+  [-1, -1], [1, -1], [-1, 1], [1, 1],
+];
 const TOP_BAR_HEIGHT = 54;
 const SKY_SAFE_TOP = Math.ceil(TOP_BAR_HEIGHT / CELL) + 4;
 const AIR_TRAFFIC_STAGGER = 3; // 15 CSS px between successive entrances
@@ -370,6 +384,8 @@ export default function Background() {
     let sparkles: Sparkle[] = [];
     let sparkleAcc = 0;
     let nameStarGlowActive = false;
+    let sunriseSkylineGlowRemaining = 0;
+    let sunriseSkylineGlowResetTimer = 0;
     let clouds: Cloud[] = [];
     let buildings: Building[] = [];
     let litWindows = new Set<string>();
@@ -405,6 +421,7 @@ export default function Background() {
     let skylineNight: HTMLCanvasElement | null = null;
     let skylineDay: HTMLCanvasElement | null = null;
     let skylineTwilight: HTMLCanvasElement | null = null;
+    let skylineTwilightGlow: HTMLCanvasElement | null = null;
     let activePhase: SkyPhase | null = null;
     let scheduledPhase = getSkyPhase();
     let sunriseBannerTopCell = 0;
@@ -432,6 +449,20 @@ export default function Background() {
       if (!(event instanceof CustomEvent)) return;
       nameStarGlowActive = event.detail === true;
       if (activePhase === "night") drawCurrentScene(0);
+    };
+
+    const onSunriseSkylineGlow = () => {
+      if (getVisibleSkyPhase() !== "twilight") return;
+      sunriseSkylineGlowRemaining = SUNRISE_SKYLINE_GLOW_DURATION_MS;
+      drawCurrentScene(reduced ? TICK : 0);
+
+      if (reduced) {
+        window.clearTimeout(sunriseSkylineGlowResetTimer);
+        sunriseSkylineGlowResetTimer = window.setTimeout(() => {
+          sunriseSkylineGlowRemaining = 0;
+          drawCurrentScene(0);
+        }, SUNRISE_SKYLINE_GLOW_DURATION_MS);
+      }
     };
 
     function getAudioContext() {
@@ -796,6 +827,19 @@ export default function Background() {
       skylineNight = renderSkyline(NIGHT, null);
       skylineDay = renderSkyline(DAY, DAY.window);
       skylineTwilight = renderSkyline(TWILIGHT, null);
+      skylineTwilightGlow = renderSkylineGlowMask(skylineTwilight);
+    }
+
+    function renderSkylineGlowMask(source: HTMLCanvasElement) {
+      const off = document.createElement("canvas");
+      off.width = source.width;
+      off.height = source.height;
+      const o = off.getContext("2d")!;
+      o.drawImage(source, 0, 0);
+      o.globalCompositeOperation = "source-in";
+      o.fillStyle = "#ffd889";
+      o.fillRect(0, 0, off.width, off.height);
+      return off;
     }
 
     /** Skyline with per-building shading, lit edges, roof details and an accurate CN Tower. */
@@ -1476,11 +1520,49 @@ export default function Background() {
         drawPlane(dt, twilight);
       }
 
+      const skylineGlowIntensity = twilight ? drawSunriseSkylineGlow(dt) : 0;
       const skyline = twilight ? skylineTwilight : skylineDay;
       if (skyline) ctx!.drawImage(skyline, 0, 0);
+      if (twilight && skylineTwilightGlow && skylineGlowIntensity > 0) {
+        ctx!.save();
+        ctx!.globalCompositeOperation = "screen";
+        ctx!.globalAlpha = skylineGlowIntensity * 0.18;
+        ctx!.drawImage(skylineTwilightGlow, 0, 0);
+        ctx!.restore();
+      }
       if (twilight) drawLitWindows(dt);
       drawWater(pal, pal.sunLane, sx + 7, dt);
       drawFerry(dt, twilight);
+    }
+
+    function drawSunriseSkylineGlow(dt: number) {
+      if (!skylineTwilightGlow || sunriseSkylineGlowRemaining <= 0) return 0;
+
+      sunriseSkylineGlowRemaining = Math.max(0, sunriseSkylineGlowRemaining - dt);
+      const elapsed = SUNRISE_SKYLINE_GLOW_DURATION_MS - sunriseSkylineGlowRemaining;
+      const attack = Math.min(1, (elapsed + TICK) / 260);
+      const release = Math.min(1, sunriseSkylineGlowRemaining / 420);
+      const pulseStep = [0.68, 1, 0.82, 1][Math.floor(elapsed / 120) % 4];
+      const intensity = Math.ceil(Math.min(attack, release) * pulseStep * 4) / 4;
+      if (intensity <= 0) return 0;
+
+      ctx!.save();
+      ctx!.globalCompositeOperation = "screen";
+      ctx!.globalAlpha = intensity * 0.12;
+      for (const [x, y] of SKYLINE_GLOW_FAR_OFFSETS) {
+        ctx!.drawImage(skylineTwilightGlow, x * CELL, y * CELL);
+      }
+      ctx!.globalAlpha = intensity * 0.28;
+      for (const [x, y] of SKYLINE_GLOW_OUTER_OFFSETS) {
+        ctx!.drawImage(skylineTwilightGlow, x * CELL, y * CELL);
+      }
+      ctx!.globalAlpha = intensity * 0.56;
+      for (const [x, y] of SKYLINE_GLOW_INNER_OFFSETS) {
+        ctx!.drawImage(skylineTwilightGlow, x * CELL, y * CELL);
+      }
+      ctx!.restore();
+
+      return intensity;
     }
 
     function drawDay(dt: number) {
@@ -1575,6 +1657,7 @@ export default function Background() {
       if (activePhase !== phase) {
         activePhase = phase;
         if (phase === "twilight") sunriseBannerMeasured = false;
+        else sunriseSkylineGlowRemaining = 0;
         document.documentElement.dataset.skyPhase = phase;
         document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";
       }
@@ -1611,6 +1694,7 @@ export default function Background() {
     build();
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener(NAME_STAR_GLOW_EVENT, onNameStarGlow);
+    window.addEventListener(SUNRISE_SKYLINE_GLOW_EVENT, onSunriseSkylineGlow);
 
     let clockTimer = 0;
     if (reduced) {
@@ -1634,8 +1718,10 @@ export default function Background() {
     return () => {
       cancelAnimationFrame(raf);
       window.clearInterval(clockTimer);
+      window.clearTimeout(sunriseSkylineGlowResetTimer);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener(NAME_STAR_GLOW_EVENT, onNameStarGlow);
+      window.removeEventListener(SUNRISE_SKYLINE_GLOW_EVENT, onSunriseSkylineGlow);
       window.removeEventListener("resize", onResize);
       planeSprite.removeEventListener("load", onPlaneSpriteLoad);
       phaseObserver.disconnect();

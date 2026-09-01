@@ -10,6 +10,11 @@ const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
 const BANNER_STATIC = "/xinge-plane-banner-static.png";
+const MIDNIGHT_FIREWORKS_NAME = "/xinge-fireworks-transparent.png";
+const MIDNIGHT_FIREWORKS_FINAL = "/xinge-fireworks-final.png";
+const MIDNIGHT_FIREWORKS_DURATION_MS = 11_850;
+const MIDNIGHT_FIREWORKS_REVEAL_MS = 11_150;
+const MIDNIGHT_STAR_GLOW_DURATION_MS = 1_900;
 const BANNER_ENTRANCE_DURATION_MS = 4200;
 const BANNER_PARTICLE_REMOVAL_INTERVAL_MS = 1000;
 const SUNRISE_TRANSIENT_PARTICLE_COUNT = 21;
@@ -566,10 +571,15 @@ function SunriseHero() {
   );
 }
 
-function DefaultHero() {
+function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
   const [typed, setTyped] = useState("");
   const [typing, setTyping] = useState(false);
+  const [midnightIntroPlaying, setMidnightIntroPlaying] = useState(phase === "night");
+  const [midnightIntroReady, setMidnightIntroReady] = useState(false);
+  const [midnightNameVisible, setMidnightNameVisible] = useState(false);
+  const [midnightGlowActive, setMidnightGlowActive] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const midnightGlowTimer = useRef<number | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   const pid = useRef(0);
 
@@ -599,9 +609,47 @@ function DefaultHero() {
     dispatchNameStarGlow(false);
   };
 
-  useEffect(() => () => dispatchNameStarGlow(false), []);
+  const handleMidnightNameClick = () => {
+    burst();
+    if (midnightGlowTimer.current) window.clearTimeout(midnightGlowTimer.current);
+    setMidnightGlowActive(true);
+    dispatchNameStarGlow(true);
+    midnightGlowTimer.current = window.setTimeout(() => {
+      setMidnightGlowActive(false);
+      dispatchNameStarGlow(false);
+      midnightGlowTimer.current = null;
+    }, MIDNIGHT_STAR_GLOW_DURATION_MS);
+  };
+
+  useEffect(() => () => {
+    if (midnightGlowTimer.current) window.clearTimeout(midnightGlowTimer.current);
+    dispatchNameStarGlow(false);
+  }, []);
 
   useEffect(() => {
+    if (phase !== "night" || !midnightIntroPlaying || !midnightIntroReady) return;
+
+    const revealTimer = window.setTimeout(
+      () => setMidnightNameVisible(true),
+      MIDNIGHT_FIREWORKS_REVEAL_MS,
+    );
+    const introTimer = window.setTimeout(
+      () => setMidnightIntroPlaying(false),
+      MIDNIGHT_FIREWORKS_DURATION_MS,
+    );
+    return () => {
+      window.clearTimeout(revealTimer);
+      window.clearTimeout(introTimer);
+    };
+  }, [midnightIntroPlaying, midnightIntroReady, phase]);
+
+  useEffect(() => {
+    if (phase === "night") {
+      setTyped("");
+      setTyping(false);
+      return;
+    }
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setTyped(NAME);
       return;
@@ -626,7 +674,11 @@ function DefaultHero() {
       window.cancelAnimationFrame(frame);
       if (timer.current) clearInterval(timer.current);
     };
-  }, []);
+  }, [phase]);
+
+  const midnightSupportingCopyClass = phase === "night"
+    ? ` midnight-supporting-copy${midnightNameVisible ? " midnight-supporting-copy-visible" : ""}`
+    : "";
 
   return (
     <section
@@ -644,7 +696,7 @@ function DefaultHero() {
       <div className="hero-layout" style={{ width: "100%", maxWidth: 1040 }}>
         <div className="hero-copy">
           <h1
-            className="font-pixel"
+            className={`font-pixel${phase === "night" ? " midnight-fireworks-heading" : ""}`}
             style={{
               display: "inline-block",
               fontSize: "clamp(40px, 8vw, 88px)",
@@ -654,15 +706,58 @@ function DefaultHero() {
               position: "relative",
             }}
           >
+            {phase === "night" ? (
+              <button
+                type="button"
+                className={`midnight-fireworks-name${midnightGlowActive ? " midnight-fireworks-name-glowing" : ""}`}
+                onClick={handleMidnightNameClick}
+                aria-label="Light up every star around Xinge Xu"
+                title="Click to light up the stars"
+              >
+                <span className="sr-only">{NAME}</span>
+                {midnightIntroPlaying && (
+                  <Image
+                    src={MIDNIGHT_FIREWORKS_NAME}
+                    width={1440}
+                    height={810}
+                    sizes="(max-width: 820px) 100vw, 980px"
+                    alt=""
+                    priority
+                    unoptimized
+                    aria-hidden
+                    className={`midnight-fireworks-name-image${midnightNameVisible ? " midnight-fireworks-name-image-finishing" : ""}`}
+                    onLoad={() => setMidnightIntroReady(true)}
+                  />
+                )}
+                <Image
+                  src={MIDNIGHT_FIREWORKS_FINAL}
+                  width={1440}
+                  height={810}
+                  sizes="(max-width: 820px) 100vw, 980px"
+                  alt=""
+                  priority
+                  unoptimized
+                  aria-hidden
+                  className={`midnight-fireworks-name-still${midnightNameVisible ? " midnight-fireworks-name-still-visible" : ""}`}
+                />
+              </button>
+            ) : (
+              <span>
+                <span
+                  className="name-hover"
+                  onMouseEnter={handleNameMouseEnter}
+                  onMouseLeave={handleNameMouseLeave}
+                >
+                  {typed}
+                </span>
+                <span className="type-cursor" aria-hidden style={{ visibility: typing ? "visible" : "hidden" }} />
+              </span>
+            )}
             <span
-              className="name-hover"
-              onMouseEnter={handleNameMouseEnter}
-              onMouseLeave={handleNameMouseLeave}
+              aria-hidden
+              className={phase === "night" ? "midnight-name-particle-layer" : undefined}
+              style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}
             >
-              {typed}
-            </span>
-            <span className="type-cursor" aria-hidden style={{ visibility: typing ? "visible" : "hidden" }} />
-            <span aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}>
               {particles.map((particle) => (
                 <span
                   key={particle.id}
@@ -686,12 +781,12 @@ function DefaultHero() {
             </span>
           </h1>
 
-          <p className="step-in-2 hero-subtitle hero-education font-pixel">
+          <p className={`step-in-2 hero-subtitle hero-education font-pixel${midnightSupportingCopyClass}`}>
             western computer science + ivey aeo &apos;31
           </p>
 
           <div
-            className="step-in-3"
+            className={`step-in-3${midnightSupportingCopyClass}`}
             style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "16px 28px", marginTop: 40 }}
           >
             <Link href="/projects" className="px-btn hero-cta-btn">
@@ -723,5 +818,5 @@ export default function Hero() {
     );
   }
 
-  return phase === "twilight" ? <SunriseHero /> : <DefaultHero />;
+  return phase === "twilight" ? <SunriseHero /> : <DefaultHero key={phase} phase={phase} />;
 }

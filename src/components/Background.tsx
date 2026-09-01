@@ -1435,8 +1435,11 @@ export default function Background() {
           }
         }
         const alpha = [0.1, 0.32, 0.58, 0.95][s.level];
+        const hoverTwinkleStep = (pulse + s.x + s.y) % 4;
+        const hoverTwinkleAlpha = [0.38, 0.68, 1, 0.72][hoverTwinkleStep];
+        const visibleAlpha = nameStarGlowActive ? hoverTwinkleAlpha : alpha;
         if (nameStarGlowActive) {
-          const glowAlpha = [0.1, 0.16, 0.23, 0.16][pulse];
+          const glowAlpha = hoverTwinkleAlpha * 0.3;
           for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
             starCell(s.x + dx, s.y + dy, s.color, glowAlpha);
           }
@@ -1447,20 +1450,24 @@ export default function Background() {
             starCell(s.x + dx, s.y + dy, s.color, glowAlpha * 0.28);
           }
         }
-        starCell(s.x, s.y, s.color, nameStarGlowActive ? Math.max(alpha, 0.82) : alpha);
-        if (s.big && s.level >= 2) {
-          starCell(s.x + 1, s.y, s.color, alpha * 0.4);
-          starCell(s.x - 1, s.y, s.color, alpha * 0.4);
-          starCell(s.x, s.y + 1, s.color, alpha * 0.4);
-          starCell(s.x, s.y - 1, s.color, alpha * 0.4);
+        starCell(s.x, s.y, s.color, visibleAlpha);
+        if ((s.big && s.level >= 2) || (nameStarGlowActive && hoverTwinkleStep === 2)) {
+          starCell(s.x + 1, s.y, s.color, visibleAlpha * 0.5);
+          starCell(s.x - 1, s.y, s.color, visibleAlpha * 0.5);
+          starCell(s.x, s.y + 1, s.color, visibleAlpha * 0.5);
+          starCell(s.x, s.y - 1, s.color, visibleAlpha * 0.5);
         }
       }
       if (!reduced) {
         sparkleAcc += dt;
-        if (sparkleAcc >= 480) {
+        const sparkleInterval = nameStarGlowActive ? 110 : 480;
+        if (sparkleAcc >= sparkleInterval) {
           sparkleAcc = 0;
-          const s = stars[Math.floor(Math.random() * stars.length)];
-          if (s) sparkles.push({ x: s.x, y: s.y, ttl: 3, color: s.color });
+          const sparkleCount = nameStarGlowActive ? 6 : 1;
+          for (let index = 0; index < sparkleCount; index += 1) {
+            const s = stars[Math.floor(Math.random() * stars.length)];
+            if (s) sparkles.push({ x: s.x, y: s.y, ttl: nameStarGlowActive ? 4 : 3, color: s.color });
+          }
         }
         sparkles = sparkles.filter((sp) => sp.ttl-- > 0);
         for (const sp of sparkles) {

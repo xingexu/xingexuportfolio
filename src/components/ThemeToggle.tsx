@@ -32,13 +32,19 @@ export default function ThemeToggle() {
   const next = nextPhase(phase);
   const nextLabel = next === "twilight" ? "sunset and sunrise" : next;
 
-  const toggle = () => {
+  const applyPhase = (target: SkyPhase) => {
     try {
-      window.localStorage.setItem(SKY_PHASE_STORAGE_KEY, next);
+      window.localStorage.setItem(SKY_PHASE_STORAGE_KEY, target);
     } catch {
       // The in-page override still works when storage is unavailable.
     }
-    document.documentElement.dataset.skyOverride = next;
+    document.documentElement.dataset.skyOverride = target;
+    document.documentElement.dataset.skyPhase = target;
+    document.documentElement.dataset.theme = target === "night" ? "dark" : "light";
+  };
+
+  const toggle = () => {
+    applyPhase(next);
   };
 
   return (

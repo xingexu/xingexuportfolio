@@ -633,6 +633,113 @@ body {
   animation: particleDrop 1s steps(11, end) both;
 }
 
+.midnight-fireworks-heading {
+  display: block !important;
+  width: min(90vw, 980px);
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 0 0 -198px;
+  line-height: 0 !important;
+  transform: translate(-8.5%, 8px);
+}
+
+.midnight-fireworks-name {
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  line-height: 0;
+  cursor: pointer;
+  isolation: isolate;
+  transition: filter 180ms steps(3, end);
+}
+
+.midnight-fireworks-name-glowing {
+  filter:
+    drop-shadow(0 0 10px rgba(255, 240, 187, 0.94))
+    drop-shadow(0 0 24px rgba(159, 196, 240, 0.72));
+}
+
+.midnight-fireworks-name-image,
+.midnight-fireworks-name-still {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter:
+    brightness(1.05)
+    saturate(1.04)
+    drop-shadow(0 0 7px rgba(207, 226, 255, 0.32));
+}
+
+.midnight-fireworks-name-still {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.midnight-fireworks-name-still-visible {
+  animation: midnightFinalFrameReveal 700ms steps(7, end) both;
+}
+
+.midnight-fireworks-name-image-finishing {
+  animation: midnightFireworksFrameFinish 700ms steps(7, end) both;
+}
+
+.midnight-name-particle-layer {
+  inset: 34% 8% auto !important;
+  height: 32%;
+}
+
+:root[data-sky-phase="night"] .hero-default-section .hero-education {
+  margin-top: 0;
+}
+
+:root[data-sky-phase="night"] .hero-default-section .hero-copy {
+  transform: translateY(-94px);
+}
+
+:root[data-sky-phase="night"] .hero-default-section .hero-copy > .step-in-3 {
+  margin-top: 24px !important;
+}
+
+:root[data-sky-phase="night"] .midnight-supporting-copy {
+  opacity: 0;
+  animation: none;
+}
+
+:root[data-sky-phase="night"] .midnight-supporting-copy-visible {
+  animation: midnightSupportingCopyReveal 700ms steps(7, end) both;
+}
+
+@keyframes midnightFinalFrameReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes midnightFireworksFrameFinish {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes midnightSupportingCopyReveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .name-hover {
   display: inline-block;
   transition: text-shadow 140ms steps(2, end);
@@ -2002,10 +2109,18 @@ a.project-card:hover .project-title { color: var(--accent); }
     align-items: center;
     text-align: center;
   }
+  :root[data-sky-phase="night"] .hero-default-section .hero-copy {
+    transform: translateY(-42px);
+  }
   .hero-copy h1 {
     max-width: 100%;
     font-size: clamp(34px, 10vw, 64px) !important;
     overflow-wrap: anywhere;
+  }
+  .midnight-fireworks-heading {
+    width: 100%;
+    margin-bottom: -62px;
+    transform: translateY(4px);
   }
   .hero-education {
     max-width: 100%;

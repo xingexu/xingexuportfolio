@@ -991,20 +991,25 @@ export default function Background() {
           return sourceX < towerX - 5 || sourceX > rogersCentreRight;
         })
         .sort((a, b) => a.x - b.x);
-      const buildingZs: SleepyZ[] = candidates
-        .filter((_, index) => index % 2 === 0)
+      const sleepyBuildings = candidates.filter((_, index) => index % 2 === 0);
+      const tallestSleepyBuilding = sleepyBuildings.reduce<Building | null>(
+        (tallest, building) => !tallest || building.h > tallest.h ? building : tallest,
+        null,
+      );
+      const buildingZs: SleepyZ[] = sleepyBuildings
         .flatMap((building, index) => {
           const sourceX = building.x + Math.floor(building.w / 2);
           const sourceY = waterTop - building.h - building.antenna - 3;
+          const isTallest = building === tallestSleepyBuilding;
           const primary: SleepyZ = {
             delay: (index * 47) % 360,
             direction: 1,
             drift: (index % 3) - 1,
-            trailLength: 1,
+            trailLength: isTallest ? 3 : 1,
             x: sourceX - 1,
             y: sourceY,
           };
-          if (building.h < 16 || index % 2 !== 0) return [primary];
+          if (isTallest || building.h < 16 || index % 2 !== 0) return [primary];
           return [
             primary,
             {
@@ -1023,17 +1028,9 @@ export default function Background() {
           delay: 120,
           direction: 1,
           drift: 0,
-          trailLength: 1,
-          x: towerX + 18,
-          y: waterTop - 18,
-        },
-        {
-          delay: 420,
-          direction: 1,
-          drift: 1,
-          trailLength: 1,
-          x: towerX + 29,
-          y: waterTop - 16,
+          trailLength: 3,
+          x: towerX + 23,
+          y: waterTop - 17,
         },
       ];
 
@@ -1042,27 +1039,9 @@ export default function Background() {
           delay: 80,
           direction: 1,
           drift: -1,
-          ferryOffsetX: 4,
-          trailLength: 1,
-          x: ferry.x + 4,
-          y: waterTop - 8 + ferry.bob,
-        },
-        {
-          delay: 300,
-          direction: 1,
-          drift: -1,
           ferryOffsetX: 12,
-          trailLength: 1,
+          trailLength: 3,
           x: ferry.x + 12,
-          y: waterTop - 8 + ferry.bob,
-        },
-        {
-          delay: 630,
-          direction: 1,
-          drift: 1,
-          ferryOffsetX: 19,
-          trailLength: 1,
-          x: ferry.x + 19,
           y: waterTop - 8 + ferry.bob,
         },
       ] : [];

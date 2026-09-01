@@ -345,6 +345,27 @@ body {
   animation-timing-function: steps(6, end);
 }
 
+.hero-banner-speed-particles-settling .hero-banner-speed-particle-fading {
+  animation-name: heroBannerParticleSettleOut;
+  animation-timing-function: steps(9, end);
+  animation-iteration-count: 1;
+  animation-fill-mode: both;
+}
+
+@keyframes heroBannerParticleSettleOut {
+  0% {
+    opacity: 0.88;
+    transform: translate3d(0, 0, 0);
+  }
+  24% { opacity: 0.72; }
+  54% { opacity: 0.48; }
+  82% { opacity: 0.2; }
+  100% {
+    opacity: 0;
+    transform: translate3d(48px, 0, 0);
+  }
+}
+
 .hero-banner-speed-particles-inside {
   z-index: 2;
 }

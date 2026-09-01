@@ -237,6 +237,7 @@ type Balloon = {
   yAcc: number;
   jiggleElapsed: number | null;
   trafficOffset: number;
+  trafficYOffset: number;
 };
 type Ferry = { x: number; acc: number; bob: number; bobAcc: number; boostRemaining: number; frame: number };
 type Plane = { x: number; y: number; acc: number; boostRemaining: number };
@@ -603,8 +604,10 @@ export default function Background() {
       const x = clientX / CELL;
       const y = clientY / CELL;
       const jiggle = balloonJiggleOffset();
-      const balloonX = balloon.x + balloon.sway + jiggle.x + balloonTrafficOffset();
-      const balloonY = balloon.y + balloon.bob + jiggle.y;
+      const traffic = balloonTrafficOffset();
+      if (!traffic.visible) return false;
+      const balloonX = balloon.x + balloon.sway + jiggle.x + traffic.x;
+      const balloonY = balloon.y + balloon.bob + jiggle.y + traffic.y;
       return x >= balloonX && x <= balloonX + BALLOON[0].length * BALLOON_SCALE &&
         y >= balloonY && y <= balloonY + BALLOON.length * BALLOON_SCALE;
     }
@@ -664,52 +667,45 @@ export default function Background() {
     }
 
     function balloonTrafficOffset() {
-      if (!balloon) return 0;
-      const occupiedByBirds = new Set<string>();
-
-      for (const flock of flocks) {
-        for (const [dx, dy] of birdOffsets(flock)) {
-          const bx = flock.x + dx;
-          const by = flock.y + dy;
-          const wingY = by + (flock.frame ? 0 : 1);
-          for (const [x, y] of [
-            [bx - 3, wingY - 1],
-            [bx + 3, wingY - 1],
-            [bx - 2, wingY],
-            [bx - 1, wingY],
-            [bx + 1, wingY],
-            [bx + 2, wingY],
-            [bx - 1, by + (flock.frame ? 1 : 0)],
-            [bx, by + (flock.frame ? 1 : 0)],
-          ] as const) {
-            occupiedByBirds.add(`${x},${y}`);
-          }
-        }
-      }
-
+      if (!balloon) return { visible: false, x: 0, y: 0 };
+      const birdBounds = flocks.flatMap((flock) =>
+        birdOffsets(flock).map(([dx, dy]) => ({
+          left: flock.x + dx - 5,
+          right: flock.x + dx + 5,
+          top: flock.y + dy - 4,
+          bottom: flock.y + dy + 5,
+        })),
+      );
       const jiggle = balloonJiggleOffset();
       const baseX = balloon.x + balloon.sway + jiggle.x;
       const baseY = balloon.y + balloon.bob + jiggle.y;
-      const candidates = [...new Set([balloon.trafficOffset, 0, -1, -2, -3])];
+      const xCandidates = [...new Set([balloon.trafficOffset, 0, -4, 4, -8, 8, -12, 12])];
+      const maxBalloonY = (sunriseBannerTopCell || waterTop) - BALLOON.length - 3;
+      const yCandidates = [...new Set([balloon.trafficYOffset, 0])];
+      for (let distance = 4; distance <= Math.max(24, rows); distance += 4) {
+        yCandidates.push(-distance, distance);
+      }
 
-      for (const offset of candidates) {
-        let intersects = false;
-        for (let row = 0; row < BALLOON.length && !intersects; row += 1) {
-          for (let column = 0; column < BALLOON[row].length; column += 1) {
-            if (!BALLOON[row][column]) continue;
-            if (occupiedByBirds.has(`${baseX + offset + column},${baseY + row}`)) {
-              intersects = true;
-              break;
-            }
-          }
-        }
-        if (!intersects) {
-          balloon.trafficOffset = offset;
-          return offset;
+      for (const yOffset of yCandidates) {
+        const top = baseY + yOffset;
+        const bottom = top + BALLOON.length - 1;
+        if (top < SKY_SAFE_TOP + 1 || bottom > maxBalloonY) continue;
+
+        for (const xOffset of xCandidates) {
+          const left = baseX + xOffset;
+          const right = left + BALLOON[0].length - 1;
+          const intersects = birdBounds.some((bounds) =>
+            left <= bounds.right && right >= bounds.left && top <= bounds.bottom && bottom >= bounds.top,
+          );
+          if (intersects) continue;
+
+          balloon.trafficOffset = xOffset;
+          balloon.trafficYOffset = yOffset;
+          return { visible: true, x: xOffset, y: yOffset };
         }
       }
 
-      return balloon.trafficOffset;
+      return { visible: false, x: balloon.trafficOffset, y: balloon.trafficYOffset };
     }
 
     // Sunrise traffic is vertically stacked above the banner. The lower
@@ -1491,13 +1487,15 @@ export default function Background() {
               balloon.bob = balloon.bob === 0 ? (Math.random() < 0.5 ? -1 : 1) : 0;
             }
             const jiggle = balloonJiggleOffset();
-            const trafficOffset = balloonTrafficOffset();
-            sprite(BALLOON, balloon.x + balloon.sway + jiggle.x + trafficOffset, balloon.y + balloon.bob + jiggle.y, {
-              1: pal.balloonA,
-              2: pal.balloonB,
-              3: pal.basket,
-              4: pal.rope,
-            }, BALLOON_SCALE);
+            const traffic = balloonTrafficOffset();
+            if (traffic.visible) {
+              sprite(BALLOON, balloon.x + balloon.sway + jiggle.x + traffic.x, balloon.y + balloon.bob + jiggle.y + traffic.y, {
+                1: pal.balloonA,
+                2: pal.balloonB,
+                3: pal.basket,
+                4: pal.rope,
+              }, BALLOON_SCALE);
+            }
           }
         } else {
           balloonWait -= dt;
@@ -1511,6 +1509,7 @@ export default function Background() {
               yAcc: 0,
               jiggleElapsed: null,
               trafficOffset: -AIR_TRAFFIC_STAGGER,
+              trafficYOffset: 0,
             };
             balloonWait = 18000 + Math.random() * 16000;
           }

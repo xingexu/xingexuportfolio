@@ -11,6 +11,12 @@ const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
 const BANNER_STATIC = "/xinge-plane-banner-static.png";
 const BANNER_ENTRANCE_DURATION_MS = 4200;
+const BANNER_PARTICLE_REMOVAL_INTERVAL_MS = 1000;
+const SUNRISE_TRANSIENT_PARTICLE_COUNT = 21;
+const SUNRISE_PARTICLES_PER_SETTLE_STEP = 4;
+const SUNRISE_PARTICLE_SETTLE_STEPS = Math.ceil(
+  SUNRISE_TRANSIENT_PARTICLE_COUNT / SUNRISE_PARTICLES_PER_SETTLE_STEP,
+);
 const SUNRISE_FIREWORK_COLORS = ["#ffd889", "#fff0cf", "#ef7f7d", "#a878c2"];
 
 const SUNRISE_LANDING_FIREWORKS = [
@@ -71,17 +77,29 @@ const SUNRISE_PARTICLE_PATH = [
 ];
 
 const SUNRISE_SETTLED_PARTICLE_INDEXES = new Set([1, 4, 7, 10, 14, 17, 20, 23]);
+let sunriseTransientParticleOrdinal = 0;
 
-const SUNRISE_SPEED_PARTICLES = SUNRISE_PARTICLE_PATH.map((position, index) => ({
-  ...position,
-  delay: `${-((index * 113) % 880)}ms`,
-  duration: `${560 + (index % 4) * 80}ms`,
-  height: index % 3 === 0 ? 6 : 4,
-  persistent: SUNRISE_SETTLED_PARTICLE_INDEXES.has(index),
-  width: 8 + (index % 3) * 4,
-}));
+function getSunriseParticleSettleGroup(persistent: boolean) {
+  if (persistent) return -1;
+  const removalRank = (sunriseTransientParticleOrdinal * 8) % SUNRISE_TRANSIENT_PARTICLE_COUNT;
+  sunriseTransientParticleOrdinal += 1;
+  return Math.floor(removalRank / SUNRISE_PARTICLES_PER_SETTLE_STEP);
+}
 
-const SUNRISE_INSIDE_SPEED_PARTICLES = [
+const SUNRISE_SPEED_PARTICLES = SUNRISE_PARTICLE_PATH.map((position, index) => {
+  const persistent = SUNRISE_SETTLED_PARTICLE_INDEXES.has(index);
+  return {
+    ...position,
+    delay: `${-((index * 113) % 880)}ms`,
+    duration: `${560 + (index % 4) * 80}ms`,
+    height: index % 3 === 0 ? 6 : 4,
+    persistent,
+    settleGroup: getSunriseParticleSettleGroup(persistent),
+    width: 8 + (index % 3) * 4,
+  };
+});
+
+const SUNRISE_INSIDE_SPEED_PARTICLES_BASE = [
   { delay: "-120ms", height: 4, left: "32%", persistent: true, top: "33%", width: 12 },
   { delay: "-410ms", height: 6, left: "43%", persistent: false, top: "68%", width: 8 },
   { delay: "-690ms", height: 4, left: "53%", persistent: true, top: "32%", width: 16 },
@@ -89,6 +107,11 @@ const SUNRISE_INSIDE_SPEED_PARTICLES = [
   { delay: "-790ms", height: 6, left: "75%", persistent: false, top: "33%", width: 8 },
   { delay: "-520ms", height: 4, left: "87%", persistent: false, top: "68%", width: 16 },
 ];
+
+const SUNRISE_INSIDE_SPEED_PARTICLES = SUNRISE_INSIDE_SPEED_PARTICLES_BASE.map((particle) => ({
+  ...particle,
+  settleGroup: getSunriseParticleSettleGroup(particle.persistent),
+}));
 
 const SUNRISE_PLANE_SMOKE_PUFFS = Array.from({ length: 8 }, (_, index) => ({
   delay: `${-(index * 145)}ms`,
@@ -162,7 +185,7 @@ function scheduleFireworkSounds(audio: AudioContext, noise: AudioBuffer, mode: F
 }
 
 type SkyPhase = "day" | "twilight" | "night";
-type BannerStage = "entrance" | "loop" | "static";
+type BannerStage = "entrance" | "settling" | "loop" | "static";
 type FireworkMode = "landing" | "extra";
 type FireworkBurst = { id: number; mode: FireworkMode };
 
@@ -272,6 +295,7 @@ function BannerFireworks({ mode }: { mode: FireworkMode }) {
 /** Plays the one-shot plane entrance, then hands off to the seamless wind loop. */
 function PlaneBanner() {
   const [stage, setStage] = useState<BannerStage>("entrance");
+  const [settleStep, setSettleStep] = useState(0);
   const [windLoaded, setWindLoaded] = useState(false);
   const [fireworkBurst, setFireworkBurst] = useState<FireworkBurst | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
@@ -284,6 +308,16 @@ function PlaneBanner() {
       return () => window.cancelAnimationFrame(frame);
     }
   }, []);
+
+  useEffect(() => {
+    if (stage !== "settling") return;
+    const settleTimer = window.setTimeout(() => {
+      const nextStep = settleStep + 1;
+      if (nextStep >= SUNRISE_PARTICLE_SETTLE_STEPS) setStage("loop");
+      else setSettleStep(nextStep);
+    }, BANNER_PARTICLE_REMOVAL_INTERVAL_MS);
+    return () => window.clearTimeout(settleTimer);
+  }, [settleStep, stage]);
 
   useEffect(() => {
     const unlockAudio = () => {
@@ -307,10 +341,15 @@ function PlaneBanner() {
     };
   }, []);
 
+  const beginParticleSettling = () => {
+    setSettleStep(0);
+    setStage("settling");
+  };
+
   const handleWindLoad = () => {
     if (stage !== "entrance" || windLoaded) return;
     setWindLoaded(true);
-    if (entranceFinished.current) setStage("loop");
+    if (entranceFinished.current) beginParticleSettling();
   };
 
   const handleEntranceEnd = () => {
@@ -318,7 +357,7 @@ function PlaneBanner() {
 
     entranceFinished.current = true;
     launchFireworks("landing", false);
-    if (windLoaded) setStage("loop");
+    if (windLoaded) beginParticleSettling();
   };
 
   const playFireworkSounds = (mode: FireworkMode, allowCreate: boolean) => {
@@ -352,11 +391,19 @@ function PlaneBanner() {
   const speedParticles =
     stage === "loop"
       ? SUNRISE_SPEED_PARTICLES.filter((particle) => particle.persistent)
-      : SUNRISE_SPEED_PARTICLES;
+      : stage === "settling"
+        ? SUNRISE_SPEED_PARTICLES.filter(
+            (particle) => particle.persistent || particle.settleGroup >= settleStep,
+          )
+        : SUNRISE_SPEED_PARTICLES;
   const insideSpeedParticles =
     stage === "loop"
       ? SUNRISE_INSIDE_SPEED_PARTICLES.filter((particle) => particle.persistent)
-      : SUNRISE_INSIDE_SPEED_PARTICLES;
+      : stage === "settling"
+        ? SUNRISE_INSIDE_SPEED_PARTICLES.filter(
+            (particle) => particle.persistent || particle.settleGroup >= settleStep,
+          )
+        : SUNRISE_INSIDE_SPEED_PARTICLES;
 
   return (
     <div
@@ -369,16 +416,22 @@ function PlaneBanner() {
       {fireworkBurst && <BannerFireworks key={fireworkBurst.id} mode={fireworkBurst.mode} />}
       {stage !== "static" ? (
         <div
-          className={`hero-banner-speed-particles${stage === "loop" ? " hero-banner-speed-particles-settled" : ""}`}
+          className={`hero-banner-speed-particles${stage === "loop" ? " hero-banner-speed-particles-settled" : stage === "settling" ? " hero-banner-speed-particles-settling" : ""}`}
           aria-hidden="true"
         >
           {speedParticles.map((particle) => (
             <span
-              className="hero-banner-speed-particle"
+              className={`hero-banner-speed-particle${stage === "settling" && particle.settleGroup === settleStep ? " hero-banner-speed-particle-fading" : ""}`}
               key={`${particle.left}-${particle.top}`}
               style={{
-                animationDelay: particle.delay,
-                animationDuration: stage === "loop" ? "1480ms" : particle.duration,
+                animationDelay:
+                  stage === "settling" && particle.settleGroup === settleStep ? "0ms" : particle.delay,
+                animationDuration:
+                  stage === "loop"
+                    ? "1480ms"
+                    : stage === "settling" && particle.settleGroup === settleStep
+                      ? `${BANNER_PARTICLE_REMOVAL_INTERVAL_MS}ms`
+                      : particle.duration,
                 height: particle.height,
                 left: particle.left,
                 top: particle.top,
@@ -390,16 +443,22 @@ function PlaneBanner() {
       ) : null}
       {stage !== "static" ? (
         <div
-          className={`hero-banner-speed-particles hero-banner-speed-particles-inside${stage === "loop" ? " hero-banner-speed-particles-settled" : ""}`}
+          className={`hero-banner-speed-particles hero-banner-speed-particles-inside${stage === "loop" ? " hero-banner-speed-particles-settled" : stage === "settling" ? " hero-banner-speed-particles-settling" : ""}`}
           aria-hidden="true"
         >
           {insideSpeedParticles.map((particle) => (
             <span
-              className="hero-banner-speed-particle"
+              className={`hero-banner-speed-particle${stage === "settling" && particle.settleGroup === settleStep ? " hero-banner-speed-particle-fading" : ""}`}
               key={`${particle.left}-${particle.top}`}
               style={{
-                animationDelay: particle.delay,
-                animationDuration: stage === "loop" ? "1580ms" : "680ms",
+                animationDelay:
+                  stage === "settling" && particle.settleGroup === settleStep ? "0ms" : particle.delay,
+                animationDuration:
+                  stage === "loop"
+                    ? "1580ms"
+                    : stage === "settling" && particle.settleGroup === settleStep
+                      ? `${BANNER_PARTICLE_REMOVAL_INTERVAL_MS}ms`
+                      : "680ms",
                 height: particle.height,
                 left: particle.left,
                 top: particle.top,

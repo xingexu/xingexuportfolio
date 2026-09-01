@@ -230,7 +230,7 @@ export default function Resume() {
           title="Back home"
         >
           <span aria-hidden>←</span>
-          <span>go back</span>
+          <span>back home</span>
         </Link>
         <div className="resume-document-wrap">
           <div className="resume-preview-shell">

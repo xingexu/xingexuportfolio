@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { SITE } from "@/app/data";
 import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
 const NAME = "xinge xu";
@@ -340,12 +339,8 @@ function SunriseHero() {
 
         <div className="hero-layout hero-layout-under-banner">
           <div className="hero-copy">
-            <p className="step-in-2 hero-subtitle" style={{ fontSize: 14 }}>
-              {SITE.role.toLowerCase()}
-            </p>
-
-            <p className="step-in-2 hero-subtitle" style={{ fontSize: 12, marginTop: 7 }}>
-              western cs + ivey aeo &apos;30
+            <p className="step-in-2 hero-subtitle hero-education font-pixel">
+              western cs + ivey aeo &apos;31
             </p>
 
             <div
@@ -465,12 +460,8 @@ function DefaultHero() {
             </span>
           </h1>
 
-          <p className="step-in-2 hero-subtitle" style={{ fontSize: 15, marginTop: 20 }}>
-            {SITE.role.toLowerCase()}
-          </p>
-
-          <p className="step-in-2 hero-subtitle" style={{ fontSize: 13, marginTop: 8 }}>
-            western cs + ivey aeo &apos;30
+          <p className="step-in-2 hero-subtitle hero-education font-pixel">
+            western cs + ivey aeo &apos;31
           </p>
 
           <div

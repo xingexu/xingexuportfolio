@@ -38,12 +38,10 @@
   --nav-accent: #ffd24a;
   --nav-accent-ink: #0a0f1c;
   --nav-shadow: #000914;
-  --nav-pixel-1: #101c30;
-  --nav-pixel-2: #172641;
-  --nav-pixel-3: #203653;
-  --chrome-pixel-1: #0e192c;
-  --chrome-pixel-2: #172641;
-  --chrome-pixel-3: #203653;
+  --nav-gradient-start: #162640;
+  --nav-gradient-end: #080f1d;
+  --chrome-gradient-start: #111d33;
+  --chrome-gradient-end: #040914;
   --confetti-1: #ffd24a;
   --confetti-2: #9fc4f0;
   --confetti-3: #e9eff8;
@@ -67,24 +65,22 @@
   --chrome-solid: #f2f9ff;
   --chrome-control: #e6f2fc;
   --chrome-text: #122341;
-  --chrome-muted: #526b8c;
+  --chrome-muted: #3f5878;
   --chrome-border: #7fa9d2;
   --chrome-accent: #d97706;
   --chrome-shadow: #9dbfdd;
   --nav-bg: #f4ead9;
   --nav-control: #fff8ed;
   --nav-text: #20344f;
-  --nav-muted: #566c84;
+  --nav-muted: #3f536c;
   --nav-border: #ad9278;
-  --nav-accent: #b86628;
+  --nav-accent: #a6531f;
   --nav-accent-ink: #fffaf1;
   --nav-shadow: #bea98f;
-  --nav-pixel-1: #eee2cf;
-  --nav-pixel-2: #e3cfb3;
-  --nav-pixel-3: #d8bc99;
-  --chrome-pixel-1: #dfeefa;
-  --chrome-pixel-2: #c9e0f2;
-  --chrome-pixel-3: #afd1e9;
+  --nav-gradient-start: #fff8ed;
+  --nav-gradient-end: #d9c5aa;
+  --chrome-gradient-start: #f7fbff;
+  --chrome-gradient-end: #bad4e8;
   --confetti-1: #d97706;
   --confetti-2: #4d83b4;
   --confetti-3: #ffffff;
@@ -114,18 +110,16 @@
   --chrome-shadow: #1e1326;
   --nav-bg: #aa79c2;
   --nav-control: #c5a3d7;
-  --nav-text: #2c1f44;
-  --nav-muted: #514064;
+  --nav-text: #fff8ff;
+  --nav-muted: #ead7ef;
   --nav-border: #76519a;
-  --nav-accent: #684a9b;
+  --nav-accent: #4c315f;
   --nav-accent-ink: #fffaf1;
   --nav-shadow: #51356f;
-  --nav-pixel-1: #b889cc;
-  --nav-pixel-2: #9b6bb4;
-  --nav-pixel-3: #c49ed6;
-  --chrome-pixel-1: #382442;
-  --chrome-pixel-2: #4c304f;
-  --chrome-pixel-3: #68425c;
+  --nav-gradient-start: #784e91;
+  --nav-gradient-end: #4b315b;
+  --chrome-gradient-start: #442b50;
+  --chrome-gradient-end: #211429;
   --confetti-1: #ffd889;
   --confetti-2: #fff0cf;
   --confetti-3: #ef7f7d;
@@ -586,15 +580,11 @@ body {
 /* ── Nav ── */
 
 .nav-bar {
-  background-color: var(--nav-bg);
-  background-image: conic-gradient(
-    from 90deg,
-    var(--nav-pixel-1) 0 25%,
-    var(--nav-bg) 0 50%,
-    var(--nav-pixel-2) 0 75%,
-    var(--nav-pixel-3) 0
+  background: linear-gradient(
+    180deg,
+    var(--nav-gradient-start) 0%,
+    var(--nav-gradient-end) 100%
   );
-  background-size: 16px 16px;
   border-bottom: 2px solid var(--nav-border);
   box-shadow: 0 2px 0 var(--nav-shadow);
 }
@@ -620,15 +610,11 @@ body {
 .site-footer {
   position: relative;
   z-index: 10;
-  background-color: var(--chrome-solid);
-  background-image: conic-gradient(
-    from 90deg,
-    var(--chrome-pixel-1) 0 25%,
-    var(--chrome-solid) 0 50%,
-    var(--chrome-pixel-2) 0 75%,
-    var(--chrome-pixel-3) 0
+  background: linear-gradient(
+    180deg,
+    var(--chrome-gradient-start) 0%,
+    var(--chrome-gradient-end) 100%
   );
-  background-size: 16px 16px;
   border-top: 2px solid var(--chrome-border);
   box-shadow: inset 0 2px 0 var(--chrome-shadow);
 }

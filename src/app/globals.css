@@ -909,6 +909,30 @@ body {
 }
 .theme-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--nav-shadow); }
 
+:root[data-sky-phase="night"] .theme-toggle {
+  color: #f4f0d8;
+  box-shadow:
+    3px 3px 0 var(--nav-shadow),
+    0 0 0 3px rgba(207, 226, 255, 0.28),
+    0 0 24px rgba(207, 226, 255, 0.82);
+}
+
+:root[data-sky-phase="night"] .theme-toggle svg {
+  filter:
+    drop-shadow(2px 0 0 rgba(207, 226, 255, 0.48))
+    drop-shadow(-2px 0 0 rgba(207, 226, 255, 0.48))
+    drop-shadow(0 2px 0 rgba(207, 226, 255, 0.36))
+    drop-shadow(0 -2px 0 rgba(207, 226, 255, 0.36))
+    drop-shadow(0 0 9px rgba(244, 248, 255, 1));
+}
+
+:root[data-sky-phase="night"] .theme-toggle:hover {
+  box-shadow:
+    4px 4px 0 var(--nav-shadow),
+    0 0 0 4px rgba(207, 226, 255, 0.34),
+    0 0 30px rgba(222, 236, 255, 0.96);
+}
+
 :root[data-sky-phase="twilight"] .theme-toggle {
   color: #f58a3f;
   box-shadow:

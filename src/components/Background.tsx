@@ -47,6 +47,34 @@ const PLANE_WIDTH_CELLS = 12;
 const PLANE_SPRITE_ASPECT = 192 / 74;
 const PLANE_SMOKE = "#898f97";
 const BALLOON_STEP_MS = 480;
+const SUNRISE_SUN_JOURNEY_MS = 48000;
+const MOON_PREVIEW_DURATION_MS = 4500;
+const SYNODIC_MONTH_MS = 29.53059 * 24 * 60 * 60 * 1000;
+// U.S. Naval Observatory: new moon on 2026-09-11 at 03:27 UTC.
+const MOON_REFERENCE_NEW_MOON_UTC = Date.UTC(2026, 8, 11, 3, 27);
+const TORONTO_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Toronto",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+const MOON_PHASE_NAMES = [
+  "new moon",
+  "waxing crescent",
+  "first quarter",
+  "waxing gibbous",
+  "full moon",
+  "waning gibbous",
+  "last quarter",
+  "waning crescent",
+] as const;
+
+/** Eight equal phase windows centered on the four primary lunar phases. */
+function getMoonPhaseIndex(date = new Date()) {
+  const lunations = (date.getTime() - MOON_REFERENCE_NEW_MOON_UTC) / SYNODIC_MONTH_MS;
+  const cyclePosition = ((lunations % 1) + 1) % 1;
+  return Math.floor(cyclePosition * MOON_PHASE_NAMES.length + 0.5) % MOON_PHASE_NAMES.length;
+}
 
 /* ── palettes ── */
 
@@ -156,7 +184,7 @@ const TWILIGHT = {
 
 /** Moon disc at 1× cell scale (all pixels uniform): 1 body / 2 bright rim / 3 crater. */
 function makeMoonMap(): number[][] {
-  const n = 11;
+  const n = 15;
   const cR = (n - 1) / 2;
   const map: number[][] = Array.from({ length: n }, (_, r) =>
     Array.from({ length: n }, (_, c) => {
@@ -166,7 +194,7 @@ function makeMoonMap(): number[][] {
       return 1;
     })
   );
-  for (const [r, c] of [[3, 4], [6, 7], [7, 3], [4, 7]] as const) map[r][c] = 3;
+  for (const [r, c] of [[4, 6], [5, 9], [7, 5], [8, 10], [10, 6], [9, 8]] as const) map[r][c] = 3;
   return map;
 }
 
@@ -415,6 +443,9 @@ export default function Background() {
     let wavePhase = 0;
     let pulseAcc = 0;
     let pulse = 0; // 0..3 shared pulse phase for sun/moon halos
+    let sunriseSunJourneyElapsed = 0;
+    let moonPhasePreviewIndex: number | null = null;
+    let moonPhasePreviewTimer = 0;
     let beaconAcc = 0;
     let beaconOn = true;
     let skyNight: HTMLCanvasElement | null = null;
@@ -629,6 +660,36 @@ export default function Background() {
       const halfHeight = PLANE_WIDTH_CELLS / PLANE_SPRITE_ASPECT / 2;
       return x >= plane.x && x <= plane.x + PLANE_WIDTH_CELLS &&
         y >= plane.y - halfHeight && y <= plane.y + halfHeight;
+    }
+
+    function moonPosition() {
+      const moonWidth = MOON_MAP[0].length;
+      return {
+        x: Math.round(cols * 0.82 - moonWidth / 2),
+        y: Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.1)),
+      };
+    }
+
+    function clickedMoon(clientX: number, clientY: number) {
+      if (getVisibleSkyPhase() !== "night") return false;
+      const x = clientX / CELL;
+      const y = clientY / CELL;
+      const moon = moonPosition();
+      const padding = 4;
+      return x >= moon.x - padding && x <= moon.x + MOON_MAP[0].length + padding &&
+        y >= moon.y - padding && y <= moon.y + MOON_MAP.length + padding;
+    }
+
+    function moonOccludesStarCell(x: number, y: number) {
+      const moon = moonPosition();
+      const row = Math.round(y - moon.y);
+      const col = Math.round(x - moon.x);
+      return row >= 0 && row < MOON_MAP.length &&
+        col >= 0 && col < MOON_MAP[row].length && MOON_MAP[row][col] !== 0;
+    }
+
+    function starCell(x: number, y: number, color: string, alpha = 1) {
+      if (!moonOccludesStarCell(x, y)) cell(x, y, color, alpha);
     }
 
     function birdOffsets(flock: Flock): readonly (readonly [number, number])[] {
@@ -1041,6 +1102,124 @@ export default function Background() {
       }
     }
 
+    function moonCellIsLit(row: number, col: number, phaseIndex: number) {
+      if (phaseIndex === 0) return false;
+      if (phaseIndex === 4) return true;
+
+      const center = (MOON_MAP.length - 1) / 2;
+      const rowOffset = row - center;
+      const rowRadius = Math.sqrt(Math.max(0.25, (center + 0.4) ** 2 - rowOffset ** 2));
+      const normalizedX = (col - center) / rowRadius;
+
+      if (phaseIndex === 1) return normalizedX >= 0.52;
+      if (phaseIndex === 2) return normalizedX >= 0;
+      if (phaseIndex === 3) return normalizedX >= -0.58;
+      if (phaseIndex === 5) return normalizedX <= 0.58;
+      if (phaseIndex === 6) return normalizedX <= 0;
+      return normalizedX <= -0.52;
+    }
+
+    /** A tight stepped glow grown only from illuminated moon pixels. */
+    function drawMoonGlow(
+      mx: number,
+      my: number,
+      illuminatedCells: { row: number; col: number; value: number }[],
+      phaseIndex: number,
+    ) {
+      const illumination = [0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25][phaseIndex];
+      const strength = 0.96 + illumination * 0.22;
+      const glowRadius = 5 + (pulse === 2 ? 1 : 0);
+      const glowCells = new Map<string, { row: number; col: number; distance: number }>();
+      const moonDisc = new Set<string>();
+
+      for (let row = 0; row < MOON_MAP.length; row++) {
+        for (let col = 0; col < MOON_MAP[row].length; col++) {
+          if (MOON_MAP[row][col]) moonDisc.add(`${row}:${col}`);
+        }
+      }
+
+      for (const lit of illuminatedCells) {
+        for (let dy = -glowRadius; dy <= glowRadius; dy++) {
+          for (let dx = -glowRadius; dx <= glowRadius; dx++) {
+            const distance = Math.hypot(dx, dy);
+            if (distance === 0 || distance > glowRadius) continue;
+            const row = lit.row + dy;
+            const col = lit.col + dx;
+            const key = `${row}:${col}`;
+            if (moonDisc.has(key)) continue;
+            const existing = glowCells.get(key);
+            if (!existing || distance < existing.distance) {
+              glowCells.set(key, { row, col, distance });
+            }
+          }
+        }
+      }
+
+      for (const glow of glowCells.values()) {
+        const alpha = glow.distance <= 1.5
+          ? 0.25 * strength
+          : glow.distance <= 3.25
+            ? 0.12 * strength
+            : 0.052 * strength;
+        cell(mx + glow.col, my + glow.row, "#eef6ff", alpha);
+      }
+    }
+
+    function drawMoon(mx: number, my: number, phaseIndex: number) {
+      const illuminatedCells: { row: number; col: number; value: number }[] = [];
+
+      for (let row = 0; row < MOON_MAP.length; row++) {
+        for (let col = 0; col < MOON_MAP[row].length; col++) {
+          const value = MOON_MAP[row][col];
+          if (value && moonCellIsLit(row, col, phaseIndex)) illuminatedCells.push({ row, col, value });
+        }
+      }
+
+      drawMoonGlow(mx, my, illuminatedCells, phaseIndex);
+
+      for (const lit of illuminatedCells) {
+        const color = lit.value === 3
+          ? NIGHT.moonCrater
+          : lit.value === 2
+            ? NIGHT.moonShade
+            : NIGHT.moonBody;
+        cell(mx + lit.col, my + lit.row, color);
+      }
+
+      // A new moon keeps only a quiet outline so the click target remains discoverable.
+      if (phaseIndex === 0) {
+        for (let row = 0; row < MOON_MAP.length; row++) {
+          for (let col = 0; col < MOON_MAP[row].length; col++) {
+            if (MOON_MAP[row][col] === 2) cell(mx + col, my + row, "#51647e", 0.42);
+          }
+        }
+      }
+    }
+
+    function sunriseSunPosition(dt: number) {
+      if (!reduced) {
+        sunriseSunJourneyElapsed = (sunriseSunJourneyElapsed + dt) % SUNRISE_SUN_JOURNEY_MS;
+      }
+
+      const rawProgress = reduced ? 0.5 : sunriseSunJourneyElapsed / SUNRISE_SUN_JOURNEY_MS;
+      const journeySteps = Math.max(1, cols + SUN_MAP[0].length);
+      const progress = Math.round(rawProgress * journeySteps) / journeySteps;
+      const radius = (SUN_MAP.length - 1) / 2;
+      const startCenterX = 3;
+      const endCenterX = cols - 4;
+      const horizonCenterY = waterTop - 1;
+      const apexCenterY = Math.max(SKY_SAFE_TOP + radius, Math.floor(rows * 0.13));
+      const arcHeight = Math.max(12, horizonCenterY - apexCenterY);
+      const centerX = Math.round(startCenterX + (endCenterX - startCenterX) * progress);
+      const centerY = horizonCenterY - Math.round(Math.sin(Math.PI * progress) * arcHeight);
+
+      return {
+        x: Math.round(centerX - radius),
+        y: Math.round(centerY - radius),
+        centerX,
+      };
+    }
+
     function stepPulse(dt: number) {
       if (reduced) return;
       pulseAcc += dt;
@@ -1259,21 +1438,21 @@ export default function Background() {
         if (nameStarGlowActive) {
           const glowAlpha = [0.1, 0.16, 0.23, 0.16][pulse];
           for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-            cell(s.x + dx, s.y + dy, s.color, glowAlpha);
+            starCell(s.x + dx, s.y + dy, s.color, glowAlpha);
           }
           for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]] as const) {
-            cell(s.x + dx, s.y + dy, s.color, glowAlpha * 0.46);
+            starCell(s.x + dx, s.y + dy, s.color, glowAlpha * 0.46);
           }
           for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]] as const) {
-            cell(s.x + dx, s.y + dy, s.color, glowAlpha * 0.28);
+            starCell(s.x + dx, s.y + dy, s.color, glowAlpha * 0.28);
           }
         }
-        cell(s.x, s.y, s.color, nameStarGlowActive ? Math.max(alpha, 0.82) : alpha);
+        starCell(s.x, s.y, s.color, nameStarGlowActive ? Math.max(alpha, 0.82) : alpha);
         if (s.big && s.level >= 2) {
-          cell(s.x + 1, s.y, s.color, alpha * 0.4);
-          cell(s.x - 1, s.y, s.color, alpha * 0.4);
-          cell(s.x, s.y + 1, s.color, alpha * 0.4);
-          cell(s.x, s.y - 1, s.color, alpha * 0.4);
+          starCell(s.x + 1, s.y, s.color, alpha * 0.4);
+          starCell(s.x - 1, s.y, s.color, alpha * 0.4);
+          starCell(s.x, s.y + 1, s.color, alpha * 0.4);
+          starCell(s.x, s.y - 1, s.color, alpha * 0.4);
         }
       }
       if (!reduced) {
@@ -1286,24 +1465,28 @@ export default function Background() {
         sparkles = sparkles.filter((sp) => sp.ttl-- > 0);
         for (const sp of sparkles) {
           const a = 0.3 * sp.ttl;
-          cell(sp.x, sp.y, "#ffffff", Math.min(1, a + 0.3));
+          starCell(sp.x, sp.y, "#ffffff", Math.min(1, a + 0.3));
           for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-            cell(sp.x + dx, sp.y + dy, sp.color, a * 0.7);
+            starCell(sp.x + dx, sp.y + dy, sp.color, a * 0.7);
           }
           if (sp.ttl >= 2) {
-            cell(sp.x + 2, sp.y, sp.color, a * 0.3);
-            cell(sp.x - 2, sp.y, sp.color, a * 0.3);
-            cell(sp.x, sp.y + 2, sp.color, a * 0.3);
-            cell(sp.x, sp.y - 2, sp.color, a * 0.3);
+            starCell(sp.x + 2, sp.y, sp.color, a * 0.3);
+            starCell(sp.x - 2, sp.y, sp.color, a * 0.3);
+            starCell(sp.x, sp.y + 2, sp.color, a * 0.3);
+            starCell(sp.x, sp.y - 2, sp.color, a * 0.3);
           }
         }
       }
 
-      // moon: pulsing halo + crater-shaded body (1× cells, uniform pixel size)
-      const mx = Math.floor(cols * 0.82);
-      const my = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.1));
-      halo(mx + 5, my + 5, "#e8e0c8", pulse, 6);
-      sprite(MOON_MAP, mx, my, { 1: NIGHT.moonBody, 2: NIGHT.moonShade, 3: NIGHT.moonCrater }, 1);
+      // Toronto's current lunar phase, with clicks providing a short preview.
+      const { x: mx, y: my } = moonPosition();
+      const now = new Date();
+      const actualMoonPhaseIndex = getMoonPhaseIndex(now);
+      const displayedMoonPhaseIndex = moonPhasePreviewIndex ?? actualMoonPhaseIndex;
+      drawMoon(mx, my, displayedMoonPhaseIndex);
+      canvas!.dataset.moonPhase = MOON_PHASE_NAMES[displayedMoonPhaseIndex];
+      canvas!.dataset.moonPhaseSource = moonPhasePreviewIndex === null ? "Toronto current phase" : "click preview";
+      canvas!.dataset.moonDateToronto = TORONTO_DATE_FORMATTER.format(now);
 
       if (!reduced) {
         // shooting star
@@ -1375,17 +1558,17 @@ export default function Background() {
       if (sky) ctx!.drawImage(sky, 0, 0);
       stepPulse(dt);
 
-      const peakY = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.08));
-      const sx = Math.round(cols * (twilight ? 0.5 : 0.82));
-      if (!twilight) {
-        halo(sx + 8, peakY + 8, pal.sunRay, pulse, 9);
-        const hot = pulse % 2 === 0;
-        sprite(SUN_MAP, sx, peakY, {
-          1: hot ? pal.sunCoreHot : pal.sunCore,
-          3: hot ? pal.sunCoreHot : pal.sunRay,
-          4: hot ? pal.sunRay : pal.sunRim,
-        }, 1);
-      }
+      const fixedSunY = Math.max(SKY_SAFE_TOP + 4, Math.floor(rows * 0.08));
+      const movingSun = twilight ? sunriseSunPosition(dt) : null;
+      const sx = movingSun?.x ?? Math.round(cols * 0.82);
+      const sy = movingSun?.y ?? fixedSunY;
+      halo(sx + 8, sy + 8, pal.sunRay, pulse, twilight ? 11 : 9);
+      const hot = pulse % 2 === 0;
+      sprite(SUN_MAP, sx, sy, {
+        1: hot ? pal.sunCoreHot : pal.sunCore,
+        3: hot ? pal.sunCoreHot : pal.sunRay,
+        4: hot ? pal.sunRay : pal.sunRim,
+      }, 1);
 
       // clouds: drift + bob, back layer then front
       for (const c of clouds) {
@@ -1538,7 +1721,8 @@ export default function Background() {
         ctx!.restore();
       }
       if (twilight) drawLitWindows(dt);
-      drawWater(pal, pal.sunLane, sx + 7, dt);
+      const sunLaneX = Math.max(1, Math.min(cols - 4, (movingSun?.centerX ?? sx + 8) - 1));
+      drawWater(pal, pal.sunLane, sunLaneX, dt);
       drawFerry(dt, twilight);
     }
 
@@ -1663,7 +1847,10 @@ export default function Background() {
       const phase = getSkyOverride() ?? scheduledPhase;
       if (activePhase !== phase) {
         activePhase = phase;
-        if (phase === "twilight") sunriseBannerMeasured = false;
+        if (phase === "twilight") {
+          sunriseBannerMeasured = false;
+          sunriseSunJourneyElapsed = 0;
+        }
         else sunriseSkylineGlowRemaining = 0;
         document.documentElement.dataset.skyPhase = phase;
         document.documentElement.dataset.theme = phase === "night" ? "dark" : "light";
@@ -1683,7 +1870,17 @@ export default function Background() {
 
     const onPointerDown = (event: PointerEvent) => {
       const birdHit = clickedBird(event.clientX, event.clientY);
-      if (clickedFerry(event.clientX, event.clientY)) {
+      if (clickedMoon(event.clientX, event.clientY)) {
+        const currentPhaseIndex = moonPhasePreviewIndex ?? getMoonPhaseIndex();
+        moonPhasePreviewIndex = (currentPhaseIndex + 1) % MOON_PHASE_NAMES.length;
+        canvas!.dataset.moonPhase = MOON_PHASE_NAMES[moonPhasePreviewIndex];
+        window.clearTimeout(moonPhasePreviewTimer);
+        moonPhasePreviewTimer = window.setTimeout(() => {
+          moonPhasePreviewIndex = null;
+          drawCurrentScene(0);
+        }, MOON_PREVIEW_DURATION_MS);
+        drawCurrentScene(0);
+      } else if (clickedFerry(event.clientX, event.clientY)) {
         if (ferry) ferry.boostRemaining = 2000;
         playFerryHorn();
       } else if (clickedBalloon(event.clientX, event.clientY)) {
@@ -1726,11 +1923,15 @@ export default function Background() {
       cancelAnimationFrame(raf);
       window.clearInterval(clockTimer);
       window.clearTimeout(sunriseSkylineGlowResetTimer);
+      window.clearTimeout(moonPhasePreviewTimer);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener(NAME_STAR_GLOW_EVENT, onNameStarGlow);
       window.removeEventListener(SUNRISE_SKYLINE_GLOW_EVENT, onSunriseSkylineGlow);
       window.removeEventListener("resize", onResize);
       planeSprite.removeEventListener("load", onPlaneSpriteLoad);
+      delete canvas.dataset.moonPhase;
+      delete canvas.dataset.moonPhaseSource;
+      delete canvas.dataset.moonDateToronto;
       phaseObserver.disconnect();
     };
   }, []);

@@ -2063,7 +2063,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   .resume-page {
     height: auto;
     min-height: 100svh;
-    padding: 76px 12px 32px;
+    padding: 96px 12px 36px;
     place-items: start center;
     overflow: visible;
   }
@@ -2077,8 +2077,9 @@ a.project-card:hover .project-title { color: var(--accent); }
   .resume-document-wrap {
     order: 1;
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 100%;
+    width: min(82vw, 460px);
+    max-width: calc(100% - 24px);
+    align-self: center;
   }
   .resume-stage > .resume-side-back {
     order: 2;

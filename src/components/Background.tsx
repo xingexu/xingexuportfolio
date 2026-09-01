@@ -483,6 +483,7 @@ export default function Background() {
     let activePhase: SkyPhase | null = null;
     let scheduledPhase = getSkyPhase();
     let heroAirTrafficTopCell = 0;
+    let heroAirTrafficBottomCell = 0;
     let heroAirTrafficMeasured = false;
     const planeSprite = new window.Image();
     let planeSpriteReady = false;
@@ -718,7 +719,6 @@ export default function Background() {
       const y = clientY / CELL;
       const jiggle = balloonJiggleOffset();
       const traffic = balloonTrafficOffset();
-      if (!traffic.visible) return false;
       const balloonX = balloon.x + balloon.sway + jiggle.x + traffic.x;
       const balloonY = balloon.y + balloon.bob + jiggle.y + traffic.y;
       return x >= balloonX && x <= balloonX + BALLOON[0].length * BALLOON_SCALE &&
@@ -822,7 +822,7 @@ export default function Background() {
     }
 
     function balloonTrafficOffset() {
-      if (!balloon) return { visible: false, x: 0, y: 0 };
+      if (!balloon) return { x: 0, y: 0 };
       const birdBounds = flocks.flatMap((flock) =>
         birdOffsets(flock).map(([dx, dy]) => ({
           left: flock.x + dx - 5,
@@ -834,47 +834,51 @@ export default function Background() {
       const jiggle = balloonJiggleOffset();
       const baseX = balloon.x + balloon.sway + jiggle.x;
       const baseY = balloon.y + balloon.bob + jiggle.y;
-      const xCandidates = [...new Set([balloon.trafficOffset, 0, -4, 4, -8, 8, -12, 12])];
-      const maxBalloonY = (heroAirTrafficTopCell || waterTop) - BALLOON.length - 3;
-      const yCandidates = [...new Set([balloon.trafficYOffset, 0])];
-      for (let distance = 4; distance <= Math.max(24, rows); distance += 4) {
-        yCandidates.push(-distance, distance);
+      const xCandidates = [balloon.trafficOffset, 0];
+      for (let distance = 4; distance <= Math.max(64, Math.ceil(cols * 0.35)); distance += 4) {
+        xCandidates.push(-distance, distance);
+      }
+      const top = baseY;
+      const bottom = top + BALLOON.length - 1;
+
+      for (const xOffset of [...new Set(xCandidates)]) {
+        const left = baseX + xOffset;
+        const right = left + BALLOON[0].length - 1;
+        const intersects = birdBounds.some((bounds) =>
+          left <= bounds.right && right >= bounds.left && top <= bounds.bottom && bottom >= bounds.top,
+        );
+        if (intersects) continue;
+
+        balloon.trafficOffset = xOffset;
+        balloon.trafficYOffset = 0;
+        return { x: xOffset, y: 0 };
       }
 
-      for (const yOffset of yCandidates) {
-        const top = baseY + yOffset;
-        const bottom = top + BALLOON.length - 1;
-        if (top < SKY_SAFE_TOP + 1 || bottom > maxBalloonY) continue;
-
-        for (const xOffset of xCandidates) {
-          const left = baseX + xOffset;
-          const right = left + BALLOON[0].length - 1;
-          const intersects = birdBounds.some((bounds) =>
-            left <= bounds.right && right >= bounds.left && top <= bounds.bottom && bottom >= bounds.top,
-          );
-          if (intersects) continue;
-
-          balloon.trafficOffset = xOffset;
-          balloon.trafficYOffset = yOffset;
-          return { visible: true, x: xOffset, y: yOffset };
-        }
-      }
-
-      return { visible: false, x: balloon.trafficOffset, y: balloon.trafficYOffset };
+      // The altitude lanes are non-intersecting, so this is only a defensive
+      // fallback during a resize. Keep the balloon visible at its last safe
+      // horizontal offset instead of dropping it from the scene.
+      balloon.trafficYOffset = 0;
+      return { x: balloon.trafficOffset, y: 0 };
     }
 
-    // Air traffic is vertically stacked above the active theme's name art.
-    // The lower flock keeps enough headroom for its full click-dispersion
-    // range, so no bird can pass behind the name while flying or scattering.
+    // The small flock and balloon use separate lanes above the name. The large
+    // flock uses a lower lane beneath the complete hero block only when there
+    // is clear sky available, preventing lane compression and intersections.
     const airplaneLaneY = () => Math.max(SKY_SAFE_TOP + 1, Math.floor(rows * 0.1));
+    const hasClearUpperBalloonLane = () =>
+      heroAirTrafficTopCell - BALLOON.length - 4 >= SKY_SAFE_TOP + 12;
+    const balloonLaneY = () => {
+      if (!heroAirTrafficTopCell) return Math.max(airplaneLaneY() + 18, Math.floor(rows * 0.3));
+      if (hasClearUpperBalloonLane()) return heroAirTrafficTopCell - BALLOON.length - 4;
+      return heroAirTrafficBottomCell + 6;
+    };
     const birdLaneY = (kind: FlockKind) => {
       const defaultThreeBirdLane = Math.max(airplaneLaneY() + 12, Math.floor(rows * 0.18));
       if (heroAirTrafficTopCell) {
-        const fiveBirdLane = Math.max(SKY_SAFE_TOP + 11, heroAirTrafficTopCell - 20);
-        const threeBirdLane = Math.max(
-          SKY_SAFE_TOP + 11,
-          Math.min(defaultThreeBirdLane, fiveBirdLane - 18),
-        );
+        const threeBirdLane = hasClearUpperBalloonLane()
+          ? balloonLaneY() - 16
+          : Math.max(SKY_SAFE_TOP + 11, heroAirTrafficTopCell - 10);
+        const fiveBirdLane = heroAirTrafficBottomCell + 12;
         return kind === "three" ? threeBirdLane : fiveBirdLane;
       }
 
@@ -882,9 +886,11 @@ export default function Background() {
         ? defaultThreeBirdLane
         : Math.max(defaultThreeBirdLane + 40, Math.floor(rows * 0.39));
     };
-    const balloonLaneY = () => Math.round(
-      (birdLaneY("three") + birdLaneY("five") - BALLOON.length * BALLOON_SCALE) / 2,
-    );
+    const hasClearLowerFlockLane = () => {
+      if (!heroAirTrafficBottomCell || !hasClearUpperBalloonLane()) return false;
+      const fiveBirdBottom = birdLaneY("five") + 19;
+      return fiveBirdBottom < waterTop - 12;
+    };
     const cnTowerX = () => Math.floor(cols * 0.22);
     const towerDims = () => {
       const h = Math.min(Math.floor(rows * 0.46), 64);
@@ -905,12 +911,16 @@ export default function Background() {
       const heroName = document.querySelector<HTMLElement>(heroSelector);
       if (!heroName) {
         heroAirTrafficTopCell = 0;
+        heroAirTrafficBottomCell = 0;
         heroAirTrafficMeasured = false;
         return;
       }
 
       const safeGapPx = Math.max(16, CELL * 4);
       heroAirTrafficTopCell = Math.floor((heroName.getBoundingClientRect().top - safeGapPx) / CELL);
+      const heroSurfaceSelector = phase === "twilight" ? ".hero-stage" : ".hero-copy";
+      const heroSurface = document.querySelector<HTMLElement>(heroSurfaceSelector) ?? heroName;
+      heroAirTrafficBottomCell = Math.ceil((heroSurface.getBoundingClientRect().bottom + safeGapPx) / CELL);
       heroAirTrafficMeasured = true;
       for (const flock of flocks) flock.y = birdLaneY(flock.kind);
       if (balloon) balloon.y = balloonLaneY();
@@ -1945,7 +1955,9 @@ export default function Background() {
 
       if (!reduced) {
         const activeFlockKinds: readonly FlockKind[] =
-          window.innerWidth <= MOBILE_LAYOUT_MAX_WIDTH ? ["three"] : ["three", "five"];
+          window.innerWidth <= MOBILE_LAYOUT_MAX_WIDTH || !hasClearLowerFlockLane()
+            ? ["three"]
+            : ["three", "five"];
 
         // Mobile keeps the scene clear with one three-bird flock. Desktop
         // retains the second, five-bird formation on its lower lane.
@@ -2026,14 +2038,12 @@ export default function Background() {
             }
             const jiggle = balloonJiggleOffset();
             const traffic = balloonTrafficOffset();
-            if (traffic.visible) {
-              sprite(BALLOON, balloon.x + balloon.sway + jiggle.x + traffic.x, balloon.y + balloon.bob + jiggle.y + traffic.y, {
-                1: pal.balloonA,
-                2: pal.balloonB,
-                3: pal.basket,
-                4: pal.rope,
-              }, BALLOON_SCALE);
-            }
+            sprite(BALLOON, balloon.x + balloon.sway + jiggle.x + traffic.x, balloon.y + balloon.bob + jiggle.y + traffic.y, {
+              1: pal.balloonA,
+              2: pal.balloonB,
+              3: pal.basket,
+              4: pal.rope,
+            }, BALLOON_SCALE);
           }
         } else {
           balloonWait -= dt;

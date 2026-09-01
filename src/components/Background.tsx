@@ -993,10 +993,10 @@ export default function Background() {
         .sort((a, b) => a.x - b.x);
       const buildingZs: SleepyZ[] = candidates
         .filter((_, index) => index % 2 === 0)
-        .map((building, index) => {
+        .flatMap((building, index) => {
           const sourceX = building.x + Math.floor(building.w / 2);
           const sourceY = waterTop - building.h - building.antenna - 3;
-          return {
+          const primary: SleepyZ = {
             delay: (index * 47) % 360,
             direction: 1,
             drift: (index % 3) - 1,
@@ -1004,7 +1004,38 @@ export default function Background() {
             x: sourceX - 1,
             y: sourceY,
           };
+          if (building.h < 16 || index % 2 !== 0) return [primary];
+          return [
+            primary,
+            {
+              delay: 180 + (index * 53) % 360,
+              direction: 1,
+              drift: 1,
+              trailLength: 1,
+              x: sourceX + 2,
+              y: sourceY + 3,
+            },
+          ];
         });
+
+      const rogersCentreZs: SleepyZ[] = [
+        {
+          delay: 120,
+          direction: 1,
+          drift: 0,
+          trailLength: 1,
+          x: towerX + 18,
+          y: waterTop - 18,
+        },
+        {
+          delay: 420,
+          direction: 1,
+          drift: 1,
+          trailLength: 1,
+          x: towerX + 29,
+          y: waterTop - 16,
+        },
+      ];
 
       const ferryZs: SleepyZ[] = ferry ? [
         {
@@ -1036,7 +1067,7 @@ export default function Background() {
         },
       ] : [];
 
-      return [...buildingZs, ...ferryZs];
+      return [...buildingZs, ...rogersCentreZs, ...ferryZs];
     }
 
     function renderSkylineGlowMask(source: HTMLCanvasElement, color = "#ffd889") {

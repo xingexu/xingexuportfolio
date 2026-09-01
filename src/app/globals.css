@@ -2078,7 +2078,7 @@ a.project-card:hover .project-title { color: var(--accent); }
     min-height: 100svh;
     padding: 96px 12px 36px;
     place-items: start center;
-    overflow: visible;
+    overflow: clip;
   }
   .resume-stage {
     width: min(94vw, 640px);
@@ -2106,6 +2106,22 @@ a.project-card:hover .project-title { color: var(--accent); }
   .resume-preview-shell,
   .resume-editor-document {
     box-shadow: 0 0 0 2px var(--shadow);
+  }
+  .resume-preview-shell,
+  .resume-preview-shell:hover {
+    transform: none;
+    transition: none;
+  }
+  .resume-animation-image {
+    transform: none;
+  }
+  .resume-sparkle:nth-child(n + 33),
+  .resume-falling-particle:nth-child(n + 49) {
+    display: none;
+  }
+  .resume-sparkle,
+  .resume-falling-particle {
+    filter: drop-shadow(0 0 4px currentColor);
   }
   .resume-editor-page {
     height: auto;

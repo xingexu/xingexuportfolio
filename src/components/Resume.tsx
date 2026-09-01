@@ -150,11 +150,11 @@ type FallingParticleStyle = CSSProperties & {
 };
 
 export default function Resume() {
-  const loadedFrames = useRef(new Set<string>());
+  const loadedFrames = useRef(new Set<number>());
   const celebrationSoundPlayed = useRef(false);
   const celebrationSoundPending = useRef(false);
-  const [animationReady, setAnimationReady] = useState(false);
   const [activeFrame, setActiveFrame] = useState(0);
+  const [loadedFrameVersion, setLoadedFrameVersion] = useState(0);
 
   useEffect(() => {
     const unlockAudio = () => resumeSharedAudioContext(getSharedAudioContext());
@@ -168,24 +168,19 @@ export default function Resume() {
   }, []);
 
   useEffect(() => {
-    if (!animationReady) return;
+    if (activeFrame < 0 || !loadedFrames.current.has(activeFrame)) return;
 
-    let nextFrame = 0;
+    const nextFrame = activeFrame + 1;
+    if (nextFrame < resumeFrames.length && !loadedFrames.current.has(nextFrame)) return;
 
-    const playbackTimer = window.setInterval(() => {
-      nextFrame += 1;
-
-      if (nextFrame >= resumeFrames.length) {
-        window.clearInterval(playbackTimer);
-        setActiveFrame(-1);
-        return;
-      }
-
-      setActiveFrame(nextFrame);
+    const playbackTimer = window.setTimeout(() => {
+      setActiveFrame((currentFrame) =>
+        currentFrame + 1 >= resumeFrames.length ? -1 : currentFrame + 1,
+      );
     }, 105);
 
-    return () => window.clearInterval(playbackTimer);
-  }, [animationReady]);
+    return () => window.clearTimeout(playbackTimer);
+  }, [activeFrame, loadedFrameVersion]);
 
   useEffect(() => {
     if (activeFrame !== -1 || celebrationSoundPlayed.current) return;
@@ -212,12 +207,10 @@ export default function Resume() {
     };
   }, [activeFrame]);
 
-  function handleFrameLoad(src: string) {
-    loadedFrames.current.add(src);
-
-    if (loadedFrames.current.size === resumeFrames.length) {
-      setAnimationReady(true);
-    }
+  function handleFrameLoad(index: number) {
+    if (loadedFrames.current.has(index)) return;
+    loadedFrames.current.add(index);
+    setLoadedFrameVersion((version) => version + 1);
   }
 
   return (
@@ -246,27 +239,32 @@ export default function Resume() {
               </p>
             </object>
             <div className="resume-animation-frames" aria-hidden="true">
-              {resumeFrames.map((src, index) => (
-                <div
-                  className={`resume-animation-frame${activeFrame === index ? " is-active" : ""}`}
-                  key={src}
-                  style={{
-                    inset: 0,
-                    position: "absolute",
-                  }}
-                >
-                  <Image
-                    className="resume-animation-image"
-                    src={src}
-                    alt=""
-                    fill
-                    sizes="(max-width: 640px) calc(100vw - 32px), 900px"
-                    loading="eager"
-                    fetchPriority={index < 4 ? "high" : "auto"}
-                    onLoad={() => handleFrameLoad(src)}
-                  />
-                </div>
-              ))}
+              {activeFrame >= 0
+                ? [activeFrame, activeFrame + 1]
+                    .filter((index) => index < resumeFrames.length)
+                    .map((index) => (
+                      <div
+                        className={`resume-animation-frame${index === activeFrame ? " is-active" : ""}`}
+                        key={resumeFrames[index]}
+                        style={{
+                          inset: 0,
+                          position: "absolute",
+                        }}
+                      >
+                        <Image
+                          className="resume-animation-image"
+                          src={resumeFrames[index]}
+                          alt=""
+                          fill
+                          sizes="(max-width: 820px) 88vw, 900px"
+                          loading="eager"
+                          fetchPriority={index === activeFrame && index < 4 ? "high" : "auto"}
+                          onLoad={() => handleFrameLoad(index)}
+                          onError={() => handleFrameLoad(index)}
+                        />
+                      </div>
+                    ))
+                : null}
             </div>
             <Link
               href="/resume/editor"

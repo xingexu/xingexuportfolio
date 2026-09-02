@@ -1,14 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
-const resumeFrames = Array.from(
-  { length: 16 },
-  (_, index) => `/resume-frames/frame-${String(index + 1).padStart(2, "0")}.png`,
-);
 const celebrationColors = [
   "var(--resume-confetti-1)",
   "var(--resume-confetti-2)",
@@ -150,11 +145,9 @@ type FallingParticleStyle = CSSProperties & {
 };
 
 export default function Resume() {
-  const loadedFrames = useRef(new Set<number>());
   const celebrationSoundPlayed = useRef(false);
   const celebrationSoundPending = useRef(false);
-  const [activeFrame, setActiveFrame] = useState(0);
-  const [loadedFrameVersion, setLoadedFrameVersion] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const unlockAudio = () => resumeSharedAudioContext(getSharedAudioContext());
@@ -168,22 +161,12 @@ export default function Resume() {
   }, []);
 
   useEffect(() => {
-    if (activeFrame < 0 || !loadedFrames.current.has(activeFrame)) return;
-
-    const nextFrame = activeFrame + 1;
-    if (nextFrame < resumeFrames.length && !loadedFrames.current.has(nextFrame)) return;
-
-    const playbackTimer = window.setTimeout(() => {
-      setActiveFrame((currentFrame) =>
-        currentFrame + 1 >= resumeFrames.length ? -1 : currentFrame + 1,
-      );
-    }, 105);
-
-    return () => window.clearTimeout(playbackTimer);
-  }, [activeFrame, loadedFrameVersion]);
+    const revealFallback = window.setTimeout(() => setIsVisible(true), 800);
+    return () => window.clearTimeout(revealFallback);
+  }, []);
 
   useEffect(() => {
-    if (activeFrame !== -1 || celebrationSoundPlayed.current) return;
+    if (!isVisible || celebrationSoundPlayed.current) return;
 
     let cancelled = false;
     const tryCelebrationSound = () => {
@@ -205,13 +188,7 @@ export default function Resume() {
       window.removeEventListener("pointerdown", tryCelebrationSound, true);
       window.removeEventListener("keydown", tryCelebrationSound, true);
     };
-  }, [activeFrame]);
-
-  function handleFrameLoad(index: number) {
-    if (loadedFrames.current.has(index)) return;
-    loadedFrames.current.add(index);
-    setLoadedFrameVersion((version) => version + 1);
-  }
+  }, [isVisible]);
 
   return (
     <div className="resume-page">
@@ -226,46 +203,19 @@ export default function Resume() {
           <span>back home</span>
         </Link>
         <div className="resume-document-wrap">
-          <div className="resume-preview-shell">
+          <div className={`resume-preview-shell${isVisible ? " is-visible" : ""}`}>
             <object
               className="resume-preview"
               data="/resume.pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH&pagemode=none"
               type="application/pdf"
               aria-label="Xinge Xu's resume"
               tabIndex={-1}
+              onLoad={() => setIsVisible(true)}
             >
               <p>
                 Your browser could not display the PDF. <a href="/resume.pdf">Open the resume</a>.
               </p>
             </object>
-            <div className="resume-animation-frames" aria-hidden="true">
-              {activeFrame >= 0
-                ? [activeFrame, activeFrame + 1]
-                    .filter((index) => index < resumeFrames.length)
-                    .map((index) => (
-                      <div
-                        className={`resume-animation-frame${index === activeFrame ? " is-active" : ""}`}
-                        key={resumeFrames[index]}
-                        style={{
-                          inset: 0,
-                          position: "absolute",
-                        }}
-                      >
-                        <Image
-                          className="resume-animation-image"
-                          src={resumeFrames[index]}
-                          alt=""
-                          fill
-                          sizes="(max-width: 820px) 88vw, 900px"
-                          loading="eager"
-                          fetchPriority={index === activeFrame && index < 4 ? "high" : "auto"}
-                          onLoad={() => handleFrameLoad(index)}
-                          onError={() => handleFrameLoad(index)}
-                        />
-                      </div>
-                    ))
-                : null}
-            </div>
             <Link
               href="/resume/editor"
               className="resume-preview-hit-area"
@@ -276,7 +226,7 @@ export default function Resume() {
             </Link>
           </div>
           <div
-            className={`resume-sparkles${activeFrame === -1 ? " is-visible" : ""}`}
+            className={`resume-sparkles${isVisible ? " is-visible" : ""}`}
             aria-hidden="true"
           >
             {resumeSparkles.map((sparkle, index) => (
@@ -299,7 +249,7 @@ export default function Resume() {
             ))}
           </div>
           <div
-            className={`resume-celebration${activeFrame === -1 ? " is-visible" : ""}`}
+            className={`resume-celebration${isVisible ? " is-visible" : ""}`}
             aria-hidden="true"
           >
             {fallingParticles.map((particle, index) => (

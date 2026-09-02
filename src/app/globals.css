@@ -1726,10 +1726,18 @@ a.project-card:hover .project-title { color: var(--accent); }
   width: 100%;
   height: 100%;
   overflow: hidden;
+  opacity: 0;
   border: 4px solid var(--border);
   background: #fff;
   box-shadow: 0 0 0 2px var(--shadow);
-  transition: transform 120ms steps(2), box-shadow 120ms steps(2);
+  transition:
+    opacity 650ms ease-out,
+    transform 120ms steps(2),
+    box-shadow 120ms steps(2);
+}
+
+.resume-preview-shell.is-visible {
+  opacity: 1;
 }
 
 .resume-preview-shell:hover {
@@ -1749,29 +1757,6 @@ a.project-card:hover .project-title { color: var(--accent); }
   border: 0;
   background: #fff;
   pointer-events: none;
-}
-
-.resume-animation-frames,
-.resume-animation-frame {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.resume-animation-frame {
-  visibility: hidden;
-  background: #fff;
-}
-
-.resume-animation-frame.is-active {
-  visibility: visible;
-}
-
-.resume-animation-image {
-  object-fit: cover;
-  transform: scale(1.03);
-  transform-origin: center;
 }
 
 .resume-sparkles {
@@ -2447,10 +2432,9 @@ a.project-card:hover .project-title { color: var(--accent); }
   .resume-preview-shell,
   .resume-preview-shell:hover {
     transform: none;
-    transition: none;
   }
-  .resume-animation-image {
-    transform: none;
+  .resume-preview-shell {
+    transition: opacity 650ms ease-out;
   }
   .resume-sparkle:nth-child(n + 33),
   .resume-falling-particle:nth-child(n + 49) {
@@ -2529,9 +2513,12 @@ a.project-card:hover .project-title { color: var(--accent); }
   .midnight-fullscreen-fireworks,
   .hero-banner-speed-particles,
   .hero-banner-plane-smoke,
-  .resume-animation-frames,
   .resume-sparkles,
   .resume-celebration {
     display: none;
+  }
+  .resume-preview-shell {
+    opacity: 1;
+    transition: none;
   }
 }

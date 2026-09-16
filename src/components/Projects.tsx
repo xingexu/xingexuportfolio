@@ -32,7 +32,7 @@ export default function Projects() {
           >
             <article className="drift-screenshot-card">
               <Image
-                src="/drift-full-preview.png"
+                src="/images/drift-full-preview.png"
                 alt="Drift app landing page preview"
                 width={3600}
                 height={2088}

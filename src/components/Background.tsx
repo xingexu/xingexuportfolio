@@ -20,16 +20,23 @@ import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
  * Respects prefers-reduced-motion (single static frame).
  */
 
+// ── tunables ──
+// These constants drive basically every "feel" decision in the scene. Tweak
+// them here rather than hunting through the drawing code below.
 const CELL = 5; // css px per sky pixel
 const TICK = 90; // ms per animation step (~11fps, intentionally chunky)
-const SEED = 20260703;
+const SEED = 20260703; // fixed seed so the skyline/stars/clouds look the same on every load
 const MOBILE_LAYOUT_MAX_WIDTH = 820;
+// Custom DOM events other components dispatch to make this background react to
+// page state (e.g. hovering the name in the hero triggers a star glow).
 const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
 const SUNRISE_SKYLINE_GLOW_DURATION_MS = 1600;
 const MIDNIGHT_WINDOW_FLASH_DURATION_MS = 320;
 const MIDNIGHT_BUILDING_SLEEP_DURATION_MS = 2000;
 const MIDNIGHT_FERRY_PAUSE_DURATION_MS = 1500;
+// A tiny 5x6 bitmap of a sleepy "Z" shape, drawn rotated/scaled as buildings
+// "fall asleep" at midnight (see drawSleepyZs below).
 const SLEEPY_Z_MAP = [
   [1, 1, 1, 1, 1],
   [0, 0, 0, 1, 1],
@@ -38,6 +45,9 @@ const SLEEPY_Z_MAP = [
   [1, 1, 0, 0, 0],
   [1, 1, 1, 1, 1],
 ];
+// Three rings of offsets (near/mid/far) used to fake a soft bloom around the
+// skyline at sunrise: the glow mask gets stamped multiple times at growing
+// offsets with decreasing opacity, which is much cheaper than a real blur.
 const SKYLINE_GLOW_FAR_OFFSETS = [
   [-4, 0], [4, 0], [0, -4], [0, 4],
   [-4, -4], [4, -4], [-4, 4], [4, 4],
@@ -51,18 +61,24 @@ const SKYLINE_GLOW_INNER_OFFSETS = [
   [-1, -1], [1, -1], [-1, 1], [1, 1],
 ];
 const TOP_BAR_HEIGHT = 54;
+// Keep stars/moon/sun/planes below the fixed top nav bar, with a little
+// breathing room (+4 cells) so nothing pokes out from behind it.
 const SKY_SAFE_TOP = Math.ceil(TOP_BAR_HEIGHT / CELL) + 4;
 const AIR_TRAFFIC_STAGGER = 3; // 15 CSS px between successive entrances
-const PLANE_SPRITE_SRC = "/background-plane.png";
+const PLANE_SPRITE_SRC = "/images/background-plane.png";
 const PLANE_WIDTH_CELLS = 12;
-const PLANE_SPRITE_ASPECT = 192 / 74;
+const PLANE_SPRITE_ASPECT = 192 / 74; // source image's native width/height ratio
 const PLANE_SMOKE = "#898f97";
 const BALLOON_STEP_MS = 480;
-const SUNRISE_SUN_JOURNEY_MS = 48000;
-const MOON_PREVIEW_DURATION_MS = 4500;
+const SUNRISE_SUN_JOURNEY_MS = 48000; // how long the sun takes to arc across the sky during twilight
+const MOON_PREVIEW_DURATION_MS = 4500; // how long a clicked moon-phase preview stays on screen before reverting
+// One full new-moon-to-new-moon cycle, in milliseconds (a "synodic month").
 const SYNODIC_MONTH_MS = 29.53059 * 24 * 60 * 60 * 1000;
 // U.S. Naval Observatory: new moon on 2026-09-11 at 03:27 UTC.
+// Every other moon phase is calculated as an offset from this one fixed point in time.
 const MOON_REFERENCE_NEW_MOON_UTC = Date.UTC(2026, 8, 11, 3, 27);
+// Used to stamp today's date (in Toronto's timezone) onto the canvas for the
+// moon-phase tooltip/debug attributes, regardless of the visitor's own timezone.
 const TORONTO_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Toronto",
   year: "numeric",
@@ -80,7 +96,13 @@ const MOON_PHASE_NAMES = [
   "waning crescent",
 ] as const;
 
-/** Eight equal phase windows centered on the four primary lunar phases. */
+/** Eight equal phase windows centered on the four primary lunar phases.
+ *  How this works: figure out how many full lunar cycles ("lunations") have
+ *  elapsed since our reference new moon, keep just the fractional part
+ *  (0 = new moon, 0.5 = full moon, approaching 1 = back to new moon), then
+ *  slice that 0–1 range into 8 equal buckets to pick a phase name/art. The
+ *  `+ 1) % 1` bit just guards against negative dates (before the reference
+ *  point) producing a negative fraction. */
 function getMoonPhaseIndex(date = new Date()) {
   const lunations = (date.getTime() - MOON_REFERENCE_NEW_MOON_UTC) / SYNODIC_MONTH_MS;
   const cyclePosition = ((lunations % 1) + 1) % 1;
@@ -88,6 +110,10 @@ function getMoonPhaseIndex(date = new Date()) {
 }
 
 /* ── palettes ── */
+// NIGHT / DAY / TWILIGHT are parallel objects: they share (mostly) the same
+// keys so the drawing functions further down can accept "whichever palette
+// is active right now" and not care which time of day it actually is. When
+// adding a new palette-driven visual, add the same key to all three objects.
 
 const NIGHT = {
   bands: ["#02040a", "#03060f", "#040813", "#060b19", "#080f20", "#0a1327", "#0d182f", "#101d37"],
@@ -192,6 +218,9 @@ const TWILIGHT = {
 };
 
 /* ── bitmaps ── */
+// Everything below is a small 2D array of small integers, where each integer
+// is a palette index (0 = transparent/skip). The `sprite()` helper later on
+// turns these grids into actual pixels using whatever color map you give it.
 
 /** Moon disc at 1× cell scale (all pixels uniform): 1 body / 2 bright rim / 3 crater. */
 function makeMoonMap(): number[][] {
@@ -254,6 +283,11 @@ const FERRY = [
 ].map((row) => Array.from(row, Number));
 
 /* ── types ── */
+// Shapes for all the "live" scene objects that get created, animated, and
+// eventually thrown away over the life of the canvas (as opposed to the
+// static bitmaps above, which never change). Most have an `acc` field —
+// short for "accumulator" — which just tracks elapsed ms toward the next
+// step of that object's animation.
 
 type Star = { x: number; y: number; big: boolean; level: number; every: number; acc: number; color: string };
 type Sparkle = { x: number; y: number; ttl: number; color: string };
@@ -298,6 +332,11 @@ type SleepyZ = {
 type Trail = { x: number; y: number }[];
 type SkyPhase = "day" | "twilight" | "night";
 
+// Maps the visitor's local wall-clock time to one of our three scenes:
+// 8:30am–4:30pm is "day", 4:31pm–11:30pm is "twilight" (sunset colors), and
+// 11:31pm–3:30am is "night". Anything left over (the very early morning,
+// pre-sunrise hours) also falls back to "twilight" since there's no dedicated
+// sunrise scene — it just reuses the sunset palette.
 function getSkyPhase(now = new Date()): SkyPhase {
   const minutes = now.getHours() * 60 + now.getMinutes();
   if (minutes >= 8 * 60 + 30 && minutes <= 16 * 60 + 30) return "day";
@@ -306,6 +345,11 @@ function getSkyPhase(now = new Date()): SkyPhase {
   return "twilight";
 }
 
+// Each flock is a handful of birds drawn as offsets from a shared leader
+// position. FORMATIONS is the normal V-shaped flying pattern; SCATTERED is
+// where each bird flies off to when you click the flock (they "spook" apart
+// before regrouping); JIGGLE adds a little extra wobble while scattered so
+// it doesn't look too mechanical.
 const BIRD_FORMATIONS = {
   three: [[0, 0], [-6, -3], [-6, 3]],
   five: [[0, 0], [-6, -3], [-6, 3], [-12, -6], [-12, 6]],
@@ -324,6 +368,12 @@ const BALLOON_SCALE = 1;
 
 /* ── seeded rng ── */
 
+// A small, fast pseudo-random number generator that always produces the same
+// sequence for the same seed. We use this (instead of Math.random) anywhere
+// the layout needs to be stable across renders/reloads — e.g. the skyline
+// silhouette and cloud shapes look the same every time you visit, while
+// things like star twinkle timing use real Math.random since they're allowed
+// to be different each time.
 function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -376,7 +426,9 @@ const CLOUD_SHAPES: string[][] = [
 ];
 
 /** Parse a silhouette, optionally mirror it, then apply the shading pass:
- *  3 = sunlit top, 1 = body, 4 = mid-tone edges, 2 = shaded underside. */
+ *  3 = sunlit top, 1 = body, 4 = mid-tone edges, 2 = shaded underside.
+ *  Doing the shading here (once, up front) instead of at draw time means we
+ *  never have to recompute cloud lighting every animation frame. */
 function makeCloud(shape: string[], mirror: boolean): number[][] {
   const h = shape.length + 1;
   const w = shape[0].length;
@@ -414,6 +466,15 @@ function makeCloud(shape: string[], mirror: boolean): number[][] {
   return grid;
 }
 
+/**
+ * The whole scene lives inside a single `useEffect` that runs once on mount.
+ * Rather than modeling stars/planes/clouds/etc. as React state (which would
+ * mean a re-render on every single animation tick — a non-starter for a
+ * canvas that updates ~11 times a second), we keep all of it as plain mutable
+ * variables closed over by the effect, and repaint the canvas imperatively
+ * every tick. React just gives us the canvas element and otherwise gets out
+ * of the way.
+ */
 export default function Background() {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -423,8 +484,15 @@ export default function Background() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // If the visitor has reduced-motion enabled, we still draw one full scene
+    // (so the page isn't blank), we just skip all the per-frame animation
+    // steps and periodically redraw on a slow timer instead of every frame.
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    /* ── mutable animation state ──
+     * Everything below is state for the running animation, not React state.
+     * It's grouped roughly by what it belongs to (stars, clouds, plane,
+     * balloon, ferry, moon/sun, offscreen render caches, etc). */
     let raf = 0;
     let last = 0;
     let cols = 0;
@@ -485,6 +553,9 @@ export default function Background() {
     let heroAirTrafficTopCell = 0;
     let heroAirTrafficBottomCell = 0;
     let heroAirTrafficMeasured = false;
+    // The plane is a real PNG sprite (not a pixel-grid bitmap like everything
+    // else) since it needed finer detail. We only draw it once it's finished
+    // loading; until then `plane` objects just exist without being rendered.
     const planeSprite = new window.Image();
     let planeSpriteReady = false;
     const onPlaneSpriteLoad = () => {
@@ -495,6 +566,10 @@ export default function Background() {
     planeSprite.decoding = "async";
     planeSprite.src = PLANE_SPRITE_SRC;
 
+    // Other parts of the site (e.g. a dev/demo toggle) can force a specific
+    // sky phase by setting `data-sky-override` on <html>, bypassing the
+    // real-time clock in getSkyPhase(). Used for previewing day/twilight/night
+    // without waiting for the actual time to change.
     function getSkyOverride(): SkyPhase | null {
       const override = document.documentElement.dataset.skyOverride;
       return override === "day" || override === "twilight" || override === "night" ? override : null;
@@ -504,6 +579,10 @@ export default function Background() {
       return getSkyOverride() ?? getSkyPhase();
     }
 
+    // Small easter-egg reactions to page events dispatched elsewhere in the
+    // app: hovering the name makes nearby stars glow, and a "sunrise" moment
+    // (fired from wherever the hero copy triggers it) makes the skyline glow
+    // warmly for a couple seconds, like the sun just cleared the horizon.
     const onNameStarGlow = (event: Event) => {
       if (!(event instanceof CustomEvent)) return;
       nameStarGlowActive = event.detail === true;
@@ -524,6 +603,10 @@ export default function Background() {
       }
     };
 
+    // Click a lit building at night and its windows flash, then it "falls
+    // asleep": windows go dark, a sleepy "Z" trail drifts up from the roof,
+    // the ferry pauses, and a little snore sound plays. All timed off the
+    // MIDNIGHT_* duration constants above.
     const startMidnightBuildingSleep = () => {
       if (getVisibleSkyPhase() !== "night") return;
       window.clearTimeout(midnightBuildingSleepTimer);
@@ -546,6 +629,12 @@ export default function Background() {
       }
     };
 
+    /* ── sound effects ──
+     * All of the sounds below are synthesized on the fly with the Web Audio
+     * API (oscillators + filters + gain envelopes) rather than loaded from
+     * audio files — no assets to fetch, and it keeps the file sizes tiny.
+     * Each one builds a little envelope (fade in, hold, fade out) and tunes
+     * an oscillator's frequency over time to get a distinct "shape" of sound. */
     function getAudioContext() {
       return resumeSharedAudioContext(getSharedAudioContext());
     }
@@ -698,6 +787,12 @@ export default function Background() {
       }
     }
 
+    /* ── click hit-testing ──
+     * The canvas itself has pointerEvents: none (see the JSX at the bottom),
+     * so clicks are actually caught by a window-level pointerdown listener.
+     * These `clickedX` functions each do a simple bounding-box check to see
+     * whether a click landed on that particular scene object, in screen
+     * pixels converted back to our CELL-sized grid coordinates. */
     function clickedBird(clientX: number, clientY: number) {
       if (getVisibleSkyPhase() === "night") return null;
       const x = clientX / CELL;
@@ -773,6 +868,9 @@ export default function Background() {
         y >= moon.y - padding && y <= moon.y + MOON_MAP.length + padding;
     }
 
+    // Stars technically extend "behind" the moon disc since they're placed
+    // randomly across the whole sky. Rather than sorting draw order, we just
+    // skip drawing any star pixel that falls inside the moon's bounding grid.
     function moonOccludesStarCell(x: number, y: number) {
       const moon = moonPosition();
       const row = Math.round(y - moon.y);
@@ -781,10 +879,17 @@ export default function Background() {
         col >= 0 && col < MOON_MAP[row].length && MOON_MAP[row][col] !== 0;
     }
 
+    // Drop-in replacement for cell() used for anything star-related, so we
+    // never have to remember to check moon occlusion at every call site.
     function starCell(x: number, y: number, color: string, alpha = 1) {
       if (!moonOccludesStarCell(x, y)) cell(x, y, color, alpha);
     }
 
+    // Returns each bird's [x, y] offset from the flock's leader position for
+    // this frame. Normally that's just the fixed V formation, but right after
+    // a click (scatterElapsed !== null) we blend from formation -> scattered
+    // -> back to formation over ~1 second, with a bit of extra per-bird
+    // jiggle thrown in near the peak of the scatter for a "startled" look.
     function birdOffsets(flock: Flock): readonly (readonly [number, number])[] {
       const formation = BIRD_FORMATIONS[flock.kind];
       if (flock.scatterElapsed === null || flock.scatterElapsed >= 960) {
@@ -808,6 +913,10 @@ export default function Background() {
       });
     }
 
+    // A short hand-keyframed wobble the balloon plays once when clicked —
+    // basically a tiny animation curve expressed as a lookup table of
+    // elapsed-time thresholds rather than a formula, since it's meant to
+    // look "designed" (a little bounce) rather than purely physical.
     function balloonJiggleOffset() {
       if (!balloon || balloon.jiggleElapsed === null) return { x: 0, y: 0 };
       const elapsed = balloon.jiggleElapsed;
@@ -821,6 +930,11 @@ export default function Background() {
       return { x: 0, y: 0 };
     }
 
+    // Keeps the balloon from visually overlapping any bird flock. It tries a
+    // handful of candidate horizontal offsets (its current one first, so it
+    // doesn't jitter unnecessarily) and picks the first one whose bounding
+    // box doesn't intersect any bird's box, walking outward in both
+    // directions until it finds a gap.
     function balloonTrafficOffset() {
       if (!balloon) return { x: 0, y: 0 };
       const birdBounds = flocks.flatMap((flock) =>
@@ -900,8 +1014,11 @@ export default function Background() {
     // low-rise zone around the landmarks so they stand against open sky
     const landmarkZone = () => ({ from: cnTowerX() - 12, to: cnTowerX() + 46 });
 
-    /* ── static layers ── */
-
+    // Looks up the hero heading/copy block in the DOM and converts its
+    // bounding box into grid rows, so the bird/balloon "lanes" above can stay
+    // clear of whatever text is currently on screen instead of flying over
+    // it. Re-run whenever the layout could have changed (resize, phase
+    // switch) since the hero content differs between day/twilight/night.
     function measureHeroAirTrafficLanes(phase = getSkyOverride() ?? scheduledPhase) {
       const heroSelector = phase === "twilight"
         ? ".hero-plane-banner"
@@ -925,6 +1042,13 @@ export default function Background() {
       for (const flock of flocks) flock.y = birdLaneY(flock.kind);
       if (balloon) balloon.y = balloonLaneY();
     }
+
+    /* ── static layers ──
+     * These render once (on mount and on resize) to offscreen canvases, then
+     * get blitted onto the visible canvas every frame with a single
+     * drawImage call. That's what keeps the animation cheap: we're not
+     * redrawing the sky gradient or the whole skyline 11 times a second,
+     * just the handful of things that actually move. */
 
     /** Sky gradient rendered as full noise-dither: no visible band edges,
      *  every row is a probabilistic blend of its two nearest band colors. */
@@ -952,6 +1076,11 @@ export default function Background() {
       return off;
     }
 
+    // Procedurally lays out two layers of buildings (a hazy far layer and a
+    // detailed near layer), keeps the CN Tower / Rogers Centre landmark zone
+    // free of tall buildings, decides which windows start out lit, then
+    // pre-renders all three time-of-day versions of the skyline once so we
+    // never have to redraw hundreds of building rects per frame.
     function buildSkyline() {
       const rng = mulberry32(SEED);
       buildings = [];
@@ -998,6 +1127,12 @@ export default function Background() {
       skylineTwilightGlow = renderSkylineGlowMask(skylineTwilight);
     }
 
+    // Decides which buildings get a "Z" trail when the midnight sleep effect
+    // triggers: every other eligible building (skipping ones too close to the
+    // CN Tower/Rogers Centre so their trails don't collide with those
+    // landmarks), plus one fixed Z for Rogers Centre itself and one for the
+    // ferry if it's around. The tallest sleepy building gets the longest
+    // (3-glyph) trail so the effect reads as coming "from" it.
     function createSleepyZs(): SleepyZ[] {
       const towerX = cnTowerX();
       const rogersCentreRight = towerX + 8 + 30;
@@ -1055,6 +1190,12 @@ export default function Background() {
       return [...buildingZs, ...rogersCentreZs, ...ferryZs];
     }
 
+    // Takes the already-rendered twilight skyline and recolors every
+    // non-transparent pixel to a single warm glow color, using the
+    // "source-in" compositing trick (paint a solid rect, but only keep it
+    // where the destination already had pixels). The result is a silhouette
+    // matching the skyline exactly, which drawSunriseSkylineGlow then stamps
+    // at several offsets to fake a soft bloom.
     function renderSkylineGlowMask(source: HTMLCanvasElement, color = "#ffd889") {
       const off = document.createElement("canvas");
       off.width = source.width;
@@ -1170,6 +1311,10 @@ export default function Background() {
       return off;
     }
 
+    // (Re)initializes the whole scene: sizes the canvas to the viewport,
+    // recomputes the CELL grid dimensions, and regenerates everything that
+    // depends on those dimensions (stars, clouds, glints, the skyline). Runs
+    // once on mount and again on every window resize.
     function build() {
       canvas!.width = window.innerWidth;
       canvas!.height = window.innerHeight;
@@ -1233,7 +1378,11 @@ export default function Background() {
       skyTwilight = renderSky(TWILIGHT.bands, true);
     }
 
-    /* ── draw helpers ── */
+    /* ── draw helpers ──
+     * Small, reusable primitives everything else in the file is built on top
+     * of. `cell` draws one grid square, `sprite` stamps out a whole bitmap
+     * using a palette-index-to-color map, and `halo` draws the soft glow
+     * rings around the sun/moon. */
 
     function cell(x: number, y: number, color: string, alpha = 1) {
       ctx!.globalAlpha = alpha;
@@ -1269,6 +1418,15 @@ export default function Background() {
       }
     }
 
+    // Decides whether a given moon-bitmap pixel is on the "lit" side for a
+    // given phase. New moon (0) is fully dark, full moon (4) is fully lit;
+    // everything else is lit based on how far the pixel sits toward one edge
+    // of the disc. We treat each row of the moon bitmap as a horizontal
+    // slice of a circle: `rowRadius` is how wide the circle is at that row
+    // (using the circle equation x² + y² = r²), and `normalizedX` rescales
+    // the pixel's horizontal position within that row to a -1..1 range so
+    // the same threshold (e.g. >= 0.52) works consistently near the top,
+    // middle, and bottom of the disc — not just literally down the center.
     function moonCellIsLit(row: number, col: number, phaseIndex: number) {
       if (phaseIndex === 0) return false;
       if (phaseIndex === 4) return true;
@@ -1286,7 +1444,15 @@ export default function Background() {
       return normalizedX <= -0.52;
     }
 
-    /** A tight stepped glow grown only from illuminated moon pixels. */
+    /** A tight stepped glow grown only from illuminated moon pixels.
+     *  Rather than a uniform circular halo (like the sun gets), the moon's
+     *  glow is "grown" outward specifically from its currently-lit pixels —
+     *  so a crescent moon gets a crescent-shaped glow, not a full circle.
+     *  We do this with a simple flood-outward search: for every lit pixel,
+     *  look at nearby cells within glowRadius and record the closest
+     *  distance any lit pixel got to each one, then shade by that distance
+     *  in three bands (near/mid/far) instead of a smooth falloff, to keep
+     *  the pixel-art look. */
     function drawMoonGlow(
       mx: number,
       my: number,
@@ -1363,6 +1529,15 @@ export default function Background() {
       }
     }
 
+    // During twilight the sun isn't fixed — it slowly arcs from one side of
+    // the sky to the other over SUNRISE_SUN_JOURNEY_MS (48 seconds), rising
+    // and setting like a time-lapse. `progress` (0..1) is where it is along
+    // that journey; we quantize it to a fixed number of discrete steps
+    // (`journeySteps`) so the sun moves in the same chunky, snapped-to-grid
+    // way as everything else instead of sliding smoothly. The actual arc
+    // shape comes from a single sine wave: at progress 0 or 1 (horizon) the
+    // sine is 0 so centerY sits at the horizon, and at progress 0.5 (peak)
+    // the sine is 1 so centerY is pushed up by the full arcHeight.
     function sunriseSunPosition(dt: number) {
       if (!reduced) {
         sunriseSunJourneyElapsed = (sunriseSunJourneyElapsed + dt) % SUNRISE_SUN_JOURNEY_MS;
@@ -1387,6 +1562,10 @@ export default function Background() {
       };
     }
 
+    // Advances the shared 0-3 "pulse" phase used by the sun/moon halos (and a
+    // few other pulsing effects) to breathe in and out. Keeping this as one
+    // shared counter (rather than separate timers per effect) means the sun
+    // and moon glow in sync, which reads as more intentional.
     function stepPulse(dt: number) {
       if (reduced) return;
       pulseAcc += dt;
@@ -1396,6 +1575,10 @@ export default function Background() {
       }
     }
 
+    // Draws Lake Ontario: a flat base color, scattered sparkling "glints",
+    // sideways-marching dashed wave crests (rows alternate direction so it
+    // doesn't look like one uniform current), and the shimmering moon/sun
+    // reflection lane that tracks whichever light source is above it.
     function drawWater(pal: typeof NIGHT | typeof DAY | typeof TWILIGHT, laneColor: string, laneX: number, dt: number) {
       ctx!.fillStyle = pal.waterBase;
       ctx!.fillRect(0, waterTop * CELL, canvas!.width, (rows - waterTop) * CELL);
@@ -1441,6 +1624,12 @@ export default function Background() {
       }
     }
 
+    // Draws one instance of the SLEEPY_Z_MAP glyph, rotated slightly (14°,
+    // left or right depending on `direction`) so it looks like a comic-book
+    // "Z" drifting up and away rather than sitting bolt upright. Standard 2D
+    // rotation matrix math: rotate each pixel's offset from the glyph's
+    // center by `angle`, then place it. A soft dark "shadow" pixel is drawn
+    // just behind/below each lit pixel to help it stand out against the sky.
     function drawRotatedPixelZ(
       x: number,
       y: number,
@@ -1474,6 +1663,10 @@ export default function Background() {
       }
     }
 
+    // Same rotation math as drawRotatedPixelZ, but instead of drawing it just
+    // returns the on-screen bounding box (with a little clearance padding),
+    // so drawSleepyZs can check whether two Z trails would visually overlap
+    // before committing to a spot.
     function getRotatedPixelZBounds(
       x: number,
       y: number,
@@ -1515,6 +1708,13 @@ export default function Background() {
       };
     }
 
+    // Animates every sleepy building's "Z" trail: each Z drifts upward,
+    // fades in then out, and wobbles slightly. Trails are staggered (each
+    // has its own `delay`) and, since several buildings can be sleeping at
+    // once, this also tries several vertical "lanes" (the `placement` search
+    // below) so overlapping trails don't visually collide — if the default
+    // spot is already taken, it slides the trail further up/along until it
+    // finds a free lane, and skips drawing it entirely if none is found.
     function drawSleepyZs(sleepElapsed: number) {
       const occupiedBounds: ReturnType<typeof getRotatedPixelZBounds>[] = [];
       sleepyZs.forEach((sleepyZ) => {
@@ -1594,6 +1794,10 @@ export default function Background() {
       });
     }
 
+    // Handles all the building-window lighting: random flicker of which
+    // windows are lit at night, the CN Tower's pod lights and blinking red
+    // aviation beacon, and the three-stage midnight sleep effect (normal ->
+    // brief bright "flash" -> windows go dark while the Zs play).
     function drawLitWindows(dt: number) {
       if (!reduced && midnightBuildingEffectElapsed >= 0) {
         midnightBuildingEffectElapsed += dt;
@@ -1665,6 +1869,12 @@ export default function Background() {
       }
     }
 
+    // Draws and advances the single plane that occasionally crosses the sky
+    // (day, twilight, or night), plus its trailing smoke puffs. `sunriseOpening`
+    // marks the special one-off plane that flies across right as twilight
+    // begins, with denser/warmer-tinted smoke as a little flourish. Clicking
+    // the plane sets `boostRemaining`, which speeds it up and thickens its
+    // smoke trail for a couple seconds.
     function drawPlane(
       dt: number,
       sunriseOpening = false,
@@ -1907,7 +2117,11 @@ export default function Background() {
       drawFerry(dt, true);
     }
 
-    /* ── daylight + shared sunrise/sunset scene ── */
+    /* ── daylight + shared sunrise/sunset scene ──
+     * Day and twilight are visually different (twilight has a moving sun and
+     * a skyline glow effect, day's sun is fixed) but structurally almost
+     * identical, so both are rendered through this one function with a
+     * `twilight` flag rather than duplicating the whole scene twice. */
 
     function drawDayScene(dt: number, pal: typeof DAY | typeof TWILIGHT, twilight: boolean) {
       if (!heroAirTrafficMeasured) measureHeroAirTrafficLanes(twilight ? "twilight" : "day");
@@ -2083,6 +2297,13 @@ export default function Background() {
       drawFerry(dt, twilight);
     }
 
+    // Fades the sunrise skyline-glow effect in then out over its duration
+    // (attack/release envelope, same idea as an ADSR in audio synthesis),
+    // with a subtle 4-step pulse layered on top, then paints the glow mask
+    // using "screen" blending (which only ever brightens, never darkens) at
+    // three offset rings for a cheap soft-bloom look. Returns the current
+    // intensity (0 when the effect isn't running) so the caller knows
+    // whether/how strongly to apply it.
     function drawSunriseSkylineGlow(dt: number) {
       if (!skylineTwilightGlow || sunriseSkylineGlowRemaining <= 0) return 0;
 
@@ -2121,6 +2342,10 @@ export default function Background() {
       drawDayScene(dt, TWILIGHT, true);
     }
 
+    // The Toronto Island ferry sails back and forth across the whole width of
+    // the scene, all times of day. It can be "boosted" (faster + kicks up
+    // wake splashes) by clicking it, paused during the midnight sleep effect,
+    // and has its cabin lights turned off while the city sleeps.
     function drawFerry(dt: number, night: boolean) {
       if (!ferry) return;
 
@@ -2203,6 +2428,12 @@ export default function Background() {
 
     /* ── loop ── */
 
+    // The single entry point for "draw whatever the sky should look like
+    // right now." Figures out which of day/twilight/night is active (real
+    // clock, unless overridden), resets some per-phase state the first time
+    // we switch into a phase, and also updates a couple of `data-*`
+    // attributes on <html> so the rest of the site's CSS can react to the
+    // current sky phase/theme.
     function drawCurrentScene(dt: number) {
       const nextScheduledPhase = getSkyPhase();
       if (nextScheduledPhase !== scheduledPhase) {
@@ -2226,6 +2457,10 @@ export default function Background() {
       else drawNight(dt);
     }
 
+    // requestAnimationFrame fires at the display's refresh rate (often
+    // 60fps+), but we deliberately throttle to TICK (~90ms/~11fps) for the
+    // chunky pixel-art feel — this just skips drawing until enough real time
+    // has passed, rather than trying to run a separate slower timer.
     function frame(now: number) {
       raf = requestAnimationFrame(frame);
       const dt = last ? now - last : TICK;
@@ -2234,6 +2469,11 @@ export default function Background() {
       drawCurrentScene(dt);
     }
 
+    // Single click handler for the whole scene, checked in priority order —
+    // first hit wins. Moon comes first since it's the most "discoverable"
+    // interactive element (cycling through phases), building sleep comes
+    // last since its hitbox is the biggest and could otherwise swallow clicks
+    // meant for something drawn on top of it.
     const onPointerDown = (event: PointerEvent) => {
       const birdHit = clickedBird(event.clientX, event.clientY);
       if (clickedMoon(event.clientX, event.clientY)) {
@@ -2268,6 +2508,9 @@ export default function Background() {
     window.addEventListener(NAME_STAR_GLOW_EVENT, onNameStarGlow);
     window.addEventListener(SUNRISE_SKYLINE_GLOW_EVENT, onSunriseSkylineGlow);
 
+    // Reduced-motion visitors get one frame drawn immediately, then a redraw
+    // every 30s (just in case the sky phase quietly changed, e.g. left the
+    // tab open overnight) instead of a real animation loop.
     let clockTimer = 0;
     if (reduced) {
       drawCurrentScene(0);
@@ -2282,6 +2525,9 @@ export default function Background() {
     };
     window.addEventListener("resize", onResize);
 
+    // Watches for the dev/demo `data-sky-override` attribute changing on
+    // <html> (see getSkyOverride above) so a manual phase switch repaints
+    // immediately instead of waiting for the next animation tick.
     const phaseObserver = new MutationObserver(() => {
       drawCurrentScene(0);
     });
@@ -2309,6 +2555,12 @@ export default function Background() {
     };
   }, []);
 
+  // A single fixed, full-viewport canvas behind everything else (zIndex: 0).
+  // `pointerEvents: none` lets clicks pass through to the real page content
+  // underneath — our own click "hit testing" happens via a window-level
+  // listener instead (see onPointerDown above). `imageRendering: pixelated`
+  // stops the browser from smoothing/blurring our chunky pixel art when it
+  // scales the canvas. `aria-hidden` because it's purely decorative.
   return (
     <canvas
       ref={ref}

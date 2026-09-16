@@ -12,6 +12,9 @@ const celebrationColors = [
   "var(--resume-confetti-5)",
 ];
 
+// A little "ta-da!" for whoever opens the resume — built entirely from
+// oscillators and noise, no audio file needed. Two layers: a quick ascending
+// arpeggio (the "notes" below) plus a short noise burst underneath for punch.
 async function playResumeCelebrationSound() {
   const audio = getSharedAudioContext();
   if (!audio || audio.state === "closed") return false;
@@ -26,6 +29,7 @@ async function playResumeCelebrationSound() {
   if (audio.state !== "running") return false;
 
   const start = audio.currentTime + 0.025;
+  // E5, G5, B5, D6, E6 — a bright little five-note run.
   const notes = [659.25, 783.99, 987.77, 1174.66, 1318.51];
 
   notes.forEach((frequency, index) => {
@@ -68,12 +72,17 @@ async function playResumeCelebrationSound() {
   return true;
 }
 
+// A tiny deterministic "random" generator (a hash, really) so the confetti
+// looks random on every render but is actually the exact same layout every
+// time — no hydration mismatches between server and client.
 function seededUnit(index: number, salt: number) {
   let value = Math.imul(index + 1, 0x45d9f3b) ^ Math.imul(salt + 1, 0x119de1f3);
   value = Math.imul(value ^ (value >>> 16), 0x45d9f3b);
   return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
 }
 
+// Picks a starting point somewhere along one of the four screen edges, so
+// confetti bursts in from off-screen rather than popping up in the middle.
 function perimeterOrigin(index: number, salt: number) {
   const edge = index % 4;
   const along = 5 + seededUnit(index, salt) * 90;
@@ -84,6 +93,9 @@ function perimeterOrigin(index: number, salt: number) {
   return { edge, left: "0%", top: `${along}%` };
 }
 
+// Gives each particle a direction to fly away from its edge, plus a bit of
+// sideways ("tangent") drift so they don't all shoot out in perfectly
+// parallel lines — that would look robotic instead of like real confetti.
 function outwardVector(index: number, edge: number, salt: number, min: number, range: number) {
   const distance = min + seededUnit(index, salt) * range;
   const tangent = (seededUnit(index, salt + 1) - 0.5) * distance * 0.95;
@@ -94,6 +106,9 @@ function outwardVector(index: number, edge: number, salt: number, min: number, r
   return { x: -distance, y: tangent };
 }
 
+// These two arrays are computed once, at module load, rather than per-render
+// — the confetti positions don't depend on any state, so there's no reason
+// to recalculate all this math every time the component re-renders.
 const resumeSparkles = Array.from({ length: 52 }, (_, index) => {
   const origin = perimeterOrigin(index, 1);
   const burst = outwardVector(index, origin.edge, 2, 52, 126);
@@ -145,10 +160,15 @@ type FallingParticleStyle = CSSProperties & {
 };
 
 export default function Resume() {
+  // Refs, not state — we don't want a re-render every time the sound
+  // succeeds or fails, we just need to remember it so we don't play it twice.
   const celebrationSoundPlayed = useRef(false);
   const celebrationSoundPending = useRef(false);
   const [isVisible, setIsVisible] = useState(false);
 
+  // Browsers won't let audio play until the user has interacted with the
+  // page at least once, so we grab the very first click/keypress anywhere
+  // and use it to unlock the shared AudioContext ahead of time.
   useEffect(() => {
     const unlockAudio = () => resumeSharedAudioContext(getSharedAudioContext());
     window.addEventListener("pointerdown", unlockAudio, { capture: true, once: true, passive: true });
@@ -160,11 +180,18 @@ export default function Resume() {
     };
   }, []);
 
+  // The PDF's onLoad usually fires quickly, but just in case it's slow (or
+  // never fires for some reason), this guarantees the confetti still shows
+  // up after a short wait instead of the page looking permanently unfinished.
   useEffect(() => {
     const revealFallback = window.setTimeout(() => setIsVisible(true), 800);
     return () => window.clearTimeout(revealFallback);
   }, []);
 
+  // Try to play the celebration chime as soon as the resume is visible. If
+  // the browser blocks it (no user interaction yet), we keep listening for
+  // the next click/keypress and try again then — so it always plays
+  // eventually, just maybe a beat later than we'd like.
   useEffect(() => {
     if (!isVisible || celebrationSoundPlayed.current) return;
 
@@ -203,17 +230,20 @@ export default function Resume() {
           <span>back home</span>
         </Link>
         <div className="resume-document-wrap">
+          {/* The <object> embeds the actual PDF; a full-shell <Link> sits on
+              top so a click anywhere opens the dedicated full-screen viewer
+              instead of fighting with the browser's built-in PDF controls. */}
           <div className={`resume-preview-shell${isVisible ? " is-visible" : ""}`}>
             <object
               className="resume-preview"
-              data="/resume.pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH&pagemode=none"
+              data="/resume/resume.pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH&pagemode=none"
               type="application/pdf"
               aria-label="Xinge Xu's resume"
               tabIndex={-1}
               onLoad={() => setIsVisible(true)}
             >
               <p>
-                Your browser could not display the PDF. <a href="/resume.pdf">Open the resume</a>.
+                Your browser could not display the PDF. <a href="/resume/resume.pdf">Open the resume</a>.
               </p>
             </object>
             <Link

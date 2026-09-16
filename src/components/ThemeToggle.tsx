@@ -10,6 +10,9 @@ import { useSyncExternalStore } from "react";
 type SkyPhase = "day" | "twilight" | "night";
 const SKY_PHASE_STORAGE_KEY = "xinge-sky-phase-v1";
 
+// The Background component writes the current sky phase onto <html> as a
+// data attribute, so we just watch that attribute instead of keeping our own
+// copy of the state — one source of truth, no prop drilling needed.
 function subscribe(onChange: () => void) {
   const observer = new MutationObserver(onChange);
   observer.observe(document.documentElement, {
@@ -24,16 +27,21 @@ const getPhase = (): SkyPhase => {
   return phase === "day" || phase === "twilight" || phase === "night" ? phase : "night";
 };
 
+// Cycles day → twilight → night → day, so one click always moves forward.
 const nextPhase = (phase: SkyPhase): SkyPhase =>
   phase === "day" ? "twilight" : phase === "twilight" ? "night" : "day";
 
 export default function ThemeToggle() {
+  // Third arg is the server-rendered fallback, since we can't read
+  // document.documentElement during SSR — night matches the site's default.
   const phase = useSyncExternalStore(subscribe, getPhase, () => "night" as const);
   const next = nextPhase(phase);
   const nextLabel = next === "twilight" ? "sunset and sunrise" : next;
 
   const applyPhase = (target: SkyPhase) => {
     try {
+      // Remember the choice so a returning visitor keeps their preferred sky
+      // instead of it resetting to whatever time it happens to be.
       window.localStorage.setItem(SKY_PHASE_STORAGE_KEY, target);
     } catch {
       // The in-page override still works when storage is unavailable.

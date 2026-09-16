@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+/** Tiny "← back home" pill used on pages that branch off the landing page. */
 export default function BackHome() {
   return (
     <div className="back-home-wrap">

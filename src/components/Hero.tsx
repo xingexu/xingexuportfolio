@@ -5,30 +5,52 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 
+// ---------------------------------------------------------------------------
+// Content + timing constants. There's a lot of these because the hero has
+// three completely different "moods" (day / twilight sunrise / night) and
+// each one has its own little choreographed sequence of images, timers, and
+// sound effects. Tweak the *_MS values below to speed up or slow down the
+// various reveals.
+// ---------------------------------------------------------------------------
 const NAME = "xinge xu";
+// Custom window events so far-away components (background/sky layers) can
+// react to what's happening in the hero without us having to prop-drill or
+// reach for context — e.g. "hey, glow the stars because the name is hovered".
 const NAME_STAR_GLOW_EVENT = "xinge:name-star-glow";
 const SUNRISE_SKYLINE_GLOW_EVENT = "xinge:sunrise-skyline-glow";
-const BANNER_LOOP = "/xinge-plane-banner-continuous-wind.png";
-const BANNER_STATIC = "/xinge-plane-banner-static.png";
-const DAY_PLANES_ANIMATION = "/planesanimation.png";
-const DAY_PLANES_FINAL = "/planesanimation-final.png";
-const DAY_PLANES_DURATION_MS = 6_000;
-const MIDNIGHT_FIREWORKS_NAME = "/newfireworks.png";
-const MIDNIGHT_FIREWORKS_FINAL = "/newfireworks-final.png";
-const MIDNIGHT_FULLSCREEN_FIREWORKS = "/fullscreenfireworks.png";
-const MIDNIGHT_FIREWORKS_DURATION_MS = 5_400;
-const MIDNIGHT_FULLSCREEN_FIREWORKS_DURATION_MS = 4_000;
-const MIDNIGHT_FIREWORKS_REVEAL_MS = 4_850;
-const MIDNIGHT_SUPPORTING_REVEAL_MS = 1_850;
-const BANNER_ENTRANCE_DURATION_MS = 4200;
-const BANNER_PARTICLE_REMOVAL_INTERVAL_MS = 1000;
+// The plane banner (used during the twilight/sunrise sky phase) has a
+// one-shot "flying in" clip and a seamless looping "cruising" clip, plus a
+// plain static image for people who've asked for reduced motion.
+const BANNER_LOOP = "/images/xinge-plane-banner-continuous-wind.png";
+const BANNER_STATIC = "/images/xinge-plane-banner-static.png";
+// Daytime hero: little planes animate once to "draw" the name, then we
+// freeze on a clean final frame so it doesn't loop forever and distract.
+const DAY_PLANES_ANIMATION = "/images/planesanimation.png";
+const DAY_PLANES_FINAL = "/images/planesanimation-final.png";
+const DAY_PLANES_DURATION_MS = 6_000; // how long we let the day-plane clip play before swapping to the frozen final frame
+// Nighttime hero: fireworks spell out the name in the sky, then settle into
+// a crisp still frame that's also a clickable "launch more fireworks" button.
+const MIDNIGHT_FIREWORKS_NAME = "/images/newfireworks.png";
+const MIDNIGHT_FIREWORKS_FINAL = "/images/newfireworks-final.png";
+const MIDNIGHT_FULLSCREEN_FIREWORKS = "/images/fullscreenfireworks.png";
+const MIDNIGHT_FIREWORKS_DURATION_MS = 5_400; // total runtime of the "fireworks spelling the name" clip
+const MIDNIGHT_FULLSCREEN_FIREWORKS_DURATION_MS = 4_000; // how long the click-triggered fullscreen fireworks overlay stays on screen
+const MIDNIGHT_FIREWORKS_REVEAL_MS = 4_850; // when we swap the animated clip for the still frame + make the name clickable (timed just before the clip actually finishes so the handoff is seamless)
+const MIDNIGHT_SUPPORTING_REVEAL_MS = 1_850; // when the subtitle + buttons fade in, staggered a beat after the fireworks start
+const BANNER_ENTRANCE_DURATION_MS = 4200; // keep this in sync with the CSS entrance animation's duration so the JS timeline and the animation finish together
+const BANNER_PARTICLE_REMOVAL_INTERVAL_MS = 1000; // once the plane "arrives", its speed particles thin out in waves, one wave per this interval, until only the persistent ones remain
 const SUNRISE_TRANSIENT_PARTICLE_COUNT = 21;
 const SUNRISE_PARTICLES_PER_SETTLE_STEP = 4;
+// How many waves it takes to clear out all the non-persistent particles.
 const SUNRISE_PARTICLE_SETTLE_STEPS = Math.ceil(
   SUNRISE_TRANSIENT_PARTICLE_COUNT / SUNRISE_PARTICLES_PER_SETTLE_STEP,
 );
 const SUNRISE_FIREWORK_COLORS = ["#ffd889", "#fff0cf", "#ef7f7d", "#a878c2"];
 
+// Hand-tuned positions (as % of the banner) and timing for the small
+// fireworks that pop off when the plane "lands"/finishes its entrance.
+// SUNRISE_CLICK_FIREWORKS reuses those plus a few extra bursts so clicking
+// the skyline button feels like a bigger celebration than the automatic one.
 const SUNRISE_LANDING_FIREWORKS = [
   { delay: "0ms", left: "37%", scale: "1.32", top: "49%", x: "-14px", y: "-124px" },
   { delay: "220ms", left: "62%", scale: "1.52", top: "46%", x: "10px", y: "-142px" },
@@ -42,6 +64,8 @@ const SUNRISE_CLICK_FIREWORKS = [
   { delay: "550ms", left: "90%", scale: "0.9", top: "55%", x: "-4px", y: "-96px" },
 ];
 
+// Offsets for the little spark trails that fly outward from each firework's
+// burst point — basically a hand-drawn circle of directions (N, NE, E, ...).
 const SUNRISE_FIREWORK_SPARKS = [
   { x: "0px", y: "-74px" },
   { x: "37px", y: "-64px" },
@@ -57,6 +81,8 @@ const SUNRISE_FIREWORK_SPARKS = [
   { x: "-37px", y: "-64px" },
 ];
 
+// Coordinates tracing two rows of little "speed lines" above and below the
+// banner, following the rough silhouette of the plane's flight path.
 const SUNRISE_PARTICLE_PATH = [
   { left: "24%", top: "20%" },
   { left: "30%", top: "17%" },
@@ -86,7 +112,13 @@ const SUNRISE_PARTICLE_PATH = [
   { left: "95%", top: "82%" },
 ];
 
+// A handful of particles are marked "persistent" — they stick around forever
+// once the plane settles into its cruising loop, giving the loop a bit of
+// life. Everything else is "transient" and gets cleared out wave by wave.
 const SUNRISE_SETTLED_PARTICLE_INDEXES = new Set([1, 4, 7, 10, 14, 17, 20, 23]);
+// Module-level counter (not React state) used purely to assign each
+// transient particle to a settle-out wave in a shuffled-but-deterministic
+// order, so they don't all vanish from left-to-right in an obvious line.
 let sunriseTransientParticleOrdinal = 0;
 
 function getSunriseParticleSettleGroup(persistent: boolean) {
@@ -109,6 +141,8 @@ const SUNRISE_SPEED_PARTICLES = SUNRISE_PARTICLE_PATH.map((position, index) => {
   };
 });
 
+// Same idea as above, but for the smaller particles that live *inside* the
+// plane's silhouette rather than tracing the outer flight path.
 const SUNRISE_INSIDE_SPEED_PARTICLES_BASE = [
   { delay: "-120ms", height: 4, left: "32%", persistent: true, top: "33%", width: 12 },
   { delay: "-410ms", height: 6, left: "43%", persistent: false, top: "68%", width: 8 },
@@ -123,15 +157,24 @@ const SUNRISE_INSIDE_SPEED_PARTICLES = SUNRISE_INSIDE_SPEED_PARTICLES_BASE.map((
   settleGroup: getSunriseParticleSettleGroup(particle.persistent),
 }));
 
+// A little contrail of smoke puffs trailing behind the plane, each one
+// staggered by its own negative animation-delay so they look continuous.
 const SUNRISE_PLANE_SMOKE_PUFFS = Array.from({ length: 8 }, (_, index) => ({
   delay: `${-(index * 145)}ms`,
   size: 5 + (index % 3) * 2,
 }));
 
+// Fired whenever the name is hovered (day mode) — lets a separate
+// background/stars component pick up the event and glow in sync, without us
+// needing to wire up shared state or context for something this occasional.
 function dispatchNameStarGlow(active: boolean) {
   window.dispatchEvent(new CustomEvent<boolean>(NAME_STAR_GLOW_EVENT, { detail: active }));
 }
 
+// --- Firework sound design -------------------------------------------------
+// We don't have a firework sound file, so we synthesize one with the Web
+// Audio API. This builds a short burst of white noise with a fade-out — the
+// "crackle" layer underneath each firework's boom.
 function createFireworkNoise(audio: AudioContext) {
   const length = Math.round(audio.sampleRate * 0.38);
   const buffer = audio.createBuffer(1, length, audio.sampleRate);
@@ -145,6 +188,11 @@ function createFireworkNoise(audio: AudioContext) {
   return buffer;
 }
 
+// Schedules the whole "whoosh...crackle-boom" sequence for a batch of
+// fireworks: one rising oscillator for the launch, then a filtered-noise
+// "crackle" plus a low sine "boom" timed to each firework's burst. `mode`
+// tweaks the pitch/volume slightly so click-triggered ("extra") fireworks
+// sound a touch punchier than the automatic landing ones.
 function scheduleFireworkSounds(audio: AudioContext, noise: AudioBuffer, mode: FireworkMode) {
   const fireworks = mode === "extra" ? SUNRISE_CLICK_FIREWORKS : SUNRISE_LANDING_FIREWORKS;
   const start = audio.currentTime + 0.018;
@@ -194,8 +242,16 @@ function scheduleFireworkSounds(audio: AudioContext, noise: AudioBuffer, mode: F
   });
 }
 
+// --- Shared types ------------------------------------------------------
+// SkyPhase mirrors a `data-sky-phase` attribute set on <html> elsewhere in
+// the app (a global day/night cycle), and decides which hero variant renders.
 type SkyPhase = "day" | "twilight" | "night";
+// The plane banner's little state machine: flies in ("entrance"), sheds its
+// extra particles ("settling"), then cruises forever ("loop") — or jumps
+// straight to "static" for reduced-motion users.
 type BannerStage = "entrance" | "settling" | "loop" | "static";
+// "landing" = the automatic burst when the plane finishes its entrance;
+// "extra" = the bigger burst triggered by clicking the skyline/name.
 type FireworkMode = "landing" | "extra";
 type FireworkBurst = { id: number; mode: FireworkMode };
 
@@ -239,10 +295,17 @@ const PARTICLE_COLORS = [
   "var(--confetti-4)",
 ];
 
+// Small pixel-art arrow glyph used inside the CTA buttons below.
 function PixelArrow() {
   return <span className="pixel-arrow" aria-hidden="true" />;
 }
 
+// --- Reading the current sky phase from the DOM ----------------------------
+// Some other part of the app owns the actual day/night cycle and reflects it
+// as `data-sky-phase` on <html>. Rather than duplicating that logic here, we
+// just watch for attribute changes with a MutationObserver and read it back
+// out. useSyncExternalStore (see the Hero() export below) wires this up so
+// React re-renders whenever the phase flips.
 function subscribeToSkyPhase(onChange: () => void) {
   const observer = new MutationObserver(onChange);
   observer.observe(document.documentElement, {
@@ -257,6 +320,13 @@ function getSkyPhase(): SkyPhase {
   return phase === "day" || phase === "twilight" || phase === "night" ? phase : "night";
 }
 
+// --- Hydration guard --------------------------------------------------------
+// These three feed useSyncExternalStore purely as a trick to detect "are we
+// on the client yet?" The server snapshot is always `false`, the client
+// snapshot is always `true`, and there's nothing to actually subscribe to —
+// so React renders the server-safe placeholder first, then flips to the real
+// content right after hydration. This avoids a hydration mismatch, since the
+// real hero depends on browser-only things like `window` and `document`.
 function subscribeToHydration() {
   return () => undefined;
 }
@@ -269,6 +339,9 @@ function getServerHydratedSnapshot() {
   return false;
 }
 
+// Renders one round of visual firework bursts over the banner (the sound is
+// handled separately by scheduleFireworkSounds). Picks the small "landing"
+// set or the bigger "click" set depending on mode.
 function BannerFireworks({ mode }: { mode: FireworkMode }) {
   const fireworks = mode === "extra" ? SUNRISE_CLICK_FIREWORKS : SUNRISE_LANDING_FIREWORKS;
 
@@ -320,10 +393,15 @@ function PlaneBanner() {
   const [settleStep, setSettleStep] = useState(0);
   const [windLoaded, setWindLoaded] = useState(false);
   const [fireworkBurst, setFireworkBurst] = useState<FireworkBurst | null>(null);
+  // Cached AudioContext + noise buffer so we don't rebuild them on every
+  // firework; entranceFinished tracks the entrance clip's completion so we
+  // can coordinate it with the (separately-async) wind-loop image load below.
   const audioContext = useRef<AudioContext | null>(null);
   const fireworkNoise = useRef<AudioBuffer | null>(null);
   const entranceFinished = useRef(false);
 
+  // Reduced-motion users skip the whole animated sequence and land straight
+  // on the static banner — no entrance, no particles, no fireworks-on-load.
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       const frame = window.requestAnimationFrame(() => setStage("static"));
@@ -331,6 +409,8 @@ function PlaneBanner() {
     }
   }, []);
 
+  // While "settling", clear out one wave of transient particles per tick
+  // until they're all gone, then move on to the steady-state "loop" stage.
   useEffect(() => {
     if (stage !== "settling") return;
     const settleTimer = window.setTimeout(() => {
@@ -341,6 +421,11 @@ function PlaneBanner() {
     return () => window.clearTimeout(settleTimer);
   }, [settleStep, stage]);
 
+  // Browsers block audio from playing until the user has interacted with the
+  // page (autoplay policy), so we listen for the very first pointer/touch/key
+  // event anywhere on the page and use it to resume the shared AudioContext.
+  // This means fireworks sound effects "just work" the moment someone starts
+  // interacting, even if they haven't clicked anything fireworks-related yet.
   useEffect(() => {
     const unlockAudio = () => {
       if (!audioContext.current || audioContext.current.state === "closed") {
@@ -368,6 +453,11 @@ function PlaneBanner() {
     setStage("settling");
   };
 
+  // Two things need to finish before we can start settling: the entrance
+  // animation must play out (handleEntranceEnd) AND the looping wind image
+  // must have finished loading (handleWindLoad) — otherwise we'd flash an
+  // unloaded image. Whichever of the two finishes second is the one that
+  // actually kicks off beginParticleSettling().
   const handleWindLoad = () => {
     if (stage !== "entrance" || windLoaded) return;
     setWindLoaded(true);
@@ -382,6 +472,10 @@ function PlaneBanner() {
     if (windLoaded) beginParticleSettling();
   };
 
+  // Plays the synthesized firework sound effect. `allowCreate` gates whether
+  // we're allowed to create/resume the AudioContext right now — we only want
+  // to do that in response to a real user gesture (see illuminateToronto),
+  // not from the automatic "landing" fireworks that fire on animation end.
   const playFireworkSounds = (mode: FireworkMode, allowCreate: boolean) => {
     let audio = audioContext.current;
     if ((!audio || audio.state === "closed") && allowCreate) {
@@ -404,11 +498,18 @@ function PlaneBanner() {
     playFireworkSounds(mode, fromGesture);
   };
 
+  // Handler for the little invisible button that sits over the banner once
+  // it's cruising — lets visitors light up the Toronto skyline on demand and
+  // fire off an extra celebratory burst. This is a real click, so audio is
+  // always allowed to start here.
   const illuminateToronto = () => {
     window.dispatchEvent(new Event(SUNRISE_SKYLINE_GLOW_EVENT));
     launchFireworks("extra", true);
   };
 
+  // Which image + which particle sets to show depends entirely on `stage`:
+  // full particle set during "entrance", a shrinking set during "settling",
+  // and just the persistent ones once we're "loop"ing forever.
   const src = stage === "static" ? BANNER_STATIC : BANNER_LOOP;
   const speedParticles =
     stage === "loop"
@@ -428,6 +529,11 @@ function PlaneBanner() {
         : SUNRISE_INSIDE_SPEED_PARTICLES;
 
   return (
+    // The `onAnimationEnd` check against currentTarget vs target matters
+    // here — without it, animations bubbling up from child elements would
+    // also (incorrectly) trigger handleEntranceEnd. animationDuration is set
+    // inline from BANNER_ENTRANCE_DURATION_MS so the constant above stays
+    // the single source of truth for how long the entrance CSS animation runs.
     <div
       className={`hero-plane-banner${stage === "entrance" ? " hero-plane-banner-entrance-playing" : ""}`}
       onAnimationEnd={(event) => {
@@ -544,6 +650,9 @@ function PlaneBanner() {
   );
 }
 
+// The twilight/sunrise variant of the hero — just the plane banner plus the
+// subtitle and CTA buttons underneath. Much simpler than DefaultHero since
+// all the fun animation logic lives inside PlaneBanner itself.
 function SunriseHero() {
   return (
     <section className="hero-section">
@@ -576,20 +685,38 @@ function SunriseHero() {
   );
 }
 
+// Handles both the "day" and "night" hero variants (everything except the
+// twilight/sunrise plane banner, which lives in SunriseHero above). Day mode
+// plays a short plane-drawn-name animation; night mode plays a fireworks
+// intro that spells the name, then lets you click it for more fireworks.
 function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
+  // Day-mode animation state: starts "already complete" if we're not even in
+  // day mode, so night mode doesn't bother rendering the day animation at all.
   const [dayAnimationComplete, setDayAnimationComplete] = useState(phase !== "day");
+  // Night-mode intro sequence state: intro plays only when we start in night
+  // mode; "ready" flips once the animated clip has actually loaded (so we
+  // don't start the reveal timers against an image that isn't even showing
+  // yet); "nameVisible"/"supportingVisible" drive the staggered fade-ins.
   const [midnightIntroPlaying, setMidnightIntroPlaying] = useState(phase === "night");
   const [midnightIntroReady, setMidnightIntroReady] = useState(false);
   const [midnightNameVisible, setMidnightNameVisible] = useState(false);
   const [midnightSupportingVisible, setMidnightSupportingVisible] = useState(false);
   const [midnightGlowActive, setMidnightGlowActive] = useState(false);
+  // 0 means "no fullscreen fireworks showing"; any other number is used both
+  // as a truthy flag and as a React `key` to force the fireworks <Image> to
+  // remount (and thus replay its animation) on every click.
   const [midnightFullscreenFireworksId, setMidnightFullscreenFireworksId] = useState(0);
   const midnightFullscreenFireworksTimer = useRef<number | null>(null);
   const midnightFireworkNoise = useRef<AudioBuffer | null>(null);
   const dayAnimationTimer = useRef<number | null>(null);
+  // Little confetti-style particles that burst out from behind the name on
+  // hover/click — shared between the day and night variants.
   const [particles, setParticles] = useState<Particle[]>([]);
   const pid = useRef(0);
 
+  // Spawns a fresh handful of randomly-styled confetti particles. Capped at
+  // 112 total (via the slice below) so a flurry of quick hovers/clicks can't
+  // pile up thousands of DOM nodes.
   const burst = () => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const next: Particle[] = Array.from({ length: 56 }, () => ({
@@ -616,6 +743,9 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
     dispatchNameStarGlow(false);
   };
 
+  // Once the day animation image has actually loaded, start the clock for
+  // how long to let it play before freezing on the final frame. Reduced-
+  // motion users get a duration of 0, so it swaps over basically immediately.
   const handleDayAnimationLoad = () => {
     if (phase !== "day" || dayAnimationComplete || dayAnimationTimer.current) return;
     const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -637,6 +767,10 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
     setMidnightGlowActive(false);
   };
 
+  // Clicking the settled fireworks name (night mode only, once it's visible)
+  // triggers a fullscreen fireworks overlay + sound, and re-triggers cleanly
+  // even on rapid repeat clicks by clearing any existing hide-timer first.
+  // This click is a genuine user gesture, so we can safely resume audio here.
   const handleMidnightNameClick = () => {
     if (phase !== "night" || !midnightNameVisible) return;
     setMidnightFullscreenFireworksId((current) => current + 1);
@@ -653,6 +787,8 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
     scheduleFireworkSounds(audio, midnightFireworkNoise.current, "extra");
   };
 
+  // Cleanup on unmount: clear any pending timers and make sure we don't leave
+  // the star-glow event "stuck" active if the component goes away mid-hover.
   useEffect(() => () => {
     if (dayAnimationTimer.current) {
       window.clearTimeout(dayAnimationTimer.current);
@@ -664,12 +800,19 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
     dispatchNameStarGlow(false);
   }, []);
 
+  // Warm the browser's image cache for the fullscreen fireworks asset ahead
+  // of time, so the first click doesn't have an awkward loading delay.
   useEffect(() => {
     if (phase !== "night") return;
     const preload = new window.Image();
     preload.src = MIDNIGHT_FULLSCREEN_FIREWORKS;
   }, [phase]);
 
+  // The night-mode intro is really three staggered reveals sharing one
+  // timeline: subtitle/buttons fade in first, then the name becomes visible
+  // (and clickable) just before the clip ends, then finally we swap away
+  // from the animated clip to the static frame. All three timers key off the
+  // same constants declared at the top of the file.
   useEffect(() => {
     if (phase !== "night" || !midnightIntroPlaying || !midnightIntroReady) return;
 
@@ -692,6 +835,8 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
     };
   }, [midnightIntroPlaying, midnightIntroReady, phase]);
 
+  // Only night mode needs the staggered supporting-copy fade-in class; day
+  // mode's subtitle/buttons just use the regular step-in animation classes.
   const midnightSupportingCopyClass = phase === "night"
     ? ` midnight-supporting-copy${midnightSupportingVisible ? " midnight-supporting-copy-visible" : ""}`
     : "";
@@ -865,14 +1010,22 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
   );
 }
 
+// The actual exported component: figures out whether we're hydrated yet and
+// which sky phase we're in, then hands off to the right variant.
 export default function Hero() {
   const hydrated = useSyncExternalStore(
     subscribeToHydration,
     getHydratedSnapshot,
     getServerHydratedSnapshot,
   );
+  // Server-side (and the very first client render) always assumes "night" so
+  // the initial markup is deterministic; the real phase kicks in once we've
+  // hydrated and can read the DOM attribute.
   const phase = useSyncExternalStore(subscribeToSkyPhase, getSkyPhase, () => "night" as const);
 
+  // Before hydration, render just the bare, animation-free shell — this has
+  // to match what the server sent exactly, or React will complain about a
+  // hydration mismatch.
   if (!hydrated) {
     return (
       <section className="hero-preload-shell">
@@ -881,5 +1034,8 @@ export default function Hero() {
     );
   }
 
+  // `key={phase}` on DefaultHero forces a full remount when switching
+  // between day and night, so all that component's animation/timer state
+  // resets cleanly instead of trying to awkwardly transition mid-sequence.
   return phase === "twilight" ? <SunriseHero /> : <DefaultHero key={phase} phase={phase} />;
 }

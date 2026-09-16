@@ -8,7 +8,9 @@ export const alt = "Xinge Xu — Fullstack Software Developer";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// deterministic pseudo-random star field
+// Deterministic pseudo-random star field — the "random" numbers are really
+// just derived from the index, so this image renders identically every time
+// (important since Next.js may regenerate it on the fly).
 const STARS = Array.from({ length: 90 }, (_, i) => ({
   left: (i * 137) % 1200,
   top: (i * 89) % 630,

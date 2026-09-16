@@ -3,6 +3,7 @@ import { GitHubIcon, LinkedInIcon, MailIcon } from "./PixelIcons";
 
 /** Footer with theme-aware official social marks in pixel-style buttons. */
 export default function Footer() {
+  // Computed on the fly so the copyright year never goes stale.
   const year = new Date().getFullYear();
 
   return (
@@ -10,6 +11,7 @@ export default function Footer() {
       <div className="site-footer-inner">
         <span className="site-footer-copyright">© {year} xinge xu</span>
 
+        {/* One array of links so adding a new social icon is a one-line change. */}
         <nav aria-label="Social and contact" style={{ display: "flex", gap: 14 }}>
           {[
             { label: "GitHub", href: LINKS.github, Icon: GitHubIcon },

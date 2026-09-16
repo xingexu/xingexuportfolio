@@ -19,7 +19,14 @@ const silkscreen = Silkscreen({
   weight: ["400", "700"],
 });
 
-/** Restores a chosen sky before hydration, otherwise falling back to local time. */
+/**
+ * Restores a chosen sky before hydration, otherwise falling back to local time.
+ * This has to run as a plain inline <script>, not a React effect, because it
+ * needs to set data-sky-phase on <html> before the page paints — otherwise
+ * visitors would see a flash of the wrong sky (night flashing to day, etc.)
+ * every time they load the page. Minified by hand into one line for the same
+ * reason: less to parse before first paint.
+ */
 const themeInit = `(function(){var p=null;try{var s=localStorage.getItem("xinge-sky-phase-v1");if(s==="day"||s==="twilight"||s==="night"){p=s;document.documentElement.dataset.skyOverride=s}}catch(e){}if(!p){var d=new Date(),m=d.getHours()*60+d.getMinutes();p=m>=510&&m<=990?"day":(m>=1411||m<=210?"night":"twilight")}document.documentElement.dataset.skyPhase=p;document.documentElement.dataset.theme=p==="night"?"dark":"light"})();`;
 
 export const metadata: Metadata = {
@@ -85,6 +92,8 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// Structured data (JSON-LD) so Google can understand "this site is a person"
+// and show a richer result — none of this is visible to human visitors.
 const personJsonLd = {
   "@context": "https://schema.org",
   "@type": "Person",
@@ -92,7 +101,7 @@ const personJsonLd = {
   url: SITE.url,
   jobTitle: "Fullstack Software Developer",
   description: SITE.description,
-  image: `${SITE.url}/photo.png`,
+  image: `${SITE.url}/images/photo.png`,
   alumniOf: { "@type": "EducationalOrganization", name: "Bayview Secondary School" },
   sameAs: [LINKS.github, LINKS.linkedin],
 };

@@ -25,7 +25,7 @@ export default function ResumeEditorPage() {
         </Link>
         <iframe
           className="resume-editor-document"
-          src="/resume.pdf#toolbar=1&navpanes=0&scrollbar=1&view=FitH&pagemode=none"
+          src="/resume/resume.pdf#toolbar=1&navpanes=0&scrollbar=1&view=FitH&pagemode=none"
           title="Xinge Xu resume PDF viewer"
         />
       </div>

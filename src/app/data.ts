@@ -22,6 +22,8 @@ export type Project = {
   url?: string;
 };
 
+// Add a new project by adding an entry here — the projects page just maps
+// over this array, so nothing else needs to change.
 export const PROJECTS: Project[] = [
   {
     num: "01",
@@ -32,6 +34,8 @@ export const PROJECTS: Project[] = [
   },
 ];
 
+// Keeping all the outbound links in one spot makes it easy to update an
+// address once and have it change everywhere it's used (footer, JSON-LD, etc).
 export const LINKS = {
   github: "https://github.com/xingexu",
   linkedin: "https://www.linkedin.com/in/xinge-xu-5b4191306/",

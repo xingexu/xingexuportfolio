@@ -16,6 +16,7 @@ BABY_BLUE = (140, 200, 248)
 
 
 def center_square_crop(im: Image.Image) -> Image.Image:
+    """Trim the longer side evenly so the photo is square before we go circular on it."""
     w, h = im.size
     side = min(w, h)
     left = (w - side) // 2
@@ -37,12 +38,17 @@ def circular_avatar_rgba(im: Image.Image, diameter: int = 420, border: int = 6) 
     if im.mode != "RGBA":
         im = im.convert("RGBA")
 
+    # Multiply the photo's alpha by the circular mask so everything outside
+    # the disc becomes transparent instead of getting cropped to a white box.
     im = im.resize((diameter, diameter), Image.Resampling.LANCZOS)
     r, g, b, a = im.split()
     disc = smooth_circle_mask(diameter)
     a = ImageChops.multiply(a, disc)
     photo = Image.merge("RGBA", (r, g, b, a))
 
+    # Draw the ring as its own layer, sized a bit larger than the photo, using
+    # plain distance-from-center math instead of PIL's stroke so it never
+    # bleeds inward and covers part of the face.
     W = diameter + 2 * border
     ring = np.zeros((W, W, 4), dtype=np.uint8)
     cx = (W - 1) / 2.0
@@ -69,12 +75,18 @@ def circular_avatar_rgba(im: Image.Image, diameter: int = 420, border: int = 6) 
 
 
 def main() -> int:
-    out_dir = Path(__file__).resolve().parent.parent / "public"
+    # Assets now live under public/images/ (moved there during a folder
+    # cleanup), so both the default source photo and the generated avatar
+    # land in the same place.
+    out_dir = Path(__file__).resolve().parent.parent / "public" / "images"
     default_src = out_dir / "selfie-source.png"
+    # Fall back to a specific local screenshot path if selfie-source.png isn't
+    # around — handy for regenerating the avatar from scratch on this machine.
     src = default_src if default_src.exists() else Path(
         "/Users/zberg_r/.cursor/projects/Users-zberg-r-Xinge/assets/"
         "Screenshot_2026-04-03_at_6.07.03_PM-77738fd5-a880-4cfd-9910-b8c37ad03b85.png"
     )
+    # Or just pass a path in directly: `python scripts/make_avatar.py photo.png`
     if len(sys.argv) >= 2:
         src = Path(sys.argv[1])
     out_dir.mkdir(parents=True, exist_ok=True)

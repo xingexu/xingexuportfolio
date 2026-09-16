@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE } from "./data";
 
+// Generates /sitemap.xml at build time. New top-level page? Add it here too.
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   return [

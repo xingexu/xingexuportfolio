@@ -79,7 +79,7 @@ export default function Projects() {
         </div>
       </section>
 
-      <section className="drift-showcase" aria-labelledby="drift-preview-title">
+      <section className="drift-showcase" aria-labelledby="drift-preview-title" style={{ marginBottom: 56 }}>
         <div className="drift-preview-stack">
           <a
             className="drift-preview-link"

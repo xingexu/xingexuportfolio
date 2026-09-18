@@ -27,6 +27,14 @@ export type Project = {
 export const PROJECTS: Project[] = [
   {
     num: "01",
+    name: "PhotoGit",
+    desc: "Git for Photoshop — version control for your PSDs, so you can branch, commit, and roll back edits without losing a single layer.",
+    stack: ["Next.js", "TypeScript", "Vercel"],
+    year: "September 2026",
+    url: "https://photogit-three.vercel.app/",
+  },
+  {
+    num: "02",
     name: "Drift",
     desc: "My first macOS app, built to help students understand whether their online time is focused through activity insights, website blocking, and study analytics.",
     stack: ["macOS", "Next.js", "TypeScript"],

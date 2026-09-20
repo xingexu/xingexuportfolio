@@ -1817,14 +1817,14 @@ a.project-card:hover .project-title { color: var(--accent); }
   right: 5px;
 }
 
-/* Top row (Sundays): the scroll container clips vertical overflow, so a
-   popup opening upward from here has nowhere to go and gets cut off.
+/* Top 3 rows: the scroll container clips vertical overflow, so a popup
+   opening upward from here doesn't have enough room and gets cut off.
    Flip it to open downward instead, and flip the arrow to match. */
-.github-activity-week > .github-activity-day[data-tooltip]:first-child::after {
+.github-activity-week > .github-activity-day[data-tooltip]:nth-child(-n + 3)::after {
   bottom: auto;
   top: calc(100% + 9px);
 }
-.github-activity-week > .github-activity-day[data-tooltip]:first-child::before {
+.github-activity-week > .github-activity-day[data-tooltip]:nth-child(-n + 3)::before {
   bottom: auto;
   top: calc(100% + 3px);
   border-right: none;

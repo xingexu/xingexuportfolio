@@ -234,18 +234,13 @@ export default function Resume() {
               top so a click anywhere opens the dedicated full-screen viewer
               instead of fighting with the browser's built-in PDF controls. */}
           <div className={`resume-preview-shell${isVisible ? " is-visible" : ""}`}>
-            <object
+            <iframe
               className="resume-preview"
-              data="/resume/resume.pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH&pagemode=none"
-              type="application/pdf"
-              aria-label="Xinge Xu's resume"
+              src="/resume/resume.pdf#toolbar=0&navpanes=0&scrollbar=0&view=FitH&pagemode=none"
+              title="Xinge Xu's resume"
               tabIndex={-1}
               onLoad={() => setIsVisible(true)}
-            >
-              <p>
-                Your browser could not display the PDF. <a href="/resume/resume.pdf">Open the resume</a>.
-              </p>
-            </object>
+            />
             <Link
               href="/resume/editor"
               className="resume-preview-hit-area"

@@ -30,7 +30,6 @@ function toWeeks(days: Day[]): (Day | null)[][] {
 export default function GithubActivity({ username, profileUrl }: { username: string; profileUrl: string }) {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [failed, setFailed] = useState(false);
-  const [hovered, setHovered] = useState<Day | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +96,7 @@ export default function GithubActivity({ username, profileUrl }: { username: str
 
       {!failed && weeks.length > 0 && (
         <div className="github-activity-scroll">
-          <div className="github-activity-grid" onMouseLeave={() => setHovered(null)}>
+          <div className="github-activity-grid">
             <div className="github-activity-months" aria-hidden="true">
               {monthMarkers.map((m) => (
                 <span key={`${m.week}-${m.label}`} style={{ gridColumnStart: m.week + 1 }}>
@@ -117,8 +116,7 @@ export default function GithubActivity({ username, profileUrl }: { username: str
                         rel="noreferrer"
                         className="github-activity-day"
                         data-level={day.level}
-                        onMouseEnter={() => setHovered(day)}
-                        onFocus={() => setHovered(day)}
+                        data-tooltip={`${day.count} contribution${day.count === 1 ? "" : "s"} · ${day.date}`}
                         aria-label={`${day.count} contribution${day.count === 1 ? "" : "s"} on ${day.date}`}
                       />
                     ) : (
@@ -131,11 +129,7 @@ export default function GithubActivity({ username, profileUrl }: { username: str
           </div>
 
           <div className="github-activity-footer">
-            <div className="github-activity-tooltip" aria-live="polite">
-              {hovered
-                ? `${hovered.count} contribution${hovered.count === 1 ? "" : "s"} · ${hovered.date}`
-                : "hover or tab through a square"}
-            </div>
+            <span className="github-activity-sub">hover or tab a square for details</span>
             <div className="github-activity-legend" aria-hidden="true">
               <span>less</span>
               {[0, 1, 2, 3, 4].map((level) => (

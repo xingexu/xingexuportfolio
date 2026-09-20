@@ -1717,6 +1717,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 .github-activity-day {
+  position: relative;
   width: 10px;
   height: 10px;
   padding: 0;
@@ -1732,8 +1733,88 @@ a.project-card:hover .project-title { color: var(--accent); }
   transform: scale(1.35);
   border-color: var(--accent);
   outline: none;
-  z-index: 1;
-  position: relative;
+  z-index: 5;
+}
+
+/* Pure-CSS popup, anchored to the exact square being hovered/focused —
+   built from the day's own data-tooltip attribute, no JS positioning needed. */
+.github-activity-day[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%) scale(0.85);
+  padding: 5px 8px;
+  white-space: nowrap;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  background: var(--panel-solid);
+  border: 2px solid var(--border);
+  box-shadow: 3px 3px 0 var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 90ms steps(2), transform 90ms steps(2);
+}
+
+.github-activity-day[data-tooltip]::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  z-index: 6;
+  width: 7px;
+  height: 7px;
+  background: var(--panel-solid);
+  border-right: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  transform: translateX(-50%) rotate(45deg) scale(0.85);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 90ms steps(2);
+}
+
+.github-activity-day[data-tooltip]:hover::after,
+.github-activity-day[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+.github-activity-day[data-tooltip]:hover::before,
+.github-activity-day[data-tooltip]:focus-visible::before {
+  opacity: 1;
+}
+
+/* First couple of weeks: a centered popup would spill past the left edge
+   of the scroll container, so pin it to the square's left edge instead. */
+.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]::after {
+  left: 0;
+  transform: translateX(0) scale(0.85);
+}
+.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]:hover::after,
+.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]:focus-visible::after {
+  transform: translateX(0) scale(1);
+}
+.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]::before {
+  left: 5px;
+}
+
+/* Same fix at the other end, so the last few weeks don't spill past the
+   right edge of the scroll container either. */
+.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: translateX(0) scale(0.85);
+}
+.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]:hover::after,
+.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]:focus-visible::after {
+  transform: translateX(0) scale(1);
+}
+.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]::before {
+  left: auto;
+  right: 5px;
 }
 
 .github-activity-day[data-level="empty"] {
@@ -1755,14 +1836,6 @@ a.project-card:hover .project-title { color: var(--accent); }
   gap: 16px;
   flex-wrap: wrap;
   margin-top: 14px;
-}
-
-.github-activity-tooltip {
-  font-family: var(--font-pixel);
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  color: var(--text-2);
-  text-transform: lowercase;
 }
 
 .github-activity-legend {

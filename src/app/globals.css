@@ -1756,7 +1756,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   box-shadow: 3px 3px 0 var(--shadow);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 90ms steps(2), transform 90ms steps(2);
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
 }
 
 .github-activity-day[data-tooltip]::before {
@@ -1773,7 +1773,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   transform: translateX(-50%) rotate(45deg) scale(0.85);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 90ms steps(2);
+  transition: opacity 160ms ease-out;
 }
 
 .github-activity-day[data-tooltip]:hover::after,
@@ -1789,32 +1789,48 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 /* First couple of weeks: a centered popup would spill past the left edge
    of the scroll container, so pin it to the square's left edge instead. */
-.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]::after {
+.github-activity-week:nth-child(-n + 9) .github-activity-day[data-tooltip]::after {
   left: 0;
   transform: translateX(0) scale(0.85);
 }
-.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]:hover::after,
-.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]:focus-visible::after {
+.github-activity-week:nth-child(-n + 9) .github-activity-day[data-tooltip]:hover::after,
+.github-activity-week:nth-child(-n + 9) .github-activity-day[data-tooltip]:focus-visible::after {
   transform: translateX(0) scale(1);
 }
-.github-activity-week:nth-child(-n + 3) .github-activity-day[data-tooltip]::before {
+.github-activity-week:nth-child(-n + 9) .github-activity-day[data-tooltip]::before {
   left: 5px;
 }
 
 /* Same fix at the other end, so the last few weeks don't spill past the
    right edge of the scroll container either. */
-.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]::after {
+.github-activity-week:nth-last-child(-n + 9) .github-activity-day[data-tooltip]::after {
   left: auto;
   right: 0;
   transform: translateX(0) scale(0.85);
 }
-.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]:hover::after,
-.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]:focus-visible::after {
+.github-activity-week:nth-last-child(-n + 9) .github-activity-day[data-tooltip]:hover::after,
+.github-activity-week:nth-last-child(-n + 9) .github-activity-day[data-tooltip]:focus-visible::after {
   transform: translateX(0) scale(1);
 }
-.github-activity-week:nth-last-child(-n + 3) .github-activity-day[data-tooltip]::before {
+.github-activity-week:nth-last-child(-n + 9) .github-activity-day[data-tooltip]::before {
   left: auto;
   right: 5px;
+}
+
+/* Top row (Sundays): the scroll container clips vertical overflow, so a
+   popup opening upward from here has nowhere to go and gets cut off.
+   Flip it to open downward instead, and flip the arrow to match. */
+.github-activity-week > .github-activity-day[data-tooltip]:first-child::after {
+  bottom: auto;
+  top: calc(100% + 9px);
+}
+.github-activity-week > .github-activity-day[data-tooltip]:first-child::before {
+  bottom: auto;
+  top: calc(100% + 3px);
+  border-right: none;
+  border-bottom: none;
+  border-top: 2px solid var(--border);
+  border-left: 2px solid var(--border);
 }
 
 .github-activity-day[data-level="empty"] {

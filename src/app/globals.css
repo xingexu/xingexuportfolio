@@ -1678,7 +1678,16 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 .github-activity-scroll {
   overflow-x: auto;
-  padding-bottom: 4px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  padding-bottom: 8px;
+}
+
+.github-activity-scroll:focus-visible,
+.github-year-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .github-activity-grid {
@@ -1857,6 +1866,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 
 .github-activity-legend {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 5px;
   font-family: var(--font-pixel);
@@ -2771,6 +2781,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 .px-btn:active { transform: translateY(1px); }
 .github-activity-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .github-year-select {
+  min-height: 44px;
   padding: 8px 10px;
   border: 2px solid var(--border);
   background: var(--panel-solid);
@@ -2782,7 +2793,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 .github-activity-retry { color: var(--link); text-decoration: underline; cursor: pointer; }
 .github-activity-loading { min-height: 140px; display: grid; align-items: center; }
 .github-activity-loading span { animation: activityPulse 1.5s ease-in-out infinite; }
-.github-activity-scroll { animation: stepIn 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.github-activity-calendar { animation: stepIn 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .github-activity-day { transition: transform 180ms ease, border-color 180ms ease; }
 @keyframes activityPulse { 50% { opacity: 0.4; } }
 @media (prefers-reduced-motion: reduce) {

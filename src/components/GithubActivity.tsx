@@ -72,7 +72,7 @@ export default function GithubActivity({ username, profileUrl }: { username: str
   const total = data?.total;
 
   return (
-    <section className="github-activity px-panel" aria-labelledby="github-activity-title">
+    <section className="github-activity px-panel" aria-labelledby="github-activity-title" aria-busy={!data && !failed}>
       <div className="github-activity-header">
         <div>
           <h2 id="github-activity-title" className="font-pixel drift-card-title">
@@ -109,36 +109,38 @@ export default function GithubActivity({ username, profileUrl }: { username: str
       )}
 
       {!failed && weeks.length > 0 && (
-        <div className="github-activity-scroll" key={data?.year}>
-          <div className="github-activity-grid">
-            <div className="github-activity-months" aria-hidden="true">
-              {monthMarkers.map((m) => (
-                <span key={`${m.week}-${m.label}`} style={{ gridColumnStart: m.week + 1 }}>
-                  {m.label}
-                </span>
-              ))}
-            </div>
-            <div className="github-activity-weeks">
-              {weeks.map((week, wi) => (
-                <div className="github-activity-week" key={wi}>
-                  {week.map((day, di) =>
-                    day ? (
-                      <a
-                        key={day.date}
-                        href={`${profileUrl}?tab=overview&from=${day.date}&to=${day.date}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="github-activity-day"
-                        data-level={day.level}
-                        data-tooltip={`${day.count} contribution${day.count === 1 ? "" : "s"} · ${day.date}`}
-                        aria-label={`${day.count} contribution${day.count === 1 ? "" : "s"} on ${day.date}`}
-                      />
-                    ) : (
-                      <span key={di} className="github-activity-day" data-level="empty" aria-hidden="true" />
-                    )
-                  )}
-                </div>
-              ))}
+        <div className="github-activity-calendar" key={data?.year}>
+          <div className="github-activity-scroll" role="region" aria-label={`${data?.year} contribution calendar`} tabIndex={0}>
+            <div className="github-activity-grid">
+              <div className="github-activity-months" aria-hidden="true">
+                {monthMarkers.map((m) => (
+                  <span key={`${m.week}-${m.label}`} style={{ gridColumnStart: m.week + 1 }}>
+                    {m.label}
+                  </span>
+                ))}
+              </div>
+              <div className="github-activity-weeks">
+                {weeks.map((week, wi) => (
+                  <div className="github-activity-week" key={wi}>
+                    {week.map((day, di) =>
+                      day ? (
+                        <a
+                          key={day.date}
+                          href={`${profileUrl}?tab=overview&from=${day.date}&to=${day.date}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="github-activity-day"
+                          data-level={day.level}
+                          data-tooltip={`${day.count} contribution${day.count === 1 ? "" : "s"} · ${day.date}`}
+                          aria-label={`${day.count} contribution${day.count === 1 ? "" : "s"} on ${day.date}`}
+                        />
+                      ) : (
+                        <span key={di} className="github-activity-day" data-level="empty" aria-hidden="true" />
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

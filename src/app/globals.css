@@ -207,9 +207,9 @@ body {
   50%, 100% { opacity: 0; }
 }
 
-.step-in   { animation: stepIn 0.5s steps(5) both; }
-.step-in-2 { animation: stepIn 0.5s steps(5) 0.12s both; }
-.step-in-3 { animation: stepIn 0.5s steps(5) 0.24s both; }
+.step-in   { animation: stepIn 0.65s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.step-in-2 { animation: stepIn 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both; }
+.step-in-3 { animation: stepIn 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.24s both; }
 
 .hero-subtitle {
   color: #fff;
@@ -1692,6 +1692,7 @@ a.project-card:hover .project-title { color: var(--accent); }
   display: grid;
   grid-auto-columns: 12px;
   grid-auto-flow: column;
+  gap: 3px;
   font-family: var(--font-pixel);
   font-size: 10px;
   letter-spacing: 0.03em;
@@ -2744,4 +2745,54 @@ a.project-card:hover .project-title { color: var(--accent); }
     opacity: 1;
     transition: none;
   }
+}
+
+/* Smooth movement preserves the pixel artwork while softening interaction. */
+.reveal {
+  transition: opacity 650ms ease, transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal[data-reveal="waiting"] { opacity: 0; transform: translateY(22px); }
+.reveal[data-reveal="visible"] { opacity: 1; transform: translateY(0); }
+.drift-showcase, .github-activity { animation: none; }
+.project-card { animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+.px-btn, .nav-link, .drift-cta-card, .drift-preview-link, .project-card {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 220ms ease, background-color 220ms ease, border-color 220ms ease,
+    box-shadow 240ms ease, text-shadow 220ms ease;
+}
+.drift-full-preview { transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1); }
+.drift-click-indicator { transition: transform 250ms ease, background-color 220ms ease, color 220ms ease; }
+@media (hover: hover) {
+  .drift-preview-link:hover { transform: translateY(-5px); }
+  .drift-preview-link:hover .drift-full-preview { transform: scale(1.025); }
+  .drift-cta-card:hover .drift-click-indicator { transform: translate(2px, -2px); }
+  .hero-cta-btn:hover, .back-home:hover { transform: translateY(-3px); }
+}
+.px-btn:active { transform: translateY(1px); }
+.github-activity-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.github-year-select {
+  padding: 8px 10px;
+  border: 2px solid var(--border);
+  background: var(--panel-solid);
+  color: var(--text);
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  cursor: pointer;
+}
+.github-activity-retry { color: var(--link); text-decoration: underline; cursor: pointer; }
+.github-activity-loading { min-height: 140px; display: grid; align-items: center; }
+.github-activity-loading span { animation: activityPulse 1.5s ease-in-out infinite; }
+.github-activity-scroll { animation: stepIn 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.github-activity-day { transition: transform 180ms ease, border-color 180ms ease; }
+@keyframes activityPulse { 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal[data-reveal] { opacity: 1; transform: none; }
 }

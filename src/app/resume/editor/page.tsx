@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { TransitionLink as Link } from "@/components/PageTransitions";
 
 export const metadata: Metadata = {
   title: "Resume PDF Viewer",

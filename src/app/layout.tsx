@@ -6,6 +6,7 @@ import { SITE, LINKS } from "./data";
 import Nav from "@/components/Nav";
 import Background from "@/components/Background";
 import Footer from "@/components/Footer";
+import PageTransitions from "@/components/PageTransitions";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -125,11 +126,13 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
         />
         <Background />
-        <Nav />
-        <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-          <main style={{ flex: 1 }}>{children}</main>
-          <Footer />
-        </div>
+        <PageTransitions>
+          <Nav />
+          <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+            <main id="page-content" style={{ flex: 1 }}>{children}</main>
+            <Footer />
+          </div>
+        </PageTransitions>
       </body>
     </html>
   );

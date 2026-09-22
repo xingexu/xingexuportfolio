@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { TransitionLink as Link } from "@/components/PageTransitions";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
 

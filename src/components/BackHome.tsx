@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TransitionLink as Link } from "@/components/PageTransitions";
 
 /** Tiny "← back home" pill used on pages that branch off the landing page. */
 export default function BackHome() {

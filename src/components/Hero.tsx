@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { TransitionLink as Link } from "@/components/PageTransitions";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 

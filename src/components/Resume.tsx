@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { TransitionLink as Link } from "@/components/PageTransitions";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
 

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
 };
 
-/** Resume route — embeds the PDF preview with a confetti "congrats for reading this far" moment. */
+/** Resume route — embeds the PDF preview, linking through to the full viewer. */
 export default function ResumePage() {
   return (
     <div className="tab-enter">

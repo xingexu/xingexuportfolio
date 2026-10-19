@@ -49,12 +49,6 @@
   --confetti-2: #9fc4f0;
   --confetti-3: #e9eff8;
   --confetti-4: #6f8fbd;
-  --resume-confetti-1: #ffd24a;
-  --resume-confetti-2: #9fc4f0;
-  --resume-confetti-3: #e9eff8;
-  --resume-confetti-4: #6f8fbd;
-  --resume-confetti-5: #fff0a8;
-  --resume-confetti-glow: rgba(159, 196, 240, 0.72);
 }
 
 :root[data-theme="light"] {
@@ -97,12 +91,6 @@
   --confetti-2: #4d83b4;
   --confetti-3: #ffffff;
   --confetti-4: #ffd24a;
-  --resume-confetti-1: #d97706;
-  --resume-confetti-2: #1d5ca8;
-  --resume-confetti-3: #ffffff;
-  --resume-confetti-4: #7fa9d2;
-  --resume-confetti-5: #ffd24a;
-  --resume-confetti-glow: rgba(77, 131, 180, 0.62);
 }
 
 :root[data-sky-phase="twilight"] {
@@ -145,12 +133,6 @@
   --confetti-2: #fff0cf;
   --confetti-3: #ef7f7d;
   --confetti-4: #a878c2;
-  --resume-confetti-1: #6f3f7c;
-  --resume-confetti-2: #a878c2;
-  --resume-confetti-3: #ffd889;
-  --resume-confetti-4: #ef7f7d;
-  --resume-confetti-5: #fff0cf;
-  --resume-confetti-glow: rgba(255, 216, 137, 0.76);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1957,18 +1939,10 @@ a.project-card:hover .project-title { color: var(--accent); }
   width: 100%;
   height: 100%;
   overflow: hidden;
-  opacity: 0;
   border: 4px solid var(--border);
   background: #fff;
   box-shadow: 0 0 0 2px var(--shadow);
-  transition:
-    opacity 650ms ease-out,
-    transform 120ms steps(2),
-    box-shadow 120ms steps(2);
-}
-
-.resume-preview-shell.is-visible {
-  opacity: 1;
+  transition: transform 120ms steps(2), box-shadow 120ms steps(2);
 }
 
 .resume-preview-shell:hover {
@@ -1990,158 +1964,25 @@ a.project-card:hover .project-title { color: var(--accent); }
   pointer-events: none;
 }
 
-.resume-sparkles {
+.resume-animation-frames,
+.resume-animation-frame {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  overflow: hidden;
   pointer-events: none;
 }
 
-.resume-sparkle {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  color: #fff;
-  background: currentColor;
-  box-shadow:
-    0 -14px 0 currentColor,
-    14px 0 0 currentColor,
-    0 14px 0 currentColor,
-    -14px 0 0 currentColor;
-  filter:
-    drop-shadow(0 0 4px currentColor)
-    drop-shadow(0 0 9px var(--resume-confetti-glow));
-  opacity: 0;
+.resume-animation-frame {
+  visibility: hidden;
+  background: #fff;
 }
 
-.resume-sparkles.is-visible .resume-sparkle {
-  animation: resume-sparkle-pop 1150ms steps(7, end) both;
+.resume-animation-frame.is-active {
+  visibility: visible;
 }
 
-.resume-sparkle:nth-child(3n) {
-  width: 11px;
-  height: 11px;
-  box-shadow:
-    0 -22px 0 currentColor,
-    22px 0 0 currentColor,
-    0 22px 0 currentColor,
-    -22px 0 0 currentColor;
-}
-
-.resume-sparkle:nth-child(4n) {
-  width: 5px;
-  height: 5px;
-  box-shadow:
-    0 -10px 0 currentColor,
-    10px 0 0 currentColor,
-    0 10px 0 currentColor,
-    -10px 0 0 currentColor;
-}
-
-@keyframes resume-sparkle-pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0) rotate(0deg);
-  }
-  12% { opacity: 1; }
-  48% {
-    opacity: 1;
-    transform:
-      translate(
-        calc(-50% + var(--sparkle-x)),
-        calc(-50% + var(--sparkle-y))
-      )
-      scale(1.65)
-      rotate(45deg);
-  }
-  72% { opacity: 1; }
-  100% {
-    opacity: 0;
-    transform:
-      translate(
-        calc(-50% + var(--sparkle-x)),
-        calc(-50% + var(--sparkle-y) + var(--sparkle-drop))
-      )
-      scale(0.25)
-      rotate(135deg);
-  }
-}
-
-.resume-celebration {
-  position: absolute;
-  inset: -18px;
-  z-index: 40;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.resume-falling-particle {
-  position: absolute;
-  opacity: 0;
-  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 28%, transparent);
-  filter:
-    drop-shadow(0 0 4px currentColor)
-    drop-shadow(0 0 9px var(--resume-confetti-glow));
-  image-rendering: pixelated;
-}
-
-.resume-falling-particle.is-star {
-  box-shadow:
-    0 -10px 0 currentColor,
-    10px 0 0 currentColor,
-    0 10px 0 currentColor,
-    -10px 0 0 currentColor,
-    0 0 0 2px color-mix(in srgb, currentColor 28%, transparent);
-}
-
-.resume-celebration.is-visible .resume-falling-particle {
-  animation-name: resume-particle-fall;
-  animation-timing-function: steps(18, end);
-  animation-fill-mode: both;
-}
-
-@keyframes resume-particle-fall {
-  0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) scale(0.2) rotate(0deg);
-  }
-  9% { opacity: 1; }
-  22% {
-    opacity: 1;
-    transform:
-      translate3d(var(--particle-burst-x), var(--particle-burst-y), 0)
-      scale(1.45)
-      rotate(45deg);
-  }
-  52% {
-    opacity: 1;
-    transform:
-      translate3d(
-        calc(var(--particle-burst-x) + var(--particle-sway)),
-        17vh,
-        0
-      )
-      scale(1.1)
-      rotate(180deg);
-  }
-  76% {
-    opacity: 1;
-    transform:
-      translate3d(
-        calc(var(--particle-drift) - var(--particle-sway)),
-        58vh,
-        0
-      )
-      scale(0.9)
-      rotate(360deg);
-  }
-  100% {
-    opacity: 0;
-    transform:
-      translate3d(var(--particle-drift), 105vh, 0)
-      scale(0.75)
-      rotate(var(--particle-spin));
-  }
+.resume-animation-image {
+  object-fit: cover;
 }
 
 .resume-preview-hit-area {
@@ -2668,15 +2509,7 @@ a.project-card:hover .project-title { color: var(--accent); }
     transform: none;
   }
   .resume-preview-shell {
-    transition: opacity 650ms ease-out;
-  }
-  .resume-sparkle:nth-child(n + 33),
-  .resume-falling-particle:nth-child(n + 49) {
-    display: none;
-  }
-  .resume-sparkle,
-  .resume-falling-particle {
-    filter: drop-shadow(0 0 4px currentColor);
+    transition: none;
   }
   .resume-editor-page {
     height: auto;
@@ -2747,13 +2580,8 @@ a.project-card:hover .project-title { color: var(--accent); }
   .midnight-fullscreen-fireworks,
   .hero-banner-speed-particles,
   .hero-banner-plane-smoke,
-  .resume-sparkles,
-  .resume-celebration {
+  .resume-animation-frames {
     display: none;
-  }
-  .resume-preview-shell {
-    opacity: 1;
-    transition: none;
   }
 }
 

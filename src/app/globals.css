@@ -1860,6 +1860,34 @@ a.project-card:hover .project-title { color: var(--accent); }
 .github-activity-legend .github-activity-day { cursor: default; }
 .github-activity-legend .github-activity-day:hover { transform: none; border-color: transparent; }
 
+/* ── Home intro: white cover that the page "develops" through ── */
+
+.home-intro {
+  display: none;
+}
+
+html[data-intro="playing"] .home-intro {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  pointer-events: none;
+  /* Failsafe: if the script never runs, don't leave visitors on a white screen. */
+  animation: homeIntroFailsafe 0s linear 6s forwards;
+}
+
+@keyframes homeIntroFailsafe {
+  to { visibility: hidden; }
+}
+
+/* Once the canvas has painted its own white, cleared cells must show the page. */
+html[data-intro="playing"] .home-intro.is-drawing {
+  background: transparent;
+}
+
 /* ── Resume ── */
 
 .resume-page {

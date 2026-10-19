@@ -30,6 +30,14 @@ const silkscreen = Silkscreen({
  */
 const themeInit = `(function(){var p=null;try{var s=localStorage.getItem("xinge-sky-phase-v1");if(s==="day"||s==="twilight"||s==="night"){p=s;document.documentElement.dataset.skyOverride=s}}catch(e){}if(!p){var d=new Date(),m=d.getHours()*60+d.getMinutes();p=m>=510&&m<=990?"day":(m>=1411||m<=210?"night":"twilight")}document.documentElement.dataset.skyPhase=p;document.documentElement.dataset.theme=p==="night"?"dark":"light"})();`;
 
+/**
+ * Flags a full page load of the home route so HomeIntro can play its white →
+ * pixels reveal. Runs before first paint so the white cover is there from the
+ * very first frame; client-side navigations back home never see this script,
+ * so they skip the intro.
+ */
+const introInit = `(function(){try{if(location.pathname==="/"&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.dataset.intro="playing"}catch(e){}})();`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
@@ -121,6 +129,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         suppressHydrationWarning
       >
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <script dangerouslySetInnerHTML={{ __html: introInit }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
@@ -133,6 +142,8 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             <Footer />
           </div>
         </PageTransitions>
+        {/* HomeIntro's white cover; kept outside #page-content so its load fade can't trap it under the nav. */}
+        <canvas id="home-intro" className="home-intro" aria-hidden="true" />
       </body>
     </html>
   );

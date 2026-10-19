@@ -31,7 +31,7 @@ export default function Resume() {
       setActiveFrame((currentFrame) =>
         currentFrame + 1 >= resumeFrames.length ? -1 : currentFrame + 1,
       );
-    }, 105);
+    }, 84);
 
     return () => window.clearTimeout(playbackTimer);
   }, [activeFrame, loadedFrameVersion]);

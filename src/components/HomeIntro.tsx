@@ -7,19 +7,12 @@ import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 const HOME_INTRO_CANVAS_ID = "home-intro";
 
 const CELL = 5; // matches the sky canvas, so every revealed cell is one real page pixel
-const FRAMES = 16;
-const FRAME_MS = 84;
-
-// Integer hash -> [0, 1): looks random, but the same cell always gets the same value.
-function hashUnit(x: number, y: number, salt: number) {
-  let value = Math.imul(x + 1, 0x45d9f3b) ^ Math.imul(y + 1, 0x119de1f3) ^ Math.imul(salt + 1, 0x27d4eb2d);
-  value = Math.imul(value ^ (value >>> 16), 0x45d9f3b);
-  return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
-}
+const DURATION_MS = 700;
 
 /**
  * First-load intro for the home page: the screen starts white, then the page
- * underneath shows through one 5px cell at a time until it's fully revealed.
+ * underneath shows through one random 5px cell at a time until it's fully
+ * revealed, in about 0.7s.
  * The overlay is a white canvas we punch holes in, so every pixel you see
  * during the reveal is the live page itself — sky, nav, footer and all.
  *
@@ -50,39 +43,41 @@ export default function HomeIntro({ children }: { children: ReactNode }) {
     ctx.fillRect(0, 0, width, height);
     canvas.classList.add("is-drawing");
 
-    // Each cell gets a reveal time. Mixing a coarse 4x4-cell hash with a
-    // per-cell one makes pixels arrive in loose clumps rather than as pure
-    // static, which reads more like the page "developing".
+    // Shuffle every cell into a random reveal order, then uncover a slice of
+    // that order on each display frame, so pixels land one at a time across
+    // the whole screen instead of in big steps.
     const cols = Math.ceil(width / CELL);
     const rows = Math.ceil(height / CELL);
     const order = new Uint32Array(cols * rows);
-    const rank = new Float32Array(cols * rows);
-    for (let y = 0; y < rows; y += 1) {
-      for (let x = 0; x < cols; x += 1) {
-        const index = y * cols + x;
-        order[index] = index;
-        rank[index] = 0.6 * hashUnit(x >> 2, y >> 2, 1) + 0.4 * hashUnit(x, y, 2);
-      }
+    for (let index = 0; index < order.length; index += 1) order[index] = index;
+    for (let index = order.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      const cell = order[index];
+      order[index] = order[swap];
+      order[swap] = cell;
     }
-    order.sort((a, b) => rank[a] - rank[b]);
 
-    let frame = 0;
+    let start: number | null = null;
     let revealed = 0;
-    const timer = window.setInterval(() => {
-      frame += 1;
-      const target = Math.round((frame / FRAMES) * order.length);
+    let frame = 0;
+    const step = (now: number) => {
+      start ??= now;
+      const progress = Math.min(1, (now - start) / DURATION_MS);
+      const target = Math.round(progress * order.length);
       for (; revealed < target; revealed += 1) {
         const index = order[revealed];
         ctx.clearRect((index % cols) * CELL, Math.floor(index / cols) * CELL, CELL, CELL);
       }
-      if (frame >= FRAMES) {
-        window.clearInterval(timer);
-        delete document.documentElement.dataset.intro;
-        setPlaying(false);
+      if (progress < 1) {
+        frame = window.requestAnimationFrame(step);
+        return;
       }
-    }, FRAME_MS);
+      delete document.documentElement.dataset.intro;
+      setPlaying(false);
+    };
+    frame = window.requestAnimationFrame(step);
 
-    return () => window.clearInterval(timer);
+    return () => window.cancelAnimationFrame(frame);
   }, [playing]);
 
   return playing ? null : children;

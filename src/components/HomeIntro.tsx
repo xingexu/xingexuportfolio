@@ -7,12 +7,13 @@ import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 const HOME_INTRO_CANVAS_ID = "home-intro";
 
 const CELL = 5; // matches the sky canvas, so every revealed cell is one real page pixel
-const DURATION_MS = 700;
+const HOLD_MS = 150; // a beat of solid white before the scatter starts
+const DURATION_MS = 900;
 
 /**
  * First-load intro for the home page: the screen starts white, then the page
  * underneath shows through one random 5px cell at a time until it's fully
- * revealed, in about 0.7s.
+ * revealed: a short white hold, then about 0.9s of scatter.
  * The overlay is a white canvas we punch holes in, so every pixel you see
  * during the reveal is the live page itself — sky, nav, footer and all.
  *
@@ -61,8 +62,8 @@ export default function HomeIntro({ children }: { children: ReactNode }) {
     let revealed = 0;
     let frame = 0;
     const step = (now: number) => {
-      start ??= now;
-      const progress = Math.min(1, (now - start) / DURATION_MS);
+      start ??= now + HOLD_MS;
+      const progress = Math.max(0, Math.min(1, (now - start) / DURATION_MS));
       const target = Math.round(progress * order.length);
       for (; revealed < target; revealed += 1) {
         const index = order[revealed];

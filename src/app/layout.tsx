@@ -130,6 +130,10 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       >
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <script dangerouslySetInnerHTML={{ __html: introInit }} />
+        {/* HomeIntro's white cover. First in <body> so it's parsed (and painted) before
+            any page content, and outside #page-content so that wrapper's load fade
+            can't trap it under the nav. */}
+        <canvas id="home-intro" className="home-intro" aria-hidden="true" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
@@ -142,8 +146,6 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
             <Footer />
           </div>
         </PageTransitions>
-        {/* HomeIntro's white cover; kept outside #page-content so its load fade can't trap it under the nav. */}
-        <canvas id="home-intro" className="home-intro" aria-hidden="true" />
       </body>
     </html>
   );

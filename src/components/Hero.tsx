@@ -4,6 +4,7 @@ import Image from "next/image";
 import { TransitionLink as Link } from "@/components/PageTransitions";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { getSharedAudioContext, resumeSharedAudioContext } from "@/lib/audio";
+import SocialLinks from "./SocialLinks";
 
 // ---------------------------------------------------------------------------
 // Content + timing constants. There's a lot of these because the hero has
@@ -663,20 +664,26 @@ function SunriseHero() {
 
         <div className="hero-layout hero-layout-under-banner">
           <div className="hero-copy">
-            <p className="step-in-2 hero-subtitle hero-education font-pixel">
-              western computer science + ivey aeo &apos;31
-            </p>
+            <div className="hero-supporting-layout">
+              <div className="hero-details">
+                <p className="step-in-2 hero-subtitle hero-education font-pixel">
+                  western computer science + ivey aeo &apos;31
+                </p>
 
-            <div
-              className="step-in-3"
-              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "14px 24px", marginTop: 32 }}
-            >
-              <Link href="/projects" className="px-btn hero-cta-btn">
-                see what i built! <PixelArrow />
-              </Link>
-              <Link href="/resume" className="px-btn px-btn-secondary hero-cta-btn hero-resume-btn">
-                resume <PixelArrow />
-              </Link>
+                <SocialLinks placement="hero" />
+
+                <div
+                  className="step-in-3"
+                  style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "14px 24px", marginTop: 32 }}
+                >
+                  <Link href="/projects" className="px-btn hero-cta-btn">
+                    see what i built! <PixelArrow />
+                  </Link>
+                  <Link href="/resume" className="px-btn px-btn-secondary hero-cta-btn hero-resume-btn">
+                    resume <PixelArrow />
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -989,20 +996,26 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
             </span>
           </h1>
 
-          <p className={`step-in-2 hero-subtitle hero-education font-pixel${midnightSupportingCopyClass}`}>
-            western computer science + ivey aeo &apos;31
-          </p>
+          <div className="hero-supporting-layout">
+            <div className="hero-details">
+              <p className={`step-in-2 hero-subtitle hero-education font-pixel${midnightSupportingCopyClass}`}>
+                western computer science + ivey aeo &apos;31
+              </p>
 
-          <div
-            className={`step-in-3${midnightSupportingCopyClass}`}
-            style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "16px 28px", marginTop: 40 }}
-          >
-            <Link href="/projects" className="px-btn hero-cta-btn">
-              see what i built! <PixelArrow />
-            </Link>
-            <Link href="/resume" className="px-btn px-btn-secondary hero-cta-btn hero-resume-btn">
-              resume <PixelArrow />
-            </Link>
+              <SocialLinks placement="hero" />
+
+              <div
+                className={`step-in-3${midnightSupportingCopyClass}`}
+                style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "16px 28px", marginTop: 40 }}
+              >
+                <Link href="/projects" className="px-btn hero-cta-btn">
+                  see what i built! <PixelArrow />
+                </Link>
+                <Link href="/resume" className="px-btn px-btn-secondary hero-cta-btn hero-resume-btn">
+                  resume <PixelArrow />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>

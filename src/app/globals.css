@@ -12,6 +12,8 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #04070f;
+  --scene-top: #02040a;
+  --nav-edge-mid: #1d2b45;
   --panel: rgba(6, 11, 22, 0.9);
   --panel-solid: #08101f;
   --text: #e9eff8;
@@ -54,6 +56,8 @@
 :root[data-theme="light"] {
   color-scheme: light;
   --bg: #cfe8fa;
+  --scene-top: #7db9ea;
+  --nav-edge-mid: color-mix(in srgb, var(--nav-gradient-end) 50%, var(--scene-top));
   --panel: rgba(255, 255, 255, 0.86);
   --panel-solid: #f2f9ff;
   --text: #122341;
@@ -96,6 +100,8 @@
 :root[data-sky-phase="twilight"] {
   color-scheme: light;
   --bg: #f3a1a8;
+  --scene-top: #ad78c7;
+  --nav-edge-mid: color-mix(in srgb, var(--nav-gradient-end) 50%, var(--scene-top));
   --panel: rgba(255, 248, 238, 0.92);
   --panel-solid: #fff7ec;
   --text: #46304e;
@@ -594,7 +600,7 @@ body {
     font-size: clamp(18px, 1.45vw, 21px);
   }
 
-  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-details > .step-in-3 {
     gap: 18px 26px !important;
     margin-top: 22px !important;
   }
@@ -723,7 +729,7 @@ body {
   animation-delay: 1.5s;
 }
 
-:root[data-sky-phase="day"] .hero-default-section .hero-copy > .step-in-3 {
+:root[data-sky-phase="day"] .hero-default-section .hero-details > .step-in-3 {
   gap: 22px 32px !important;
   margin-top: 22px !important;
 }
@@ -833,7 +839,7 @@ body {
   transform: translateY(-128px);
 }
 
-:root[data-sky-phase="night"] .hero-default-section .hero-copy > .step-in-3 {
+:root[data-sky-phase="night"] .hero-default-section .hero-details > .step-in-3 {
   gap: 20px 28px !important;
   margin-top: 16px !important;
 }
@@ -965,9 +971,66 @@ body {
 /* ── Pixel panel: hard border + hard offset shadow ── */
 
 .px-panel {
-  background: var(--panel);
+  background-color: var(--panel);
   border: 2px solid var(--border);
   box-shadow: 6px 6px 0 var(--shadow);
+}
+
+/* ── Pixel texture: every container gets a dithered fill with drifting pixels ──
+   Two tiles on the 5px grid: a dense low-contrast dither and a sparse layer
+   of brighter cells. They slide in opposite directions one cell at a time,
+   so pixels appear to drift across the surface. The rules above set
+   background-color only, leaving background-image free for this.
+
+   The drift is one stepped animation of --px-shift on <html>, inherited by
+   every container, so it never competes with their own `animation` (stepIn,
+   reveals) and all surfaces stay in sync. */
+@property --px-shift {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+html { animation: pxDrift 14s steps(24) infinite; }
+
+@keyframes pxDrift {
+  to { --px-shift: 120px; }
+}
+
+.px-panel,
+.project-card,
+.drift-info-card,
+.certification-card,
+.resume-section {
+  background-image: url("/images/px-drift.svg"), url("/images/px-dither.svg");
+  background-size: 120px 120px;
+  background-position:
+    calc(var(--px-shift) * 2) calc(var(--px-shift) * -1),
+    calc(var(--px-shift) * -1) var(--px-shift);
+}
+
+/* Buttons keep a flat fill; their pixels live on the border instead. A ring
+   masked down to the 2px border shows a diagonal-striped tile, so one
+   sideways shift reads as pixels marching along all four edges. */
+.px-btn,
+.resume-side-back {
+  position: relative;
+}
+.px-btn::after,
+.resume-side-back::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  padding: 2px;
+  pointer-events: none;
+  background: url("/images/px-edge.svg") var(--px-shift) 0 / 120px 120px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
 }
 
 /* ── Buttons / chips / links ── */
@@ -980,7 +1043,7 @@ body {
   font-size: 13px;
   text-transform: lowercase;
   color: var(--accent-ink);
-  background: var(--accent);
+  background-color: var(--accent);
   border: 2px solid var(--border);
   box-shadow: 4px 4px 0 var(--shadow);
   padding: 10px 18px;
@@ -992,7 +1055,7 @@ body {
 
 .px-btn-secondary {
   color: var(--text);
-  background: var(--panel);
+  background-color: var(--panel);
 }
 .px-btn-secondary:hover {
   color: var(--accent);
@@ -1062,7 +1125,7 @@ body {
 :root[data-sky-phase="twilight"] .hero-resume-btn {
   --hero-cta-glow: rgba(112, 54, 132, 0.5);
   color: #5d2f70;
-  background: #f4d79a;
+  background-color: #f4d79a;
   border-color: #d6a66f;
   text-shadow:
     2px 0 0 rgba(112, 54, 132, 0.28),
@@ -1072,7 +1135,7 @@ body {
 
 :root[data-sky-phase="twilight"] .hero-resume-btn:hover {
   color: #51265f;
-  background: #f8e4b5;
+  background-color: #f8e4b5;
   border-color: #dfb47d;
 }
 
@@ -1098,6 +1161,66 @@ body {
   padding: 3px 8px;
 }
 
+.hero-supporting-layout {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 24px;
+}
+
+.hero-details {
+  display: contents;
+}
+
+.hero-details > .hero-education {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.hero-details > .step-in-3 {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: max-content;
+  max-width: calc(100vw - 56px);
+}
+
+/* Follow the visible name inside each differently cropped banner asset. */
+:root[data-sky-phase="day"] .hero-supporting-layout {
+  max-width: min(47vw, 768px);
+}
+
+:root[data-sky-phase="twilight"] .hero-supporting-layout {
+  max-width: 700px;
+}
+
+:root[data-sky-phase="night"] .hero-supporting-layout {
+  max-width: 850px;
+}
+
+.social-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.social-links-hero {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.social-links-hero .icon-btn {
+  width: 52px;
+  height: 52px;
+  background-image: url("/images/px-dither.svg");
+  background-size: 120px 120px;
+}
+
+.social-links-hero .icon-btn:hover,
+.social-links-hero .icon-btn:active {
+  transform: none;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1108,15 +1231,47 @@ body {
   background: var(--chrome-control);
   border: 2px solid var(--chrome-border);
   box-shadow: 3px 3px 0 var(--chrome-shadow);
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease,
+    border-color 180ms ease, box-shadow 180ms ease;
 }
 .icon-btn:hover {
   color: var(--chrome-solid);
-  background: var(--chrome-accent);
+  background-color: var(--chrome-accent);
   border-color: var(--chrome-accent);
   transform: translate(-1px, -1px);
   box-shadow: 4px 4px 0 var(--chrome-shadow);
 }
 .icon-btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--chrome-shadow); }
+
+.icon-btn:focus-visible {
+  outline: 3px solid var(--chrome-accent);
+  outline-offset: 5px;
+}
+
+@media (max-width: 820px) {
+  :root[data-sky-phase] .hero-supporting-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    max-width: 100%;
+  }
+
+  .hero-details {
+    display: block;
+    width: 100%;
+  }
+
+  .hero-details > .step-in-3 {
+    max-width: 100%;
+  }
+
+  .social-links-hero {
+    justify-content: center;
+    margin-top: 20px;
+  }
+}
 
 .px-link {
   font-size: 13px;
@@ -1220,8 +1375,34 @@ body {
 .nav-bar {
   --bar-gradient-start: var(--nav-gradient-start);
   --bar-gradient-end: var(--nav-gradient-end);
-  border-bottom: 2px solid var(--nav-border);
-  box-shadow: 0 2px 0 var(--nav-shadow);
+}
+
+/* Instead of a ruled border, the bar's bottom edge dissolves into the sky
+   in two stages: bar colour -> mid tone -> sky. --nav-edge-mid is a 50/50
+   mix of bar and sky by day and at twilight; at night both are near-black,
+   so it is set lighter than either to keep the edge visible. Each mask is a
+   seeded noise dither on the canvas's 5px grid, the same probabilistic blend
+   renderSky() uses between sky bands. ::before is the mid-tone band, ::after
+   the bar colour breaking up on top of it. */
+.nav-bar::before,
+.nav-bar::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
+}
+.nav-bar::before {
+  background-color: var(--nav-edge-mid);
+  -webkit-mask: url("/images/nav-edge-mid-mask.svg") 0 0 / 640px 40px repeat-x;
+  mask: url("/images/nav-edge-mid-mask.svg") 0 0 / 640px 40px repeat-x;
+}
+.nav-bar::after {
+  background-color: var(--bar-gradient-end);
+  -webkit-mask: url("/images/nav-edge-mask.svg") 0 0 / 480px 40px repeat-x;
+  mask: url("/images/nav-edge-mask.svg") 0 0 / 480px 40px repeat-x;
 }
 
 /* Six opaque rows form a dithered gradient from solid pixel blocks. */
@@ -1370,7 +1551,7 @@ body {
   display: block;
   color: inherit;
   text-decoration: none;
-  background: var(--panel);
+  background-color: var(--panel);
   border: 2px solid var(--border);
   box-shadow: 6px 6px 0 var(--shadow);
   padding: 26px;
@@ -1590,7 +1771,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 :root[data-theme="light"] .drift-info-card {
-  background: rgba(232, 245, 255, 0.92);
+  background-color: rgba(232, 245, 255, 0.92);
   border-color: #6f9bc4;
   box-shadow: 6px 6px 0 rgba(111, 155, 196, 0.36);
 }
@@ -1613,7 +1794,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 :root[data-sky-phase="twilight"] .drift-info-card {
-  background: rgba(255, 245, 218, 0.97);
+  background-color: rgba(255, 245, 218, 0.97);
   border-color: #9870ad;
   box-shadow: 6px 6px 0 rgba(116, 76, 137, 0.38);
 }
@@ -1930,7 +2111,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
   justify-content: center;
   padding: 0 10px;
   color: var(--text);
-  background: var(--panel);
+  background-color: var(--panel);
   border: 2px solid var(--border);
   box-shadow: 4px 4px 0 var(--shadow);
   font-family: var(--font-pixel);
@@ -2080,7 +2261,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
   border: 2px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-left: 4px solid var(--border);
   border-right: 4px solid var(--border);
-  background: color-mix(in srgb, var(--panel-solid) 34%, transparent);
+  background-color: color-mix(in srgb, var(--panel-solid) 34%, transparent);
 }
 
 .resume-section:first-child {
@@ -2198,7 +2379,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
   padding: 18px;
   border: 2px solid var(--border);
   border-left: 4px solid var(--accent);
-  background: var(--panel);
+  background-color: var(--panel);
   box-shadow: 4px 4px 0 var(--shadow);
 }
 
@@ -2359,7 +2540,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
     margin-bottom: clamp(-62px, -12vw, -42px);
     transform: translateX(12%);
   }
-  :root[data-sky-phase="day"] .hero-default-section .hero-copy > .step-in-3 {
+  :root[data-sky-phase="day"] .hero-default-section .hero-details > .step-in-3 {
     width: min(92vw, 440px);
     gap: 12px !important;
     margin-top: 24px !important;
@@ -2398,7 +2579,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
     line-height: 1.75;
     overflow-wrap: anywhere;
   }
-  .hero-copy > .step-in-3 {
+  .hero-details > .step-in-3 {
     display: grid !important;
     width: min(88vw, 420px);
     grid-template-columns: minmax(0, 1fr);
@@ -2438,7 +2619,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
   :root[data-sky-phase="twilight"] .hero-stage {
     transform: translateY(-20px);
   }
-  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-copy > .step-in-3 {
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-details > .step-in-3 {
     width: min(88vw, 410px);
     gap: 12px !important;
     margin-right: auto !important;

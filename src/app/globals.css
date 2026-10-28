@@ -15,7 +15,7 @@
   --scene-top: #02040a;
   --hero-resume-width: 230px;
   --hero-control-height: 76px;
-  --panel: rgba(6, 11, 22, 0.9);
+  --panel: #08101f;
   --panel-solid: #08101f;
   --text: #e9eff8;
   --text-2: rgba(233, 239, 248, 0.6);
@@ -60,7 +60,7 @@
   --scene-top: #7db9ea;
   --hero-resume-width: 300px;
   --hero-control-height: 94px;
-  --panel: rgba(255, 255, 255, 0.86);
+  --panel: #f2f9ff;
   --panel-solid: #f2f9ff;
   --text: #122341;
   --text-2: rgba(18, 35, 65, 0.62);
@@ -105,7 +105,7 @@
   --scene-top: #ad78c7;
   --hero-resume-width: 280px;
   --hero-control-height: 88px;
-  --panel: rgba(255, 248, 238, 0.92);
+  --panel: #fff7ec;
   --panel-solid: #fff7ec;
   --text: #46304e;
   --text-2: rgba(70, 48, 78, 0.68);
@@ -603,7 +603,7 @@ body {
     font-size: clamp(18px, 1.45vw, 21px);
   }
 
-  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-details > .step-in-3 {
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-details > .hero-actions {
     gap: 18px 26px !important;
     margin-top: 22px !important;
   }
@@ -732,7 +732,7 @@ body {
   animation-delay: 1.5s;
 }
 
-:root[data-sky-phase="day"] .hero-default-section .hero-details > .step-in-3 {
+:root[data-sky-phase="day"] .hero-default-section .hero-details > .hero-actions {
   gap: 22px 32px !important;
   margin-top: 22px !important;
 }
@@ -842,7 +842,7 @@ body {
   transform: translateY(-128px);
 }
 
-:root[data-sky-phase="night"] .hero-default-section .hero-details > .step-in-3 {
+:root[data-sky-phase="night"] .hero-default-section .hero-details > .hero-actions {
   gap: 20px 28px !important;
   margin-top: 16px !important;
 }
@@ -977,63 +977,6 @@ body {
   background-color: var(--panel);
   border: 2px solid var(--border);
   box-shadow: 6px 6px 0 var(--shadow);
-}
-
-/* ── Pixel texture: every container gets a dithered fill with drifting pixels ──
-   Two tiles on the 5px grid: a dense low-contrast dither and a sparse layer
-   of brighter cells. They slide in opposite directions one cell at a time,
-   so pixels appear to drift across the surface. The rules above set
-   background-color only, leaving background-image free for this.
-
-   The drift is one stepped animation of --px-shift on <html>, inherited by
-   every container, so it never competes with their own `animation` (stepIn,
-   reveals) and all surfaces stay in sync. */
-@property --px-shift {
-  syntax: "<length>";
-  inherits: true;
-  initial-value: 0px;
-}
-
-html { animation: pxDrift 14s steps(24) infinite; }
-
-@keyframes pxDrift {
-  to { --px-shift: 120px; }
-}
-
-.px-panel,
-.project-card,
-.drift-info-card,
-.certification-card,
-.resume-section {
-  background-image: url("/images/px-drift.svg"), url("/images/px-dither.svg");
-  background-size: 120px 120px;
-  background-position:
-    calc(var(--px-shift) * 2) calc(var(--px-shift) * -1),
-    calc(var(--px-shift) * -1) var(--px-shift);
-}
-
-/* Buttons keep a flat fill; their pixels live on the border instead. A ring
-   masked down to the 2px border shows a diagonal-striped tile, so one
-   sideways shift reads as pixels marching along all four edges. */
-.px-btn,
-.resume-side-back {
-  position: relative;
-}
-.px-btn::after,
-.resume-side-back::after {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  padding: 2px;
-  pointer-events: none;
-  background: url("/images/px-edge.svg") var(--px-shift) 0 / 120px 120px;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box exclude,
-    linear-gradient(#000 0 0);
 }
 
 /* ── Buttons / chips / links ── */
@@ -1183,7 +1126,7 @@ html { animation: pxDrift 14s steps(24) infinite; }
   grid-row: 1;
 }
 
-.hero-details > .step-in-3 {
+.hero-details > .hero-actions {
   grid-column: 1 / -1;
   grid-row: 2;
   width: max-content;
@@ -1320,7 +1263,7 @@ html { animation: pxDrift 14s steps(24) infinite; }
     width: 100%;
   }
 
-  .hero-details > .step-in-3 {
+  .hero-details > .hero-actions {
     max-width: 100%;
   }
 
@@ -1446,80 +1389,6 @@ html { animation: pxDrift 14s steps(24) infinite; }
   pointer-events: none;
 }
 
-/* Keep the existing pixel treatment on the footer. */
-.site-footer {
-  --bar-step-1: color-mix(in srgb, var(--bar-gradient-start) 80%, var(--bar-gradient-end) 20%);
-  --bar-step-2: color-mix(in srgb, var(--bar-gradient-start) 64%, var(--bar-gradient-end) 36%);
-  --bar-step-3: color-mix(in srgb, var(--bar-gradient-start) 48%, var(--bar-gradient-end) 52%);
-  --bar-step-4: color-mix(in srgb, var(--bar-gradient-start) 32%, var(--bar-gradient-end) 68%);
-  --bar-step-5: color-mix(in srgb, var(--bar-gradient-start) 16%, var(--bar-gradient-end) 84%);
-  background-color: var(--bar-gradient-end);
-  background-image:
-    linear-gradient(
-      90deg,
-      var(--bar-gradient-start) 0 12px,
-      var(--bar-step-1) 12px 20px,
-      var(--bar-gradient-start) 20px 36px,
-      var(--bar-step-1) 36px 44px,
-      var(--bar-gradient-start) 44px 56px,
-      var(--bar-step-1) 56px 64px
-    ),
-    linear-gradient(
-      90deg,
-      var(--bar-step-1) 0 8px,
-      var(--bar-step-2) 8px 20px,
-      var(--bar-step-1) 20px 32px,
-      var(--bar-step-2) 32px 40px,
-      var(--bar-step-1) 40px 56px,
-      var(--bar-step-2) 56px 64px
-    ),
-    linear-gradient(
-      90deg,
-      var(--bar-step-2) 0 16px,
-      var(--bar-step-3) 16px 24px,
-      var(--bar-step-2) 24px 36px,
-      var(--bar-step-3) 36px 48px,
-      var(--bar-step-2) 48px 56px,
-      var(--bar-step-3) 56px 64px
-    ),
-    linear-gradient(
-      90deg,
-      var(--bar-step-3) 0 8px,
-      var(--bar-step-4) 8px 24px,
-      var(--bar-step-3) 24px 32px,
-      var(--bar-step-4) 32px 44px,
-      var(--bar-step-3) 44px 56px,
-      var(--bar-step-4) 56px 64px
-    ),
-    linear-gradient(
-      90deg,
-      var(--bar-step-4) 0 12px,
-      var(--bar-step-5) 12px 28px,
-      var(--bar-step-4) 28px 36px,
-      var(--bar-step-5) 36px 52px,
-      var(--bar-step-4) 52px 60px,
-      var(--bar-step-5) 60px 64px
-    ),
-    linear-gradient(
-      90deg,
-      var(--bar-step-5) 0 8px,
-      var(--bar-gradient-end) 8px 24px,
-      var(--bar-step-5) 24px 32px,
-      var(--bar-gradient-end) 32px 48px,
-      var(--bar-step-5) 48px 56px,
-      var(--bar-gradient-end) 56px 64px
-    );
-  background-position:
-    0 0,
-    13px 20%,
-    5px 40%,
-    29px 60%,
-    17px 80%,
-    37px 100%;
-  background-repeat: repeat-x;
-  background-size: 64px 16.6667%;
-}
-
 .nav-link {
   font-family: var(--font-pixel);
   font-size: clamp(15px, 1.25vw, 17px);
@@ -1555,8 +1424,7 @@ html { animation: pxDrift 14s steps(24) infinite; }
 /* ── Footer ── */
 
 .site-footer {
-  --bar-gradient-start: var(--chrome-gradient-start);
-  --bar-gradient-end: var(--chrome-gradient-end);
+  background: var(--chrome-solid);
   position: relative;
   z-index: 10;
   border-top: 2px solid var(--chrome-border);
@@ -1811,7 +1679,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 :root[data-theme="light"] .drift-info-card {
-  background-color: rgba(232, 245, 255, 0.92);
+  background-color: #e8f5ff;
   border-color: #6f9bc4;
   box-shadow: 6px 6px 0 rgba(111, 155, 196, 0.36);
 }
@@ -1834,7 +1702,7 @@ a.project-card:hover .project-title { color: var(--accent); }
 }
 
 :root[data-sky-phase="twilight"] .drift-info-card {
-  background-color: rgba(255, 245, 218, 0.97);
+  background-color: #fff5da;
   border-color: #9870ad;
   box-shadow: 6px 6px 0 rgba(116, 76, 137, 0.38);
 }
@@ -2301,7 +2169,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
   border: 2px solid color-mix(in srgb, var(--border) 70%, transparent);
   border-left: 4px solid var(--border);
   border-right: 4px solid var(--border);
-  background-color: color-mix(in srgb, var(--panel-solid) 34%, transparent);
+  background-color: var(--panel-solid);
 }
 
 .resume-section:first-child {
@@ -2580,7 +2448,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
     margin-bottom: clamp(-62px, -12vw, -42px);
     transform: translateX(12%);
   }
-  :root[data-sky-phase="day"] .hero-default-section .hero-details > .step-in-3 {
+  :root[data-sky-phase="day"] .hero-default-section .hero-details > .hero-actions {
     width: var(--hero-actions-width);
     gap: 12px !important;
     margin-top: 24px !important;
@@ -2619,7 +2487,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
     line-height: 1.75;
     overflow-wrap: anywhere;
   }
-  .hero-details > .step-in-3 {
+  .hero-details > .hero-actions {
     display: grid !important;
     width: var(--hero-actions-width);
     grid-template-columns: minmax(0, 1fr);
@@ -2659,7 +2527,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
   :root[data-sky-phase="twilight"] .hero-stage {
     transform: translateY(-20px);
   }
-  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-details > .step-in-3 {
+  :root[data-sky-phase="twilight"] .hero-layout-under-banner .hero-details > .hero-actions {
     width: var(--hero-actions-width);
     gap: 12px !important;
     margin-right: auto !important;

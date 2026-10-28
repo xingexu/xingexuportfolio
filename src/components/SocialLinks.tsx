@@ -7,9 +7,14 @@ const SOCIAL_LINKS = [
   { label: "Email xxu767@uwo.ca", href: LINKS.email, Icon: MailIcon },
 ];
 
-export default function SocialLinks({ placement = "footer" }: { placement?: "hero" | "footer" }) {
+type SocialLinksProps = {
+  placement?: "hero" | "footer";
+  className?: string;
+};
+
+export default function SocialLinks({ placement = "footer", className = "" }: SocialLinksProps) {
   return (
-    <nav aria-label="Social and contact" className={`social-links social-links-${placement}`}>
+    <nav aria-label="Social and contact" className={`social-links social-links-${placement} ${className}`}>
       {SOCIAL_LINKS.map(({ label, href, Icon }) => (
         <a
           key={label}

@@ -1203,6 +1203,10 @@ body {
     position: relative;
     top: 24px;
   }
+
+  :root[data-sky-phase="night"] .social-links-hero {
+    top: calc(var(--hero-control-height) + 16px);
+  }
 }
 
 .icon-btn {

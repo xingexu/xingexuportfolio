@@ -6,7 +6,7 @@ import ThemeToggle from "./ThemeToggle";
 
 /**
  * Top navigation. Real crawlable links; active state via usePathname.
- * Solid pixel bar — no blur, no transparency tricks.
+ * The theme-colored header fades into the live sky below it.
  */
 export default function Nav() {
   const pathname = usePathname();

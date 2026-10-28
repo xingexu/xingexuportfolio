@@ -1163,7 +1163,10 @@ body {
   max-width: 100%;
   height: var(--hero-control-height);
   align-items: stretch;
-  gap: 12px;
+  gap: 20px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .social-links-label {
@@ -1174,6 +1177,10 @@ body {
   margin: 0;
   text-align: center;
   white-space: nowrap;
+}
+
+:root[data-sky-phase="night"] .social-links-label {
+  bottom: calc(100% + 38px);
 }
 
 .social-icon-btn {
@@ -1272,6 +1279,10 @@ body {
   .social-links-hero {
     justify-content: center;
     margin: 52px auto 0;
+  }
+
+  :root[data-sky-phase="night"] .social-links-hero {
+    margin-top: 76px;
   }
 }
 

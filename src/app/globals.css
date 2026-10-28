@@ -1198,6 +1198,13 @@ body {
   outline-offset: -6px;
 }
 
+@media (min-width: 821px) {
+  .social-links-hero {
+    position: relative;
+    top: 24px;
+  }
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

@@ -1210,16 +1210,96 @@ body {
 }
 
 @media (min-width: 821px) {
+  .hero-plane-banner {
+    --hero-plane-rest-x: 0px;
+    width: min(100%, 1080px);
+  }
+
+  .midnight-fireworks-heading {
+    margin-bottom: clamp(-226px, -20vw, -164px);
+  }
+
+  .hero-copy {
+    width: 100%;
+  }
+
+  :root[data-sky-phase="day"],
+  :root[data-sky-phase="twilight"] {
+    --hero-resume-width: 230px;
+  }
+
+  .hero-supporting-layout {
+    grid-template-rows: minmax(var(--hero-control-height), auto) auto;
+    row-gap: 16px;
+  }
+
+  :root[data-sky-phase="day"] .hero-supporting-layout,
+  :root[data-sky-phase="twilight"] .hero-supporting-layout {
+    max-width: 900px;
+    row-gap: 22px;
+  }
+
+  :root[data-sky-phase] .hero-supporting-layout .hero-education {
+    margin: 0;
+  }
+
+  :root[data-sky-phase] .hero-supporting-layout .hero-details > .hero-actions {
+    grid-column: 1;
+    margin-top: 0 !important;
+  }
+
+  :root:is([data-sky-phase="day"], [data-sky-phase="twilight"]) .hero-details > .hero-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) var(--hero-resume-width);
+    width: 100%;
+    gap: 24px !important;
+  }
+
+  :root:is([data-sky-phase="day"], [data-sky-phase="twilight"]) .hero-supporting-layout .hero-cta-btn {
+    min-width: 0;
+    padding-inline: 16px;
+    gap: 12px;
+    font-size: clamp(14px, 1.1vw, 18px);
+    justify-content: center;
+  }
+
   .social-links-hero {
-    top: 24px;
+    display: grid;
+    grid-row: 1 / 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: subgrid;
+    height: auto;
+    row-gap: inherit;
   }
 
-  :root[data-sky-phase="night"] .social-links-hero {
-    top: calc(var(--hero-control-height) + 16px);
+  :root[data-sky-phase] .social-links-label {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    align-self: center;
+    bottom: auto;
   }
 
-  :root[data-sky-phase="night"] .social-links-label {
-    bottom: calc(150% + 16px - 0.75em);
+  .social-icon-btn {
+    grid-row: 2;
+    height: var(--hero-control-height);
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1000px) {
+  :root[data-sky-phase="night"] .hero-details > .hero-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) var(--hero-resume-width);
+    width: 100%;
+    gap: 20px !important;
+  }
+
+  :root[data-sky-phase="night"] .hero-supporting-layout .hero-cta-btn {
+    min-width: 0;
+    padding-inline: 12px;
+    gap: 10px;
+    font-size: 14px;
+    justify-content: center;
   }
 }
 

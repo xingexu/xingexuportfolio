@@ -1153,6 +1153,7 @@ body {
 }
 
 .social-links-hero {
+  position: relative;
   grid-column: 2;
   grid-row: 1;
   width: var(--hero-resume-width);
@@ -1167,6 +1168,19 @@ body {
     5px 5px 0 var(--shadow),
     0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent),
     0 0 20px var(--hero-cta-glow);
+}
+
+.social-links-label {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 0;
+  width: 100%;
+  font-family: var(--font-pixel);
+  font-size: clamp(12px, 1vw, 14px);
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .social-links-hero .icon-btn {
@@ -1200,7 +1214,6 @@ body {
 
 @media (min-width: 821px) {
   .social-links-hero {
-    position: relative;
     top: 24px;
   }
 
@@ -1280,7 +1293,7 @@ body {
 
   .social-links-hero {
     justify-content: center;
-    margin: 20px auto 0;
+    margin: 52px auto 0;
   }
 }
 

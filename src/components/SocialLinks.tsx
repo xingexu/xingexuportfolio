@@ -15,6 +15,7 @@ type SocialLinksProps = {
 export default function SocialLinks({ placement = "footer", className = "" }: SocialLinksProps) {
   return (
     <nav aria-label="Social and contact" className={`social-links social-links-${placement} ${className}`}>
+      {placement === "hero" && <span className="social-links-label">let&apos;s connect</span>}
       {SOCIAL_LINKS.map(({ label, href, Icon }) => (
         <a
           key={label}

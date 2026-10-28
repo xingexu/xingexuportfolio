@@ -670,10 +670,10 @@ function SunriseHero() {
                   western computer science + ivey aeo &apos;31
                 </p>
 
-                <SocialLinks placement="hero" />
+                <SocialLinks placement="hero" className="step-in-3" />
 
                 <div
-                  className="step-in-3"
+                  className="hero-actions step-in-3"
                   style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "14px 24px", marginTop: 32 }}
                 >
                   <Link href="/projects" className="px-btn hero-cta-btn">
@@ -1002,10 +1002,10 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
                 western computer science + ivey aeo &apos;31
               </p>
 
-              <SocialLinks placement="hero" />
+              <SocialLinks placement="hero" className={`step-in-3${midnightSupportingCopyClass}`} />
 
               <div
-                className={`step-in-3${midnightSupportingCopyClass}`}
+                className={`hero-actions step-in-3${midnightSupportingCopyClass}`}
                 style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "16px 28px", marginTop: 40 }}
               >
                 <Link href="/projects" className="px-btn hero-cta-btn">

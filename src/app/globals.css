@@ -1171,6 +1171,10 @@ body {
 
 .social-links-label {
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   bottom: calc(100% + 14px);
   left: 0;
   width: 100%;
@@ -1181,6 +1185,14 @@ body {
 
 :root[data-sky-phase="night"] .social-links-label {
   bottom: calc(100% + 38px);
+}
+
+.social-links-arrow {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  filter: drop-shadow(0 0 4px currentColor);
 }
 
 .social-icon-btn {
@@ -1204,6 +1216,10 @@ body {
 
   :root[data-sky-phase="night"] .social-links-hero {
     top: calc(var(--hero-control-height) + 16px);
+  }
+
+  :root[data-sky-phase="night"] .social-links-label {
+    bottom: calc(150% + 16px - 0.75em);
   }
 }
 

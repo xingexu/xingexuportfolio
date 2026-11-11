@@ -28,12 +28,12 @@
 }
 .about-field { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: -1; }
 .about-name {
-  --letter-pixel: 4px;
-  --letter-travel: 8px;
+  --letter-pixel: 5px;
+  --letter-jump: 12px;
   position: absolute;
-  top: 18%;
+  top: 15%;
   left: 50%;
-  width: min(44%, 560px);
+  width: min(60%, 720px);
   margin: 0;
   padding: 0;
   display: flex;
@@ -47,16 +47,21 @@
 .about-letter {
   display: block;
   margin-top: calc(var(--letter-row) * var(--letter-pixel));
-  animation: about-letter-float var(--loop-duration) steps(2, end) var(--letter-delay) infinite;
+  animation: about-letter-jitter 2s steps(1, end) var(--letter-delay) infinite;
 }
 .about-letter:nth-child(even) { animation-direction: reverse; }
-.about-letter-art { display: block; width: calc(var(--letter-pixel) * 6); height: calc(var(--letter-pixel) * 8); image-rendering: pixelated; }
-@keyframes about-letter-float {
+.about-letter-art { display: block; width: calc(var(--letter-pixel) * 13); height: calc(var(--letter-pixel) * 15); image-rendering: pixelated; }
+.about-letter-glow { animation: about-letter-glow var(--loop-duration) steps(4, end) var(--glow-delay) infinite; }
+.about-letter-spark { animation: about-letter-spark var(--loop-duration) steps(1, end) var(--glow-delay) infinite; }
+@keyframes about-letter-jitter {
   0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(var(--letter-travel), calc(-1 * var(--letter-travel))); }
-  50% { transform: translate(0, calc(-2 * var(--letter-travel))); }
-  75% { transform: translate(calc(-1 * var(--letter-travel)), calc(-1 * var(--letter-travel))); }
+  12.5%, 87.5% { transform: translateY(calc(-2 * var(--letter-jump))); }
+  25%, 62.5% { transform: translateY(calc(-1 * var(--letter-jump))); }
+  37.5%, 75% { transform: translateY(var(--letter-jump)); }
+  50% { transform: translateY(calc(-3 * var(--letter-jump))); }
 }
+@keyframes about-letter-glow { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+@keyframes about-letter-spark { 0%, 37.5%, 62.5%, 100% { opacity: 0; } 50% { opacity: .7; } }
 .about-objects { position: absolute; inset: 0; pointer-events: none; }
 .about-object {
   position: absolute;
@@ -74,6 +79,8 @@
 .about-object-art { display: grid; place-items: center; width: 100%; height: 80px; }
 .about-object-motion { display: inline-block; animation: about-float var(--loop-duration) steps(4, end) var(--float-delay) infinite; }
 .about-sprite { display: block; overflow: visible; image-rendering: pixelated; }
+.about-sprite-knight { width: 60px; height: 72px; }
+.about-sprite-volleyball { width: 60px; height: 60px; }
 .about-object:hover .about-object-motion, .about-object:focus-visible .about-object-motion { animation-play-state: paused; }
 .about-object:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 5px; }
 .about-object-knight { left: calc(50% - 465px); top: 29%; }
@@ -84,7 +91,7 @@
 .about-exit, .about-motion-toggle { font: inherit; color: #777; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .about-exit:hover, .about-motion-toggle:hover { color: #fff; }
 .about-exit:focus-visible, .about-motion-toggle:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 4px; }
-.about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-letter) { animation-play-state: paused !important; }
+.about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-letter, .about-letter-glow, .about-letter-spark) { animation-play-state: paused !important; }
 
 @keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(8px, -8px); } 50% { transform: translate(0, -16px); } 75% { transform: translate(-8px, -8px); } }
 @keyframes about-knight { 0%, 12.5%, 100% { transform: translate(0, 0); } 37.5% { transform: translate(0, -18px); } 50%, 62.5% { transform: translate(18px, -18px); } 87.5% { transform: translate(18px, 0); } }
@@ -96,19 +103,17 @@
 }
 
 @media (max-width: 1050px) {
-  .about-name { --letter-pixel: 3px; --letter-travel: 6px; top: 23%; width: 60%; }
-  .about-object-knight { left: 24%; top: 14%; }
-  .about-object-ball { right: 22%; top: 13%; }
+  .about-name { --letter-pixel: 4px; --letter-jump: 8px; top: 18%; width: 66%; }
+  .about-object-knight { left: 0; top: 14%; }
+  .about-object-ball { right: 0; top: 13%; }
 }
 
 @media (max-width: 600px) {
-  .about-name { --letter-pixel: 3px; --letter-travel: 6px; top: 64%; width: 80%; }
+  .about-name { --letter-pixel: 3px; --letter-jump: 6px; top: calc(64% - 18px); width: 94%; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
-  .about-object-knight { left: 8%; top: 21%; }
-  .about-object-knight .about-sprite { width: 40px; height: 48px; }
-  .about-object-ball { right: 8%; top: 21%; }
-  .about-object-ball .about-sprite { width: 40px; height: 40px; }
+  .about-object-knight { left: 8%; top: 18.5%; }
+  .about-object-ball { right: 8%; top: 18.5%; }
   .about-bottom { left: 12px; right: 12px; }
 }
 

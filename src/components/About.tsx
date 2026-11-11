@@ -3,6 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import { LINKS } from "@/app/data";
 import AboutField from "./AboutField";
+import AboutName from "./AboutName";
 import AboutSprite, { type AboutSpriteKind } from "./AboutSprites";
 
 const OBJECTS: { id: string; kind: AboutSpriteKind; href: string; label: string; delay: string }[] = [
@@ -20,6 +21,7 @@ export default function About() {
   return (
     <section className="about-page" aria-label="Xinge's pixel room with illustrative stock charts" data-paused={paused}>
       <AboutField paused={paused} />
+      <AboutName />
       <div className="about-objects" aria-label="My interests and profiles">
         {OBJECTS.map((object) => (
           <a

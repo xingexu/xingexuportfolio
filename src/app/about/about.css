@@ -50,6 +50,36 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   overflow: clip;
 }
 .about-field { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: -1; }
+.about-name {
+  --letter-pixel: 4px;
+  --letter-travel: 8px;
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  width: min(44%, 560px);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 2;
+  line-height: 1;
+}
+.about-letter {
+  display: block;
+  margin-top: calc(var(--letter-row) * var(--letter-pixel));
+  animation: about-letter-float var(--loop-duration) steps(2, end) var(--letter-delay) infinite;
+}
+.about-letter:nth-child(even) { animation-direction: reverse; }
+.about-letter-art { display: block; width: calc(var(--letter-pixel) * 6); height: calc(var(--letter-pixel) * 8); image-rendering: pixelated; }
+@keyframes about-letter-float {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(var(--letter-travel), calc(-1 * var(--letter-travel))); }
+  50% { transform: translate(0, calc(-2 * var(--letter-travel))); }
+  75% { transform: translate(calc(-1 * var(--letter-travel)), calc(-1 * var(--letter-travel))); }
+}
 .about-objects { position: absolute; inset: 0; pointer-events: none; }
 .about-object {
   position: absolute;
@@ -76,7 +106,7 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 .about-object-laptop { right: calc(50% - 470px); top: 43%; }
 .about-object-rook { left: 14%; top: 48%; }
 .about-object-rook .about-sprite { width: 32px; height: 40px; }
-.about-object-ball-small { left: calc(50% - 165px); top: 16%; }
+.about-object-ball-small { left: 18%; top: 12%; }
 .about-object-ball-small .about-sprite { width: 20px; height: 20px; }
 .about-object-pawn { right: calc(50% - 210px); bottom: 13%; }
 .about-object-pawn .about-sprite { width: 28px; height: 40px; }
@@ -84,7 +114,7 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 .about-bottom { position: absolute; bottom: 28px; left: max(28px, calc(50% - 500px)); right: max(28px, calc(50% - 500px)); display: flex; align-items: center; justify-content: flex-end; }
 .about-motion-toggle { font: inherit; color: #acacac; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .about-motion-toggle:hover { color: #fff; }
-.about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-laptop-cursor) { animation-play-state: paused !important; }
+.about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-laptop-cursor, .about-letter) { animation-play-state: paused !important; }
 
 @keyframes about-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(8px, -8px); } 50% { transform: translate(0, -16px); } 75% { transform: translate(-8px, -8px); } }
@@ -99,6 +129,7 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 }
 
 @media (max-width: 1050px) {
+  .about-name { --letter-pixel: 3px; --letter-travel: 6px; top: 23%; width: 60%; }
   .about-object-knight { left: 24%; top: 14%; }
   .about-object-ball { right: 22%; top: 13%; }
   .about-object-laptop { left: calc(50% - 70px); right: auto; top: 7%; bottom: auto; }
@@ -107,6 +138,7 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 }
 
 @media (max-width: 600px) {
+  .about-name { --letter-pixel: 3px; --letter-travel: 6px; top: 64%; width: 80%; }
   .nav-bar-about > nav { justify-content: space-between !important; padding-inline: 20px !important; }
   .about-home-link { font-size: 10px; gap: 8px; }
   .nav-bar-about .nav-link { font-size: 11px; padding-inline: 5px; }

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import About from "@/components/About";
+import "./about.css";
 
 export const metadata: Metadata = {
   title: "About",
+  description: "A little about Xinge Xu: computer science, chess, volleyball, and the things he builds.",
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About · Xinge Xu",
@@ -10,6 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function AboutPage() {
-  // Add your design here. The shared layout supplies the sky, navigation, and footer.
-  return null;
+  return <About />;
 }

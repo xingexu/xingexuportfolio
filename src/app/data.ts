@@ -46,6 +46,8 @@ export const PROJECTS: Project[] = [
 // address once and have it change everywhere it's used (footer, JSON-LD, etc).
 export const LINKS = {
   github: "https://github.com/xingexu",
+  lichess: "https://lichess.org/@/zinger6767",
+  volleyball: "https://www.instagram.com/ziggyvb/",
   linkedin: "https://www.linkedin.com/in/xinge-xu-5b4191306/",
   // Gmail compose in a new tab (mailto: silently fails without a mail app)
   email: "https://mail.google.com/mail/?view=cm&fs=1&to=xxu767@uwo.ca",

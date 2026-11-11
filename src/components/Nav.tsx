@@ -10,10 +10,11 @@ import ThemeToggle from "./ThemeToggle";
  */
 export default function Nav() {
   const pathname = usePathname();
+  const isAbout = pathname === "/about";
 
   return (
     // Fixed to the top so it stays put while the page (and the sky behind it) scrolls.
-    <header className="nav-bar" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50 }}>
+    <header className={`nav-bar${isAbout ? " nav-bar-about" : ""}`} style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50 }}>
       <nav
         aria-label="Primary"
         style={{
@@ -26,6 +27,7 @@ export default function Nav() {
           padding: "0 20px",
         }}
       >
+        {isAbout && <Link href="/" className="about-home-link" aria-label="Back to home">← <span>xinge xu</span></Link>}
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <Link href="/projects" aria-current={pathname === "/projects" ? "page" : undefined} className="nav-link">
             projects
@@ -34,7 +36,7 @@ export default function Nav() {
           <Link href="/resume" aria-current={pathname.startsWith("/resume") ? "page" : undefined} className="nav-link">
             resume
           </Link>
-          <ThemeToggle />
+          {!isAbout && <ThemeToggle />}
         </div>
       </nav>
     </header>

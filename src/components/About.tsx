@@ -8,11 +8,7 @@ import AboutSprite, { type AboutSpriteKind } from "./AboutSprites";
 
 const OBJECTS: { id: string; kind: AboutSpriteKind; href: string; label: string; delay: string }[] = [
   { id: "knight", kind: "knight", href: LINKS.lichess, label: "Play zinger6767 on Lichess", delay: "0s" },
-  { id: "ball", kind: "volleyball", href: LINKS.volleyball, label: "Follow ziggyvb on Instagram", delay: "-2s" },
-  { id: "laptop", kind: "laptop", href: LINKS.github, label: "See xingexu on GitHub", delay: "-4s" },
-  { id: "rook", kind: "rook", href: LINKS.lichess, label: "View zinger6767 on Lichess", delay: "-3s" },
-  { id: "ball-small", kind: "volleyball", href: LINKS.volleyball, label: "See ziggyvb volleyball on Instagram", delay: "-6s" },
-  { id: "pawn", kind: "pawn", href: LINKS.lichess, label: "Challenge zinger6767 on Lichess", delay: "-5s" },
+  { id: "ball", kind: "volleyball", href: LINKS.volleyball, label: "Mikasa volleyball — follow ziggyvb on Instagram", delay: "-2s" },
 ];
 
 export default function About() {

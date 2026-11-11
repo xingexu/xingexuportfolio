@@ -25,7 +25,7 @@ npm run dev
 
 Then open `http://localhost:3000` and you're good to go.
 
-The `/about` page uses a pixel-art computer room with an eight-second ambient animation loop. `AboutSprites.tsx` contains the small hand-drawn pixel maps; `AboutField.tsx` plays the room animation drawn in `src/lib/about-room.ts`. The room uses a limited palette and integer-aligned rectangles, scaled to a four-pixel grid. The chess, volleyball, and laptop links come from `LINKS` in `src/app/data.ts`. The typed introduction plays once, and the scene supports pausing and reduced motion.
+The `/about` page uses a layered grayscale pixel-art computer room with an eight-second ambient animation loop. `AboutSprites.tsx` contains the small hand-drawn pixel maps; `AboutField.tsx` plays the room animation drawn in `src/lib/about-room.ts`. The room rasterizes textured plaster, wood, metal, and glass into a strictly grayscale three-pixel grid. Static artwork is cached per size; stepped foreground parallax and ambient details respect pause and reduced motion. The chess, volleyball, and laptop links come from `LINKS` in `src/app/data.ts`. The typed introduction plays once, and the scene supports pausing and reduced motion.
 
 ## GitHub activity
 

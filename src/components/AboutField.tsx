@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { drawAboutRoom, ROOM_CELL, ROOM_FRAME_MS } from "@/lib/about-room";
+import { createAboutRoom, ROOM_CELL, ROOM_FRAME_MS, type AboutRoom } from "@/lib/about-room";
 
 /** One low-resolution drawing surface. All moving geometry repeats after exactly 8s. */
 export default function AboutField({ paused }: { paused: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const elapsedRef = useRef(0);
+  const cameraRef = useRef({ x: 0, y: 0 });
+  const roomRef = useRef<AboutRoom | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -17,10 +19,14 @@ export default function AboutField({ paused }: { paused: boolean }) {
     let frame = 0;
     let previous: number | null = null;
     let lastDraw = -1;
+    let room = roomRef.current;
+    const camera = cameraRef.current;
+    const surface = canvas.parentElement;
+    const finePointer = window.matchMedia("(pointer: fine)");
 
     function draw() {
       if (!canvas) return;
-      drawAboutRoom(ctx, canvas.width, canvas.height, Math.floor(elapsedRef.current / ROOM_FRAME_MS));
+      room?.draw(ctx, Math.floor(elapsedRef.current / ROOM_FRAME_MS), camera.x, camera.y);
     }
 
     function tick(now: number) {
@@ -37,31 +43,51 @@ export default function AboutField({ paused }: { paused: boolean }) {
     function syncPlayback() {
       cancelAnimationFrame(frame);
       previous = null;
+      if (reducedMotion.matches) { camera.x = 0; camera.y = 0; }
       draw();
       if (!paused && !reducedMotion.matches && !document.hidden) frame = requestAnimationFrame(tick);
     }
 
-    // Keep every source pixel exactly four CSS pixels, including after resize.
-    const surface = canvas.parentElement;
+    function moveCamera(event: PointerEvent) {
+      if (!surface || paused || reducedMotion.matches || !finePointer.matches) return;
+      const bounds = surface.getBoundingClientRect();
+      camera.x = Math.round((event.clientX / bounds.width - .5) * 4);
+      camera.y = Math.round(((event.clientY - bounds.top) / bounds.height - .5) * 4);
+    }
+    function resetCamera() {
+      if (paused) return;
+      camera.x = 0; camera.y = 0;
+    }
+
+    // Cache the illustration on resize; each source pixel stays exactly three CSS pixels.
     const resize = new ResizeObserver(() => {
       if (!surface) return;
-      canvas.width = Math.max(1, Math.ceil(surface.clientWidth / ROOM_CELL));
-      canvas.height = Math.max(1, Math.ceil(surface.clientHeight / ROOM_CELL));
+      const width = Math.max(1, Math.ceil(surface.clientWidth / ROOM_CELL));
+      const height = Math.max(1, Math.ceil(surface.clientHeight / ROOM_CELL));
+      if (width === canvas.width && height === canvas.height && room) return;
+      canvas.width = width;
+      canvas.height = height;
       canvas.style.width = `${canvas.width * ROOM_CELL}px`;
       canvas.style.height = `${canvas.height * ROOM_CELL}px`;
+      room = createAboutRoom(canvas.width, canvas.height);
+      roomRef.current = room;
       draw();
     });
     if (surface) resize.observe(surface);
+    surface?.addEventListener("pointermove", moveCamera);
+    surface?.addEventListener("pointerleave", resetCamera);
     reducedMotion.addEventListener("change", syncPlayback);
     document.addEventListener("visibilitychange", syncPlayback);
     syncPlayback();
     return () => {
       cancelAnimationFrame(frame);
       resize.disconnect();
+      surface?.removeEventListener("pointermove", moveCamera);
+      surface?.removeEventListener("pointerleave", resetCamera);
       reducedMotion.removeEventListener("change", syncPlayback);
       document.removeEventListener("visibilitychange", syncPlayback);
     };
   }, [paused]);
 
-  return <canvas ref={canvasRef} className="about-field" aria-hidden="true" />;
+  return <canvas ref={canvasRef} className="about-field" style={{ position: "absolute", inset: 0 }} aria-hidden="true" />;
 }

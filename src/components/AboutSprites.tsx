@@ -1,5 +1,5 @@
 /** Small, palette-limited sprites. Each character is one square source pixel. */
-const INK: Record<string, string> = { w: "#f3f2e9", s: "#a8b0aa", e: "#68736e", b: "#0b0e10", "#": "#f3f2e9" };
+const INK: Record<string, string> = { w: "#eeeeee", s: "#a8a8a8", e: "#686868", b: "#0c0c0c", "#": "#eeeeee" };
 
 // Curved, interlocking panel seams read as a volleyball even at 20 × 20.
 const BALL_WIDTHS = [6, 10, 12, 14, 16, 18, 18, 20, 20, 20, 20, 20, 20, 18, 18, 16, 14, 12, 10, 6];

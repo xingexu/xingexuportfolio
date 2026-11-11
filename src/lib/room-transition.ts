@@ -198,7 +198,6 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
   function waitForRoom() {
     if (document.querySelector('.about-field[data-ready="true"]')) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
-      let timeout: ReturnType<typeof setTimeout>;
       const done = (ready: boolean) => {
         clearTimeout(timeout);
         window.removeEventListener("about-room-ready", readyHandler);
@@ -208,7 +207,7 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
       const readyHandler = () => done(true);
       waitCleanup = () => done(false);
       window.addEventListener("about-room-ready", readyHandler, { once: true });
-      timeout = setTimeout(() => done(false), 3500);
+      const timeout = setTimeout(() => done(false), 3500);
     });
   }
 

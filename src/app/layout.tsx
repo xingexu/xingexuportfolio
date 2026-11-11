@@ -38,7 +38,7 @@ const themeInit = `(function(){var p=null;try{var s=localStorage.getItem("xinge-
  */
 const introInit = `(function(){try{if(location.pathname==="/"&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.dataset.intro="playing"}catch(e){}})();`;
 
-// Cover direct About loads before hydration, matching the client-side shutter.
+// Cover direct About loads before hydration, matching the pixel-corrosion overlay.
 const roomIntroInit = `(function(){try{if(location.pathname==="/about"&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.dataset.roomTransition="waiting"}catch(e){}})();`;
 
 export const metadata: Metadata = {

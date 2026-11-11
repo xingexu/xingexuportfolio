@@ -4,7 +4,7 @@ import { JetBrains_Mono, Silkscreen } from "next/font/google";
 import "./globals.css";
 import { SITE, LINKS } from "./data";
 import Nav from "@/components/Nav";
-import Background from "@/components/Background";
+import SiteBackground from "@/components/SiteBackground";
 import Footer from "@/components/Footer";
 import PageTransitions from "@/components/PageTransitions";
 
@@ -138,7 +138,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
         />
-        <Background />
+        <SiteBackground />
         <PageTransitions>
           <Nav />
           <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>

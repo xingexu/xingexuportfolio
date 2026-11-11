@@ -10,7 +10,7 @@ Feel free to explore my work or reach out at [xingexu1107@gmail.com](mailto:xing
 
 It's a Next.js (App Router) site. Here's where everything lives:
 
-- `src/app/` — routes and pages (home, `/projects`, `/resume`), plus the layout, metadata, sitemap, and the generated Open Graph image.
+- `src/app/` — routes and pages (home, `/about`, `/projects`, `/resume`), plus the layout, metadata, sitemap, and the generated Open Graph image.
 - `src/components/` — the actual UI: the animated day/night `Background`, the `Hero` section, `Resume`, `Projects`, and the small bits like `Nav` and `Footer`.
 - `src/lib/` — small shared helpers (right now, just the audio context used for sound effects).
 - `public/images/` — photos and animation frames used around the site.
@@ -24,6 +24,8 @@ npm run dev
 ```
 
 Then open `http://localhost:3000` and you're good to go.
+
+The `/about` page uses a monochrome circuit scene with an eight-second ambient animation loop. `AboutSprites.tsx` contains the small hand-drawn pixel maps; `AboutField.tsx` draws the background. The chess, volleyball, and laptop links come from `LINKS` in `src/app/data.ts`. The typed introduction plays once, and the scene supports pausing and reduced motion.
 
 ## GitHub activity
 

@@ -94,7 +94,7 @@ export function createAboutRoom(width: number, height: number) {
   const poly = (layer: Pixels, points: readonly Point[], shade: number, material: Material = "paint") => layer.polygon(points.map(p => point(...p)), shade, material);
   const line = (layer: Pixels, a: Point, b: Point, shade: number, thickness = 1) => layer.line(point(...a), point(...b), shade, thickness);
 
-  // Dithered plaster fills the entire image, including the quiet reading area.
+  // Dithered plaster fills the entire image behind the workstation.
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const u = (x - MARGIN) / width, v = (y - MARGIN) / height;
     const lamp = Math.max(0, 1 - Math.hypot((u - .28) * 1.7, (v - .22) * 1.3));
@@ -179,7 +179,71 @@ export function createAboutRoom(width: number, height: number) {
     back.line([hx + 10, hy + 13], [hx + 13, hy + 30], 8);
   }
 
-  const deskBack = compact ? .85 : .79, deskFront = mobile ? .96 : .96;
+  // Wall-mounted trading display. All charts are illustrative and contain no text.
+  const displayX = MARGIN + width * (mobile ? .06 : compact ? .17 : .245);
+  const displayY = MARGIN + height * (mobile ? .32 : .27);
+  const displayW = width * (mobile ? .88 : compact ? .66 : .51);
+  const displayH = height * (mobile ? .29 : .36);
+  back.rect(displayX + 3, displayY + 4, displayW, displayH, 6);
+  back.rect(displayX + displayW * .43, displayY + displayH, displayW * .14, 4, 13, "metal");
+  back.rect(displayX, displayY, displayW, displayH, 39, "metal");
+  back.rect(displayX + 1, displayY + 1, displayW - 2, displayH - 2, 19, "metal");
+  back.rect(displayX + 3, displayY + 3, displayW - 6, displayH - 7, 8, "glass");
+  back.line([displayX + 1, displayY], [displayX + displayW - 2, displayY], 74);
+  back.line([displayX, displayY + 1], [displayX, displayY + displayH - 2], 51);
+  const screen = (u: number, v: number): Point => [displayX + displayW * u, displayY + displayH * v];
+  for (let i = 0; i < 4; i++) back.rect(...screen(.065 + i * .036, .065), 3, 1, i === 0 ? 72 : 32);
+  for (let i = 0; i < 3; i++) back.rect(...screen(.89 + i * .025, .065), 1, 1, 53);
+
+  const plotX = displayX + displayW * .065, plotY = displayY + displayH * .16;
+  const plotW = displayW * (mobile ? .86 : .61), plotH = displayH * .50;
+  const volumeBottom = displayY + displayH * .88;
+  for (let row = 0; row <= 5; row++) back.line([plotX, plotY + plotH * row / 5], [plotX + plotW, plotY + plotH * row / 5], 24);
+  for (let col = 0; col <= 8; col++) back.line([plotX + plotW * col / 8, plotY], [plotX + plotW * col / 8, volumeBottom], 20);
+  back.line([plotX, displayY + displayH * .72], [plotX + plotW, displayY + displayH * .72], 36);
+  back.line([plotX, volumeBottom], [plotX + plotW, volumeBottom], 36);
+
+  const prices = [.29,.34,.28,.36,.43,.39,.48,.53,.46,.41,.49,.57,.54,.63,.59,.65,.70,.66,.73,.68,.62,.67,.76,.71,.79,.74,.69,.77,.82,.76,.81,.85];
+  const count = mobile ? 18 : 32;
+  const step = plotW / count, bodyW = Math.max(1, Math.floor(step * .55));
+  let average: Point | null = null;
+  let lastCandle = { x: 0, open: 0, close: 0, volume: 0 };
+  for (let i = 0; i < count; i++) {
+    const index = Math.round(i / (count - 1) * (prices.length - 1));
+    const close = prices[index], open = prices[Math.max(0, index - 1)];
+    const x = Math.round(plotX + (i + .5) * step);
+    const openY = Math.round(plotY + (1 - open) * plotH), closeY = Math.round(plotY + (1 - close) * plotH);
+    const volume = Math.max(2, Math.round(displayH * (.025 + Math.abs(close - open) * .75 + noise(i, 19) * .035)));
+    const mean = prices.slice(Math.max(0, index - 4), index + 1).reduce((sum, value) => sum + value, 0) / Math.min(index + 1, 5);
+    const nextAverage: Point = [x, Math.round(plotY + (1 - mean) * plotH)];
+    if (average) back.line(average, nextAverage, 43);
+    average = nextAverage;
+    if (i === count - 1) { lastCandle = { x, open: openY, close: closeY, volume }; continue; }
+    const top = Math.min(openY, closeY), candleH = Math.max(2, Math.abs(openY - closeY));
+    back.rect(x, top - 2 - i % 3, 1, candleH + 4 + i % 3, 69);
+    back.rect(x - Math.floor(bodyW / 2), top, bodyW, candleH, close >= open ? 85 : 55, "metal");
+    if (close < open && bodyW > 2 && candleH > 2) back.rect(x - Math.floor(bodyW / 2) + 1, top + 1, bodyW - 2, candleH - 2, 12, "glass");
+    back.rect(x - Math.floor(bodyW / 2), volumeBottom - volume, bodyW, volume, close >= open ? 52 : 30, "metal");
+  }
+
+  if (!mobile) {
+    const sx = displayX + displayW * .74, sw = displayW * .19;
+    back.line([sx - 3, plotY - 2], [sx - 3, volumeBottom], 31);
+    for (let panel = 0; panel < 3; panel++) {
+      const sy = displayY + displayH * (.16 + panel * .25), sh = displayH * .17;
+      for (let row = 0; row < 3; row++) back.line([sx, sy + row * sh / 2], [sx + sw, sy + row * sh / 2], 23);
+      let previous: Point | null = null;
+      for (let i = 0; i < 13; i++) {
+        const value = panel === 1 ? 1 - prices[i * 2] : prices[(i * 2 + panel * 3) % prices.length];
+        const next: Point = [sx + i * sw / 12, sy + (1 - value) * sh];
+        if (previous) back.line(previous, next, panel === 1 ? 53 : 74);
+        previous = next;
+      }
+    }
+  }
+  back.rect(...screen(.47, .965), displayW * .06, 1, 48);
+
+  const deskBack = compact ? .85 : .79, deskFront = .96;
   // Desk legs and cables sit behind the broad, foreshortened desktop.
   poly(front, [[.12, deskBack], [.14, deskBack], [.10, 1], [.07, 1]], 8, "metal");
   poly(front, [[.86, deskBack], [.89, deskBack], [.96, 1], [.92, 1]], 6, "metal");
@@ -302,6 +366,19 @@ export function createAboutRoom(width: number, height: number) {
       const mark = (px: number, py: number, rw: number, rh: number, color: string) => {
         ctx.fillStyle = color; ctx.fillRect(Math.round(px + fx), Math.round(py + fy), rw, rh);
       };
+      // Only the final candle moves; the complete chart repeats after eight seconds.
+      const drift = [0, -1, -3, -2, 0, 2, 1, 0][Math.floor(tick / 8)];
+      const close = lastCandle.close + drift;
+      const top = Math.min(lastCandle.open, close), candleH = Math.max(2, Math.abs(lastCandle.open - close));
+      const chartMark = (px: number, py: number, rw: number, rh: number, color: string) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(Math.round(px - MARGIN + x), Math.round(py - MARGIN + y), rw, rh);
+      };
+      chartMark(lastCandle.x, top - 3, 1, candleH + 6, "#545454");
+      chartMark(lastCandle.x - Math.floor(bodyW / 2), top, bodyW, candleH, close <= lastCandle.open ? "#606060" : "#383838");
+      chartMark(lastCandle.x - Math.floor(bodyW / 2), volumeBottom - lastCandle.volume - Math.abs(drift), bodyW, lastCandle.volume + Math.abs(drift), "#383838");
+      for (let px = lastCandle.x + bodyW; px < plotX + plotW + 2; px += 3) chartMark(px, close, 1, 1, "#444444");
+      chartMark(displayX + displayW - 5, displayY + displayH - 3, 1, 1, tick < 48 ? "#707070" : "#404040");
       for (const led of [leftMonitor, rightMonitor]) if (led) mark(...led, 1, 1, tick < 48 ? "#808080" : "#484848");
       for (const [cx,cy] of fans) {
         const step = Math.floor(tick / 8) % 4;

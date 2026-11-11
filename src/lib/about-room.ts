@@ -339,7 +339,7 @@ export function createAboutRoom(width: number, height: number) {
   front.rect(mouse[0] - 1, mouse[1] - 4, 1, 2, 77);
 
   // Compact tower: mesh front, port bank, two recessed fans and machined edges.
-  const pcX = MARGIN + width * (mobile ? .74 : .925), pcY = MARGIN + height * (mobile ? .70 : compact ? .76 : .72);
+  const pcX = MARGIN + width * (mobile ? .74 : .925), pcY = MARGIN + height * (mobile ? .73 : compact ? .76 : .72);
   const pcW = width * (mobile ? .22 : .07), pcH = height * (mobile ? .18 : compact ? .16 : .20);
   front.rect(pcX + 2, pcY + 1, pcW, pcH, 5);
   front.rect(pcX, pcY, pcW, pcH, 25, "metal");

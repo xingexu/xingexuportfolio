@@ -28,12 +28,13 @@
 }
 .about-field { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: -1; }
 .about-name {
-  --letter-pixel: 5px;
-  --letter-drift: 12px;
+  --letter-pixel: 8px;
+  --letter-drift: 42px;
+  --letter-sway: 12px;
   position: absolute;
   top: 15%;
   left: 50%;
-  width: min(60%, 720px);
+  width: min(66%, 900px);
   margin: 0;
   padding: 0;
   display: flex;
@@ -50,12 +51,21 @@
   animation: about-letter-float var(--loop-duration) ease-in-out var(--letter-delay) infinite;
 }
 .about-letter:nth-child(even) { animation-direction: reverse; }
-.about-letter-art { display: block; width: calc(var(--letter-pixel) * 13); height: calc(var(--letter-pixel) * 15); image-rendering: pixelated; }
+.about-letter-art {
+  display: block;
+  width: calc(var(--letter-pixel) * 13);
+  height: calc(var(--letter-pixel) * 15);
+  image-rendering: pixelated;
+  animation: about-letter-sway var(--loop-duration) ease-in-out calc(var(--letter-delay) - 2s) infinite;
+}
+.about-letter:nth-child(even) .about-letter-art { animation-direction: reverse; }
 @keyframes about-letter-float {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(2px, calc(-.5 * var(--letter-drift))); }
-  50% { transform: translate(0, calc(-1 * var(--letter-drift))); }
-  75% { transform: translate(-2px, calc(-.5 * var(--letter-drift))); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(calc(-1 * var(--letter-drift))); }
+}
+@keyframes about-letter-sway {
+  0%, 100% { transform: translateX(calc(-1 * var(--letter-sway))); }
+  50% { transform: translateX(var(--letter-sway)); }
 }
 .about-objects { position: absolute; inset: 0; pointer-events: none; }
 .about-object {
@@ -84,7 +94,7 @@
 .about-exit, .about-motion-toggle { font: inherit; color: #777; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .about-exit:hover, .about-motion-toggle:hover { color: #fff; }
 .about-exit:focus-visible, .about-motion-toggle:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 4px; }
-.about-page[data-paused="true"] :is(.about-object-motion, .about-letter) { animation-play-state: paused !important; }
+.about-page[data-paused="true"] :is(.about-object-motion, .about-letter, .about-letter-art) { animation-play-state: paused !important; }
 
 @keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(3px, -5px); } 50% { transform: translate(0, -10px); } 75% { transform: translate(-3px, -5px); } }
 
@@ -94,13 +104,13 @@
 }
 
 @media (max-width: 1050px) {
-  .about-name { --letter-pixel: 4px; --letter-drift: 8px; top: 18%; width: 66%; }
+  .about-name { --letter-pixel: 6px; --letter-drift: 28px; --letter-sway: 8px; top: 15%; width: 72%; }
   .about-object-knight { left: 0; top: 14%; }
   .about-object-ball { right: 0; top: 13%; }
 }
 
 @media (max-width: 600px) {
-  .about-name { --letter-pixel: 3px; --letter-drift: 6px; top: calc(64% - 18px); width: 94%; }
+  .about-name { --letter-pixel: 4px; --letter-drift: 18px; --letter-sway: 4px; top: calc(64% - 10px); width: 94%; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
   .about-object-knight { left: 8%; top: 8%; }

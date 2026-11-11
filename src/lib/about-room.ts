@@ -208,16 +208,36 @@ export function createAboutRoom(width: number, height: number) {
     back.line([hx + 10, hy + 13], [hx + 13, hy + 30], 8);
   }
 
-  // One central trading display leaves the side walls clear for the About copy.
-  // Compact layouts place the display below the biography.
+  // Native HTML biography text is aligned with these two pixel monitor faces.
+  const narrow = width <= 200;
+  const bioMonitors = !mobile ? [
+    { x: width * .035, y: height * .32, width: width * .27, height: height * .35, slope: height * .02 },
+    { x: width * .695, y: height * .34, width: width * .27, height: height * .35, slope: -height * .02 },
+  ] : narrow ? [
+    { x: width * .06, y: height * .205, width: width * .88, height: height * .17, slope: 0 },
+    { x: width * .06, y: height * .40, width: width * .88, height: height * .185, slope: 0 },
+  ] : [
+    { x: width * .04, y: height * .25, width: width * .44, height: height * .285, slope: 0 },
+    { x: width * .52, y: height * .25, width: width * .44, height: height * .285, slope: 0 },
+  ];
   const displayX = MARGIN + width * (mobile ? .06 : .325);
-  const displayY = MARGIN + height * (mobile ? .59 : .33);
+  const displayY = MARGIN + height * (narrow ? .635 : mobile ? .59 : .33);
   const displayW = width * (mobile ? .88 : .35);
-  const displayH = height * (mobile ? .20 : .34);
+  const displayH = height * (narrow ? .155 : mobile ? .20 : .34);
 
   // A single central mount and cable sleeve support the remaining display.
   line(back, [.49, mobile ? .77 : .64], [.49, mobile ? .86 : .79], 9, 5);
   line(back, [.49, mobile ? .77 : .64], [.49, mobile ? .86 : .79], 45, 2);
+  if (!mobile) {
+    for (const side of [-1, 1]) {
+      line(back, [.49,.74], [.5 + side * .21,.71], 8, 5);
+      line(back, [.5 + side * .21,.71], [.5 + side * .32,.64], 8, 5);
+      line(back, [.49,.74], [.5 + side * .21,.71], 45, 2);
+      line(back, [.5 + side * .21,.71], [.5 + side * .32,.64], 38, 2);
+      back.ellipse(...point(.5 + side * .21,.71), 3, 3, 55);
+      back.ellipse(...point(.5 + side * .21,.71), 1, 1, 10);
+    }
+  }
   poly(back, [[.46,.78],[.54,.78],[.56,.80],[.44,.80]], 19, "metal");
   back.rect(displayX + 3, displayY + 4, displayW, displayH, 6);
   back.rect(displayX + displayW * .43, displayY + displayH, displayW * .14, 4, 13, "metal");
@@ -262,6 +282,32 @@ export function createAboutRoom(width: number, height: number) {
   }
 
   back.rect(...screen(.47, .965), displayW * .06, 1, 48);
+
+  const monitorLights: PixelLight[] = [];
+  const monitorLeds: Point[] = [];
+  const bio = bioMonitors.map((monitor) => {
+    const { x, y, width: mw, height: mh, slope } = monitor;
+    const at = (u: number, v: number): Point => [MARGIN + x + u, MARGIN + y + v + u / mw * slope];
+    const quad = (u: number, v: number, rw: number, rh: number, shade: number, material: Material = "metal") => {
+      back.polygon([at(u,v), at(u+rw,v), at(u+rw,v+rh), at(u,v+rh)], shade, material);
+    };
+    quad(2,3,mw,mh,5);
+    quad(0,0,mw,mh,47);
+    quad(1,1,mw-2,mh-2,20);
+    quad(3,3,mw-6,mh-8,9,"glass");
+    back.line(at(1,0),at(mw-2,0),85);
+    back.line(at(0,1),at(0,mh-2),58);
+    back.line(at(3,mh-5),at(mw-4,mh-5),35);
+    for (let i=0;i<3;i++) quad(6+i*3,5,1,1,i===0?84:40);
+    quad(mw-10,5,4,1,34);
+    quad(mw*.43,mh-3,mw*.14,1,56);
+    monitorLeds.push(at(mw-5,mh-3));
+    monitorLights.push({x:MARGIN+x,y:MARGIN+y+Math.min(0,slope),width:mw,height:mh+Math.abs(slope),reach:18,strength:.27,hollow:true});
+    return {
+      x:x+6,y:y+10+6/mw*slope,width:mw-12,height:mh-17,
+      tilt:Math.atan2(slope,mw)*180/Math.PI,
+    };
+  });
 
   const deskBack = compact ? .85 : .79, deskFront = .96;
   // Desk legs and cables sit behind the broad, foreshortened desktop.
@@ -357,13 +403,19 @@ export function createAboutRoom(width: number, height: number) {
 
   const backCanvas = back.canvas(), frontCanvas = front.canvas();
   const backGlow = pixelGlow(w, h, [
-    { x: displayX, y: displayY, width: displayW, height: displayH, reach: 12, strength: .18, hollow: true },
+    { x: displayX, y: displayY, width: displayW, height: displayH, reach: 20, strength: .27, hollow: true },
+    ...monitorLights,
     { x: MARGIN + width * .28, y: MARGIN + height * .12, width: width * .15, height: 1, reach: 8, strength: .26 },
     { x: MARGIN + width * .57, y: MARGIN + height * .12, width: width * .15, height: 1, reach: 8, strength: .20 },
   ]);
   const frontGlow = pixelGlow(w, h, [
     ...fans.map(([x, y]) => ({ x, y, width: 1, height: 1, reach: Math.min(12, pcW * .6), strength: .19 })),
   ]);
+  // Shallow pools of screen light fall across the desk on the same square grid.
+  const deskGlow = pixelGlow(w,h,(mobile?[.5]:[.22,.5,.78]).map((u)=>({
+    x:MARGIN+width*(u-.08),y:MARGIN+height*(deskBack+.025),
+    width:width*.16,height:1,reach:height*.065,strength:.15,
+  })));
   // Sparse fragments rise against gravity, fading before the eight-second wrap.
   const suspended = Array.from({ length: mobile ? 18 : 38 }, (_, i) => ({
     x: width * (.04 + noise(i, 231) * .92),
@@ -372,6 +424,7 @@ export function createAboutRoom(width: number, height: number) {
     drift: noise(i, 76) > .5 ? 1 : -1,
   }));
   return {
+    bio,
     display: { x: displayX - MARGIN, y: displayY - MARGIN, width: displayW, height: displayH },
     draw(ctx: CanvasRenderingContext2D, frame: number, cameraX = 0, cameraY = 0) {
       const tick = ((frame % ROOM_LOOP_FRAMES) + ROOM_LOOP_FRAMES) % ROOM_LOOP_FRAMES;
@@ -390,6 +443,10 @@ export function createAboutRoom(width: number, height: number) {
       ctx.globalCompositeOperation = "screen";
       ctx.globalAlpha = glow;
       ctx.drawImage(frontGlow, fx, fy);
+      ctx.beginPath();
+      ctx.rect(0,Math.ceil(height*deskBack+y*2),width,Math.floor(height*(deskFront-deskBack)));
+      ctx.clip();
+      ctx.drawImage(deskGlow,fx,fy);
       ctx.restore();
       const mark = (px: number, py: number, rw: number, rh: number, color: string) => {
         ctx.fillStyle = color; ctx.fillRect(Math.round(px + fx), Math.round(py + fy), rw, rh);
@@ -407,6 +464,7 @@ export function createAboutRoom(width: number, height: number) {
       chartMark(lastCandle.x - Math.floor(bodyW / 2), volumeBottom - lastCandle.volume - Math.abs(drift), bodyW, lastCandle.volume + Math.abs(drift), "#383838");
       for (let px = lastCandle.x + bodyW; px < plotX + plotW + 2; px += 3) chartMark(px, close, 1, 1, "#444444");
       chartMark(displayX + displayW - 5, displayY + displayH - 3, 1, 1, tick < 48 ? "#707070" : "#404040");
+      for (const led of monitorLeds) chartMark(...led,1,1,tick<48?"#a0a0a0":"#707070");
       for (const [cx,cy] of fans) {
         const step = Math.floor(tick / 8) % 4;
         mark(cx + [0,1,0,-1][step],cy + [-1,0,1,0][step],1,1,"#707070");

@@ -1,26 +1,25 @@
 /** Small, palette-limited sprites. Each character is one square source pixel. */
-const INK: Record<string, string> = { w: "#eeeeee", s: "#a8a8a8", e: "#686868", b: "#0c0c0c", "#": "#eeeeee" };
+const INK: Record<string, string> = { w: "#eeeeee", s: "#a8a8a8", e: "#686868", b: "#0c0c0c", "#": "#eeeeee", y: "#ffd119", h: "#ffe35c", d: "#d99c08", u: "#29268a", l: "#4543b0", n: "#17175b" };
 
-// Curved, interlocking panel seams read as a volleyball even at 20 × 20.
+// The V200W reference has broad blue ribbons curving around yellow panels.
+// A 20 × 20 source grid keeps the ball small and deliberately pixelated.
 const BALL_WIDTHS = [6, 10, 12, 14, 16, 18, 18, 20, 20, 20, 20, 20, 20, 18, 18, 16, 14, 12, 10, 6];
-const BALL_SEAMS = new Set([
-  // Three curved joins meet in the middle.
-  "6,1", "6,2", "6,3", "6,4", "7,5", "7,6", "8,7", "9,8", "10,9",
-  "11,9", "12,8", "13,7", "14,6", "15,6", "16,5", "17,5", "18,5",
-  "10,10", "10,11", "10,12", "11,13", "11,14", "12,15", "12,16", "13,17", "14,18",
-  // Parallel joins divide each curved group into long panels.
-  "2,5", "2,6", "3,7", "3,8", "4,9", "5,10", "6,11", "7,11", "8,12", "9,12",
-  "10,0", "10,1", "10,2", "11,3", "12,4", "13,5", "14,5",
-  "19,10", "18,10", "17,11", "16,11", "15,12", "14,13", "14,14", "14,15", "15,16", "15,17",
-]);
+const BLUE_TOP = [8, 7, 5, 4, 5, 6, 7, 7, 7, 7, 7, 7, 8, 8, 9, 10, 10, 9, 8, 7];
+const BLUE_BOTTOM = [10, 10, 11, 12, 12, 13, 13, 13, 13, 13, 13, 14, 14, 15, 16, 17, 16, 15, 13, 11];
 const VOLLEYBALL = BALL_WIDTHS.map((width, y) => {
-  const left = (20 - width) / 2;
+  const left = (20 - width) / 2, right = left + width - 1;
   return Array.from({ length: 20 }, (_, x) => {
-    if (x < left || x >= left + width) return ".";
-    if (BALL_SEAMS.has(`${x},${y}`)) return "b";
-    if (x === left || x === left + width - 1) return y < 12 ? "s" : "e";
-    if ((y > 14 && x > 11) || y === 19) return "s";
-    return "w";
+    if (x < left || x > right) return ".";
+    const ribbon = y >= BLUE_TOP[x] && y <= BLUE_BOTTOM[x];
+    const upperRim = y > 0 && y < 8 && x <= left + 1;
+    const lowerRim = y >= 14 && y < 19 && x >= right - 1;
+    if (ribbon || upperRim || lowerRim) {
+      if ((x === right && y > 9) || y > 16) return "n";
+      return x < 9 && y < 10 ? "l" : "u";
+    }
+    if (y < 4 || (x === left && y < 11)) return "h";
+    if (y > 16 || (x === right && y > 10)) return "d";
+    return "y";
   }).join("");
 });
 

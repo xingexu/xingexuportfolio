@@ -102,21 +102,12 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 .about-object-knight { left: calc(50% - 465px); top: 29%; }
 .about-object-knight .about-object-motion { animation-name: about-knight; animation-timing-function: steps(3, end); }
 .about-object-ball { right: calc(50% - 440px); top: 25%; }
-.about-object-ball .about-sprite, .about-object-ball-small .about-sprite { animation: about-ball-turn var(--loop-duration) steps(1, end) var(--float-delay) infinite; }
-.about-object-laptop { right: calc(50% - 470px); top: 43%; }
-.about-object-rook { left: 14%; top: 48%; }
-.about-object-rook .about-sprite { width: 32px; height: 40px; }
-.about-object-ball-small { left: 18%; top: 12%; }
-.about-object-ball-small .about-sprite { width: 20px; height: 20px; }
-.about-object-pawn { right: calc(50% - 210px); bottom: 13%; }
-.about-object-pawn .about-sprite { width: 28px; height: 40px; }
-.about-laptop-cursor { animation: about-blink 2s step-end infinite; }
+.about-object-ball .about-sprite { animation: about-ball-turn var(--loop-duration) steps(1, end) var(--float-delay) infinite; }
 .about-bottom { position: absolute; bottom: 28px; left: max(28px, calc(50% - 500px)); right: max(28px, calc(50% - 500px)); display: flex; align-items: center; justify-content: flex-end; }
 .about-motion-toggle { font: inherit; color: #acacac; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .about-motion-toggle:hover { color: #fff; }
-.about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-laptop-cursor, .about-letter) { animation-play-state: paused !important; }
+.about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-letter) { animation-play-state: paused !important; }
 
-@keyframes about-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(8px, -8px); } 50% { transform: translate(0, -16px); } 75% { transform: translate(-8px, -8px); } }
 @keyframes about-knight { 0%, 12.5%, 100% { transform: translate(0, 0); } 37.5% { transform: translate(0, -18px); } 50%, 62.5% { transform: translate(18px, -18px); } 87.5% { transform: translate(18px, 0); } }
 @keyframes about-ball-turn { 0% { transform: rotate(0); } 25% { transform: rotate(90deg); } 50% { transform: rotate(180deg); } 75% { transform: rotate(270deg); } 100% { transform: rotate(360deg); } }
@@ -124,16 +115,12 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 @media (min-width: 1500px) {
   .about-object-knight { left: 14%; }
   .about-object-ball { right: 16%; }
-  .about-object-laptop { right: 12%; }
-  .about-object-rook { left: 17%; }
 }
 
 @media (max-width: 1050px) {
   .about-name { --letter-pixel: 3px; --letter-travel: 6px; top: 23%; width: 60%; }
   .about-object-knight { left: 24%; top: 14%; }
   .about-object-ball { right: 22%; top: 13%; }
-  .about-object-laptop { left: calc(50% - 70px); right: auto; top: 7%; bottom: auto; }
-  .about-object-rook, .about-object-ball-small, .about-object-pawn { display: none; }
   .about-page { min-height: max(1020px, calc(100svh - 76px)); padding: 0; }
 }
 
@@ -149,8 +136,6 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   .about-object-knight .about-sprite { width: 40px; height: 48px; }
   .about-object-ball { right: 8%; top: 21%; }
   .about-object-ball .about-sprite { width: 40px; height: 40px; }
-  .about-object-laptop { left: calc(50% - 60px); right: auto; top: auto; bottom: 24%; }
-  .about-object-laptop .about-sprite { width: 40px; height: 28px; }
   .about-bottom { left: 24px; right: 24px; bottom: 20px; gap: 12px; font-size: 9px; }
 }
 

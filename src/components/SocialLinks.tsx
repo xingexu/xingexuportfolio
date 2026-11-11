@@ -10,9 +10,10 @@ const SOCIAL_LINKS = [
 type SocialLinksProps = {
   placement?: "hero" | "footer";
   className?: string;
+  showGitHub?: boolean;
 };
 
-export default function SocialLinks({ placement = "footer", className = "" }: SocialLinksProps) {
+export default function SocialLinks({ placement = "footer", className = "", showGitHub = true }: SocialLinksProps) {
   return (
     <nav aria-label="Social and contact" className={`social-links social-links-${placement} ${className}`}>
       {placement === "hero" && (
@@ -23,7 +24,7 @@ export default function SocialLinks({ placement = "footer", className = "" }: So
           </svg>
         </span>
       )}
-      {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+      {SOCIAL_LINKS.filter(({ href }) => showGitHub || href !== LINKS.github).map(({ label, href, Icon }) => (
         <a
           key={label}
           href={href}

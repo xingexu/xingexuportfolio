@@ -23,6 +23,7 @@
   font-size: 13px;
 }
 .nav-bar-about .nav-link:hover { color: #fff; text-shadow: none; }
+.nav-bar-about .nav-link[aria-current="page"] { color: #fff; background: transparent; border-color: transparent; border-bottom-color: #c3c7c7; }
 .about-home-link {
   margin-right: auto;
   color: #c3c7c7;

@@ -29,6 +29,9 @@ export default function Nav() {
       >
         {isAbout && <Link href="/" className="about-home-link" aria-label="Back to home">← <span>xinge xu</span></Link>}
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <Link href="/about" aria-current={isAbout ? "page" : undefined} className="nav-link">
+            about
+          </Link>
           <Link href="/projects" aria-current={pathname === "/projects" ? "page" : undefined} className="nav-link">
             projects
           </Link>

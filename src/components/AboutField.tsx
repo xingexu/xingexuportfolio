@@ -27,6 +27,14 @@ export default function AboutField({ paused }: { paused: boolean }) {
     function draw() {
       if (!canvas) return;
       room?.draw(ctx, Math.floor(elapsedRef.current / ROOM_FRAME_MS), camera.x, camera.y);
+      if (room && canvas.dataset.ready !== "true") {
+        canvas.dataset.screenX = String(room.display.x);
+        canvas.dataset.screenY = String(room.display.y);
+        canvas.dataset.screenWidth = String(room.display.width);
+        canvas.dataset.screenHeight = String(room.display.height);
+        canvas.dataset.ready = "true";
+        window.dispatchEvent(new Event("about-room-ready"));
+      }
     }
 
     function tick(now: number) {
@@ -71,6 +79,7 @@ export default function AboutField({ paused }: { paused: boolean }) {
       canvas.style.height = `${canvas.height * ROOM_CELL}px`;
       room = createAboutRoom(canvas.width, canvas.height);
       roomRef.current = room;
+      delete canvas.dataset.ready;
       draw();
     });
     if (surface) resize.observe(surface);

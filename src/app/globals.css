@@ -2151,6 +2151,26 @@ html[data-intro="playing"] .home-intro.is-drawing {
   background: transparent;
 }
 
+/* The room shutter covers the old sky, navigation, and incoming scene together. */
+.room-transition { display: none; }
+html[data-room-transition] .room-transition {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1100;
+  image-rendering: pixelated;
+  background: #080808;
+  pointer-events: none;
+  animation: roomTransitionFailsafe 0s 7s forwards;
+}
+html[data-room-transition] .room-transition.is-drawing { background: transparent; }
+@keyframes roomTransitionFailsafe { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-room-transition] .room-transition { display: none; }
+}
+
 /* ── Resume ── */
 
 .resume-page {

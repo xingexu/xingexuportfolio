@@ -56,8 +56,6 @@ export default function About() {
   return (
     <section className="about-page" aria-labelledby="about-heading" data-paused={paused}>
       <AboutField paused={paused} />
-      <div className="about-crosshair about-crosshair-one" aria-hidden="true">+</div>
-      <div className="about-crosshair about-crosshair-two" aria-hidden="true">+</div>
 
       <div className="about-objects" aria-label="My interests and profiles">
         {OBJECTS.map((object) => (

@@ -1,12 +1,12 @@
 /* The About scene has its own monochrome palette, independent of the sky clock. */
 :root:has(.about-page) {
   color-scheme: dark;
-  --bg: #090a0b;
+  --bg: #13191c;
   --text: #f2f2ee;
   --accent: #f2f2ee;
-  --accent-ink: #090a0b;
+  --accent-ink: #13191c;
   --border: #343a3d;
-  --chrome-solid: #090a0b;
+  --chrome-solid: #13191c;
   --chrome-muted: #909698;
   --chrome-text: #e5e7e7;
   --chrome-border: #2b3032;
@@ -15,7 +15,7 @@
   --chrome-accent: #f2f2ee;
 }
 
-.nav-bar-about { background: #090a0b; }
+.nav-bar-about { background: #13191c; }
 .nav-bar-about::after { display: none; }
 .nav-bar-about .nav-link {
   color: #a4a9aa;
@@ -47,7 +47,7 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   place-items: center;
   min-height: max(760px, calc(100svh - 76px));
   padding: 170px 24px 180px;
-  background: #090a0b;
+  background: #13191c;
   color: #f2f2ee;
   overflow: clip;
 }
@@ -101,29 +101,26 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   z-index: 3;
 }
 .about-object-art { display: grid; place-items: center; width: 100%; height: 80px; }
-.about-object-motion { display: inline-block; animation: about-float var(--loop-duration) steps(12, end) var(--float-delay) infinite; }
+.about-object-motion { display: inline-block; animation: about-float var(--loop-duration) steps(4, end) var(--float-delay) infinite; }
 .about-sprite { display: block; overflow: visible; image-rendering: pixelated; }
 .about-object-caption { font-size: 10px; letter-spacing: .015em; color: #9aa3a5; white-space: nowrap; transition: color 120ms; }
 .about-object:hover .about-object-caption, .about-object:focus-visible .about-object-caption { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
 .about-object:hover .about-object-motion, .about-object:focus-visible .about-object-motion { animation-play-state: paused; }
 .about-object:focus-visible { outline: 1px dashed #cdd3d3; outline-offset: 5px; }
 .about-object-knight { left: calc(50% - 490px); top: 24%; }
-.about-object-knight .about-object-motion { animation-name: about-knight; }
-.about-object-ball { right: calc(50% - 475px); top: 19%; }
+.about-object-knight .about-object-motion { animation-name: about-knight; animation-timing-function: steps(3, end); }
+.about-object-ball { right: calc(50% - 390px); top: 10%; }
 .about-object-ball .about-sprite, .about-object-ball-small .about-sprite { animation: about-ball-turn var(--loop-duration) steps(1, end) var(--float-delay) infinite; }
-.about-object-laptop { right: calc(50% - 505px); top: 57%; }
-.about-object-rook { left: calc(50% - 435px); top: 63%; }
-.about-object-rook .about-sprite { width: 36px; height: 36px; }
+.about-object-laptop { right: calc(50% - 505px); top: 41%; }
+.about-object-rook { left: 7%; top: 44%; }
+.about-object-rook .about-sprite { width: 32px; height: 40px; }
 .about-object-ball-small { left: calc(50% - 155px); top: 12%; }
-.about-object-ball-small .about-sprite { width: 32px; height: 32px; }
+.about-object-ball-small .about-sprite { width: 20px; height: 20px; }
 .about-object-ball-small .about-object-caption, .about-object-pawn .about-object-caption { opacity: 0; }
 .about-object-ball-small:is(:hover, :focus-visible) .about-object-caption, .about-object-pawn:is(:hover, :focus-visible) .about-object-caption { opacity: 1; }
 .about-object-pawn { right: calc(50% - 245px); bottom: 9%; }
-.about-object-pawn .about-sprite { width: 24px; height: 24px; }
+.about-object-pawn .about-sprite { width: 28px; height: 40px; }
 .about-laptop-cursor { animation: about-blink 2s step-end infinite; }
-.about-crosshair { position: absolute; color: #4d575b; font-size: 17px; line-height: 1; }
-.about-crosshair-one { top: 18%; left: 8%; }
-.about-crosshair-two { bottom: 15%; right: 9%; }
 .about-bottom { position: absolute; bottom: 28px; left: max(28px, calc(50% - 500px)); right: max(28px, calc(50% - 500px)); display: flex; align-items: center; justify-content: space-between; gap: 24px; font-size: 10px; color: #949d9f; }
 .about-explore > span { color: #c0c7c9; }
 .about-motion-toggle { font: inherit; color: #acb3b5; background: none; border: none; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -148,13 +145,11 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 }
 
 @media (max-width: 1050px) {
-  .about-object-knight { left: 3%; top: 18%; }
-  .about-object-ball { right: 4%; top: 19%; }
-  .about-object-laptop { right: 4%; top: auto; bottom: 13%; }
-  .about-object-rook { left: 4%; top: auto; bottom: 14%; }
-  .about-object-ball-small { left: 37%; top: 9%; }
-  .about-object-pawn { right: 40%; bottom: 7%; }
-  .about-page { min-height: 850px; padding: 235px 36px 245px; }
+  .about-object-knight { left: 24%; top: 14%; }
+  .about-object-ball { right: 22%; top: 13%; }
+  .about-object-laptop { left: calc(50% - 70px); right: auto; top: 7%; bottom: auto; }
+  .about-object-rook, .about-object-ball-small, .about-object-pawn { display: none; }
+  .about-page { min-height: max(850px, calc(100svh - 76px)); padding: 235px 36px 245px; }
 }
 
 @media (max-width: 600px) {
@@ -169,15 +164,12 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   .about-text-links { gap: 20px; font-size: 11px; margin-top: 20px; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
-  .about-object-knight { left: 9%; top: 11%; }
-  .about-object-knight .about-sprite { width: 32px; height: 32px; }
-  .about-object-ball { right: 7%; top: 14%; }
-  .about-object-ball .about-sprite { width: 32px; height: 32px; }
-  .about-object-laptop { right: 7%; bottom: 12%; }
+  .about-object-knight { left: 8%; top: 18%; }
+  .about-object-knight .about-sprite { width: 40px; height: 48px; }
+  .about-object-ball { right: 8%; top: 18%; }
+  .about-object-ball .about-sprite { width: 40px; height: 40px; }
+  .about-object-laptop { left: calc(50% - 60px); right: auto; top: auto; bottom: 16%; }
   .about-object-laptop .about-sprite { width: 40px; height: 28px; }
-  .about-object-rook { left: 6%; bottom: 14%; }
-  .about-object-rook .about-sprite { width: 24px; height: 24px; }
-  .about-object-ball-small, .about-object-pawn { display: none; }
   .about-object-caption { font-size: 9px; }
   .about-bottom { left: 24px; right: 24px; bottom: 20px; gap: 12px; font-size: 9px; }
   .about-explore { max-width: 140px; line-height: 1.8; }

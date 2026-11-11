@@ -2151,7 +2151,7 @@ html[data-intro="playing"] .home-intro.is-drawing {
   background: transparent;
 }
 
-/* The room shutter covers the old sky, navigation, and incoming scene together. */
+/* Pixel corrosion covers the old sky, navigation, and incoming scene together. */
 .room-transition { display: none; }
 html[data-room-transition] .room-transition {
   display: block;

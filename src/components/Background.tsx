@@ -2564,6 +2564,7 @@ export default function Background() {
   return (
     <canvas
       ref={ref}
+      data-pixel-sky
       aria-hidden
       style={{
         position: "fixed",

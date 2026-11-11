@@ -1,10 +1,61 @@
-/** A real three-pixel raster shutter, composited over both routes and the nav. */
-const CELL = 3;
-const CLOSE_MS = 420;
-const REVEAL_MS = 1550;
+/** Pixel corrosion on the sky's five-pixel grid, covering both routes and the nav. */
+const CELL = 5;
+const CLOSE_MS = 1150;
+const REVEAL_MS = 1100;
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const ease = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
-const noise = (index: number) => ((index * 37 + 17) % 29) / 29;
+const hash = (x: number, y: number) => {
+  let n = Math.imul(x, 374761393) + Math.imul(y, 668265263);
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+};
+
+function noise(x: number, y: number) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const u = ease(x - ix), v = ease(y - iy);
+  const top = hash(ix, iy) * (1 - u) + hash(ix + 1, iy) * u;
+  const bottom = hash(ix, iy + 1) * (1 - u) + hash(ix + 1, iy + 1) * u;
+  return top * (1 - v) + bottom * v;
+}
+
+/** Coherent islands and tiny pits, rather than independent TV-static pixels. */
+function corrosion(width: number, height: number, origin?: { x: number; y: number }) {
+  const thresholds = new Float32Array(width * height);
+  const grit = new Float32Array(width * height);
+  let low = Infinity, high = -Infinity;
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = y * width + x;
+    const grain = hash(x + 89, y + 43);
+    const islands = noise(x / 32, y / 32) * .52 + noise(x / 11, y / 11) * .29
+      + noise(x / 3, y / 3) * .13 + grain * .06;
+    const distance = Math.hypot((x - (origin?.x ?? width * .52)) / width,
+      (y - (origin?.y ?? height * .45)) / height);
+    const value = origin ? islands * .44 + distance * .84 : islands - distance * .42;
+    thresholds[i] = value;
+    grit[i] = grain;
+    low = Math.min(low, value); high = Math.max(high, value);
+  }
+  for (let i = 0; i < thresholds.length; i++) thresholds[i] = (thresholds[i] - low) / (high - low || 1) * .78;
+  return { thresholds, grit };
+}
+
+/** Read only our same-origin sky canvas once; no screen capture or extra assets. */
+function skyPixels(width: number, height: number) {
+  const source = document.querySelector<HTMLCanvasElement>("canvas[data-pixel-sky]");
+  if (!source) return null;
+  const sample = document.createElement("canvas");
+  sample.width = width; sample.height = height;
+  const ctx = sample.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  try {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(source, 0, 0, width, height);
+    return ctx.getImageData(0, 0, width, height).data;
+  } catch {
+    // A future cross-origin sky asset should never break navigation.
+    return null;
+  }
+}
 
 export function createRoomTransition(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d");
@@ -72,27 +123,42 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     clear();
     if (!prepare("closing") || !ctx) return true;
     const { width, height } = canvas;
-    const horizon = Math.round(height * .45);
+    const { thresholds, grit } = corrosion(width, height);
+    const colors = skyPixels(width, height);
+    const mask = ctx.createImageData(width, height);
+    const pixels = mask.data;
+    const fragments: { x: number; y: number; onset: number; grain: number; color: string }[] = [];
+    if (colors) for (let i = 0; i < thresholds.length; i++) {
+      if (grit[i] > .013 || colors[i * 4 + 3] === 0) continue;
+      const r = colors[i * 4], g = colors[i * 4 + 1], b = colors[i * 4 + 2];
+      if (Math.max(r, g, b) < 45) continue;
+      fragments.push({ x: i % width, y: Math.floor(i / width), onset: thresholds[i],
+        grain: hash(i, 17), color: `rgb(${r} ${g} ${b})` });
+    }
     const finished = await animate(CLOSE_MS, (elapsed) => {
-      ctx.clearRect(0, 0, width, height);
-      for (let x = 0, i = 0; x < width; x += 6, i++) {
-        const progress = ease((elapsed / CLOSE_MS - noise(i) * .16) / .84);
-        const top = Math.ceil(horizon * progress);
-        const bottom = Math.ceil((height - horizon) * progress);
-        ctx.fillStyle = i % 3 === 0 ? "#0b0b0b" : "#080808";
-        ctx.fillRect(x, 0, 6, top);
-        ctx.fillRect(x, height - bottom, 6, bottom);
-        if (progress > 0 && progress < .97) {
-          ctx.fillStyle = "#292929";
-          ctx.fillRect(x, top - 1, 6, 1);
-          ctx.fillRect(x, height - bottom, 6, 1);
-        }
+      const progress = elapsed / CLOSE_MS;
+      for (let i = 0; i < thresholds.length; i++) {
+        // Quantized darkening preserves the source colors at each eroding edge.
+        const decay = Math.round(ease((progress - thresholds[i]) / .16) * 12) / 12;
+        const shade = 6 + Math.floor(grit[i] * 5);
+        const offset = i * 4;
+        pixels[offset] = shade; pixels[offset + 1] = shade; pixels[offset + 2] = shade;
+        pixels[offset + 3] = Math.round(decay * 255);
       }
+      ctx.putImageData(mask, 0, 0);
+      // A few actual sky-colored cells shed from the rim, then lose their color.
+      for (const fragment of fragments) {
+        const age = (progress - fragment.onset - .065) / .15;
+        if (age <= 0 || age >= 1) continue;
+        ctx.globalAlpha = Math.round((1 - age) * 6) / 6;
+        ctx.fillStyle = fragment.color;
+        const drift = Math.floor(age * 5);
+        ctx.fillRect(fragment.x + Math.round((fragment.grain - .5) * drift * 2), fragment.y - drift, 1, 1);
+      }
+      ctx.globalAlpha = 1;
     });
     if (finished) {
       root.dataset.roomTransition = "waiting";
-      ctx.fillStyle = "#080808";
-      ctx.fillRect(0, 0, width, height);
     }
     return finished;
   }
@@ -127,11 +193,12 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     if (!field) { clear(); return; }
     const bounds = field.getBoundingClientRect();
     const { width, height } = canvas;
-    const sx = Math.round(bounds.left / CELL + Number(field.dataset.screenX));
-    const sy = Math.round(bounds.top / CELL + Number(field.dataset.screenY));
-    const sw = Number(field.dataset.screenWidth);
-    const sh = Number(field.dataset.screenHeight);
-    const cx = sx + sw / 2, cy = sy + sh / 2;
+    const scale = bounds.width / field.width;
+    const cx = (bounds.left + (Number(field.dataset.screenX) + Number(field.dataset.screenWidth) / 2) * scale) / CELL;
+    const cy = (bounds.top + (Number(field.dataset.screenY) + Number(field.dataset.screenHeight) / 2) * scale) / CELL;
+    const { thresholds, grit } = corrosion(width, height, { x: cx, y: cy });
+    const mask = ctx.createImageData(width, height);
+    const pixels = mask.data;
     root.dataset.roomTransition = "revealing";
 
     // Separate wrappers keep the existing eight-second floats uninterrupted.
@@ -139,38 +206,19 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     revealEffects = Array.from(arrivals, (element, index) => element.animate([
       { opacity: 0, transform: "translateY(12px)" },
       { opacity: 1, transform: "translateY(0)" },
-    ], { duration: 300, delay: 850 + index * 45, easing: "steps(5, end)", fill: "both" }));
+    ], { duration: 250, delay: 440 + index * 45, easing: "steps(5, end)", fill: "both" }));
 
     const finished = await animate(REVEAL_MS, (elapsed) => {
-      ctx.fillStyle = "#080808";
-      ctx.fillRect(0, 0, width, height);
-      // A single phosphor line opens into the actual trading display.
-      const ignition = ease(elapsed / 260);
-      const screen = ease((elapsed - 220) / 440);
-      const expansion = ease((elapsed - 610) / 850);
-      const left = Math.round(cx - sw / 2 * ignition - sx * expansion);
-      const right = Math.round(cx + sw / 2 * ignition + (width - sx - sw) * expansion);
-      for (let x = left; x < right; x += 4) {
-        const stagger = noise(Math.floor(x / 4)) * .07 * Math.sin(expansion * Math.PI);
-        const spread = clamp(expansion - stagger);
-        const top = Math.round(cy - sh / 2 * screen - (sy + 3) * spread);
-        const bottom = Math.round(cy + sh / 2 * screen + (height - sy - sh + 3) * spread);
-        ctx.clearRect(x, top, Math.min(4, right - x), Math.max(1, bottom - top));
-        if (elapsed < 1250) {
-          const gray = Math.round(90 * (1 - expansion) + 20);
-          ctx.fillStyle = `rgb(${gray} ${gray} ${gray})`;
-          ctx.fillRect(x, top, Math.min(4, right - x), 1);
-          if (screen > .1) ctx.fillRect(x, bottom - 1, Math.min(4, right - x), 1);
-        }
+      const progress = elapsed / REVEAL_MS;
+      for (let i = 0; i < thresholds.length; i++) {
+        // Light finds the monitor first, then eats through the same granular dark.
+        const light = Math.round(ease((progress - thresholds[i]) / .20) * 12) / 12;
+        const shade = 6 + Math.floor(grit[i] * 5);
+        const offset = i * 4;
+        pixels[offset] = shade; pixels[offset + 1] = shade; pixels[offset + 2] = shade;
+        pixels[offset + 3] = Math.round((1 - light) * 255);
       }
-      // Small, dim raster brackets register the monitor as the scene opens.
-      if (elapsed > 120 && elapsed < 610) {
-        ctx.fillStyle = "#343434";
-        for (const [x, y, dx, dy] of [[sx - 3, sy - 3, 1, 1], [sx + sw + 2, sy - 3, -1, 1], [sx - 3, sy + sh + 2, 1, -1], [sx + sw + 2, sy + sh + 2, -1, -1]]) {
-          ctx.fillRect(Math.round(x), Math.round(y), dx * 4, 1);
-          ctx.fillRect(Math.round(x), Math.round(y), 1, dy * 4);
-        }
-      }
+      ctx.putImageData(mask, 0, 0);
     });
     if (finished) clear();
   }

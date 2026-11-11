@@ -1,174 +1,317 @@
-/** A small pixel room drawn only with integer-aligned, solid-color rectangles. */
+/** A grayscale pixel illustration. Geometry and light are rasterized once per size. */
 export const ROOM_FRAME_MS = 125;
 export const ROOM_LOOP_FRAMES = 64;
-export const ROOM_CELL = 4;
+export const ROOM_CELL = 3;
 
-const P = {
-  black: "#090c0e", wall: "#13191c", joint: "#192024", grain: "#1c2529",
-  shade: "#20292d", dark: "#2b363b", mid: "#455156", light: "#73817f",
-  silver: "#a2ada5", white: "#d3d7c8", screen: "#121c1b", code: "#6b8477",
-} as const;
+const MARGIN = 6;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+type Point = readonly [number, number];
+type Material = "paint" | "metal" | "wood" | "glass";
 
-export function drawAboutRoom(ctx: CanvasRenderingContext2D, width: number, height: number, frame: number) {
-  const tick = ((frame % ROOM_LOOP_FRAMES) + ROOM_LOOP_FRAMES) % ROOM_LOOP_FRAMES;
-  const mobile = width < 160;
-  const deskY = Math.round(height * (width < 266 ? .86 : .79));
-  const floorY = deskY + 13;
-  const r = (x: number, y: number, w: number, h: number, color: string) => {
-    ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
-  };
-  const line = (x1: number, y1: number, x2: number, y2: number, color: string) => {
-    let x = Math.round(x1), y = Math.round(y1);
-    const endX = Math.round(x2), endY = Math.round(y2);
+function noise(x: number, y: number) {
+  let n = Math.imul(x + 179, 374761393) ^ Math.imul(y + 421, 668265263);
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+}
+
+/** Every mark is a square, opaque pixel; no blur, gradients, strokes or antialiasing. */
+class Pixels {
+  readonly data: Uint8ClampedArray;
+  constructor(readonly width: number, readonly height: number) {
+    this.data = new Uint8ClampedArray(width * height * 4);
+  }
+  pixel(x: number, y: number, shade: number, material: Material = "paint") {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
+    const grain = (noise(x, y) - .5) * (material === "glass" ? 3 : 8);
+    const clusters = (noise(Math.floor(x / 5), Math.floor(y / 4)) - .5) * 4;
+    const surface = material === "wood" ? (noise(Math.floor(x / 13), y) - .5) * 9
+      : material === "metal" ? (y % 3 === 0 ? 2 : -1) : clusters;
+    const threshold = BAYER[(y & 3) * 4 + (x & 3)] / 16;
+    const value = Math.max(4, Math.min(112, Math.floor((shade + grain + surface) / 4 + threshold) * 4));
+    const index = (y * this.width + x) * 4;
+    this.data[index] = value; this.data[index + 1] = value; this.data[index + 2] = value; this.data[index + 3] = 255;
+  }
+  rect(x: number, y: number, w: number, h: number, shade: number, material: Material = "paint") {
+    for (let py = Math.max(0, Math.round(y)); py < Math.min(this.height, Math.round(y + h)); py++)
+      for (let px = Math.max(0, Math.round(x)); px < Math.min(this.width, Math.round(x + w)); px++) this.pixel(px, py, shade, material);
+  }
+  polygon(points: readonly Point[], shade: number, material: Material = "paint") {
+    const minY = Math.max(0, Math.ceil(Math.min(...points.map(p => p[1]))));
+    const maxY = Math.min(this.height - 1, Math.floor(Math.max(...points.map(p => p[1]))));
+    for (let y = minY; y <= maxY; y++) {
+      const intersections: number[] = [];
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i], b = points[(i + 1) % points.length];
+        if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) intersections.push(a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+      }
+      intersections.sort((a, b) => a - b);
+      for (let i = 0; i < intersections.length; i += 2)
+        for (let x = Math.max(0, Math.ceil(intersections[i])); x < Math.min(this.width, Math.ceil(intersections[i + 1])); x++) this.pixel(x, y, shade, material);
+    }
+  }
+  line(a: Point, b: Point, shade: number, thickness = 1) {
+    let x = Math.round(a[0]), y = Math.round(a[1]);
+    const endX = Math.round(b[0]), endY = Math.round(b[1]);
     const dx = Math.abs(endX - x), dy = -Math.abs(endY - y);
     const sx = x < endX ? 1 : -1, sy = y < endY ? 1 : -1;
     let error = dx + dy;
     for (;;) {
-      r(x, y, 1, 1, color);
+      this.rect(x, y, thickness, thickness, shade, "metal");
       if (x === endX && y === endY) break;
       const next = error * 2;
       if (next >= dy) { error += dy; x += sx; }
       if (next <= dx) { error += dx; y += sy; }
     }
-  };
-  const shelf = (x: number, y: number, w: number) => {
-    r(x, y, w, 2, P.mid); r(x, y + 2, w, 3, P.dark);
-    r(x + 4, y + 5, 2, 5, P.shade); r(x + w - 6, y + 5, 2, 5, P.shade);
-  };
-  const book = (x: number, y: number, w: number, h: number, color: string) => {
-    r(x, y - h, w, h, color); r(x + 1, y - h + 2, w - 2, 1, P.silver);
-    r(x + 1, y - 3, w - 2, 1, P.shade);
-  };
-  const frameOnWall = (x: number, y: number, w: number, h: number) => {
-    r(x + 1, y + 1, w, h, P.black); r(x, y, w, h, P.mid);
-    r(x + 1, y + 1, w - 2, h - 2, P.silver); r(x + 3, y + 3, w - 6, h - 6, P.dark);
-  };
-  const monitor = (x: number, y: number, w: number, h: number) => {
-    r(x + 1, y, w - 2, h, P.light); r(x, y + 1, w, h - 2, P.light);
-    r(x + 1, y + 1, w - 2, h - 2, P.mid);
-    r(x + 3, y + 3, w - 6, h - 8, P.black); r(x + 4, y + 4, w - 8, h - 10, P.screen);
-    r(x + 4, y + h - 4, 2, 1, P.silver); r(x + w - 5, y + h - 4, 1, 1, tick < 48 ? P.white : P.light);
-    r(x + Math.floor(w / 2) - 2, y + h, 4, 4, P.dark);
-    r(x + Math.floor(w / 2) - 8, y + h + 4, 16, 2, P.mid);
-    // A tiny editor: sidebar, line numbers and stepped code lengths.
-    r(x + 5, y + 5, 5, h - 12, P.shade);
-    for (let i = 0; i < 5; i++) {
-      r(x + 6, y + 7 + i * 3, 2, 1, P.mid);
-      r(x + 12 + (i % 2) * 2, y + 7 + i * 3, Math.min(w - 19, [13, 8, 17, 11, 6][i]), 1, i === 0 ? P.silver : P.code);
+  }
+  ellipse(cx: number, cy: number, rx: number, ry: number, shade: number, material: Material = "metal") {
+    for (let y = Math.floor(cy - ry); y <= cy + ry; y++) {
+      const span = rx * Math.sqrt(Math.max(0, 1 - ((y - cy) / ry) ** 2));
+      this.rect(cx - span, y, span * 2, 1, shade, material);
     }
-    if (tick % 8 < 4) r(x + 21, y + 19, 2, 1, P.white);
+  }
+  canvas() {
+    const canvas = document.createElement("canvas");
+    canvas.width = this.width; canvas.height = this.height;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      const image = ctx.createImageData(this.width, this.height);
+      image.data.set(this.data);
+      ctx.putImageData(image, 0, 0);
+    }
+    return canvas;
+  }
+}
+
+export type AboutRoom = ReturnType<typeof createAboutRoom>;
+
+export function createAboutRoom(width: number, height: number) {
+  const w = width + MARGIN * 2, h = height + MARGIN * 2;
+  const mobile = width < 210;
+  const compact = width < 350;
+  const back = new Pixels(w, h), front = new Pixels(w, h);
+  const point = (x: number, y: number): Point => [MARGIN + width * x, MARGIN + height * y];
+  const poly = (layer: Pixels, points: readonly Point[], shade: number, material: Material = "paint") => layer.polygon(points.map(p => point(...p)), shade, material);
+  const line = (layer: Pixels, a: Point, b: Point, shade: number, thickness = 1) => layer.line(point(...a), point(...b), shade, thickness);
+
+  // Dithered plaster fills the entire image, including the quiet reading area.
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = (x - MARGIN) / width, v = (y - MARGIN) / height;
+    const lamp = Math.max(0, 1 - Math.hypot((u - .28) * 1.7, (v - .22) * 1.3));
+    const edge = Math.min(1, Math.abs(u - .5) * 2);
+    back.pixel(x, y, 14 + lamp * 13 - edge * 7 + (v > .65 ? 3 : 0));
+  }
+
+  const wallL = mobile ? .07 : compact ? .12 : .205, wallR = 1 - wallL;
+  poly(back, [[0, 0], [wallL, .14], [wallL, .735], [0, .96]], 23);
+  poly(back, [[1, 0], [wallR, .14], [wallR, .735], [1, .96]], 13);
+  poly(back, [[0, 0], [1, 0], [wallR, .14], [wallL, .14]], 10, "metal");
+  line(back, [wallL, .14], [wallL, .735], 32);
+  line(back, [wallR, .14], [wallR, .735], 25);
+  line(back, [wallL, .14], [wallR, .14], 38);
+  line(back, [wallL, .145], [wallR, .145], 8);
+
+  // Ceiling ribs and inset light housings recede toward the back wall.
+  for (const u of [.06, .16, .84, .94]) {
+    line(back, [u, 0], [.5 + (u - .5) * (1 - 2 * wallL), .14], 28, 2);
+    line(back, [u + .008, 0], [.5 + (u - .492) * (1 - 2 * wallL), .14], 7);
+  }
+  line(back, [.28, .12], [.43, .12], 64);
+  line(back, [.57, .12], [.72, .12], 44);
+  for (let y = .26; y < .7; y += .11) {
+    line(back, [0, y - .04], [wallL, y], 12);
+    line(back, [1, y - .04], [wallR, y], 7);
+  }
+
+  // Narrow seams in large plaster panels; the center stays low contrast.
+  for (const u of [.32, .68]) line(back, [u, .15], [u, .73], 16);
+  line(back, [wallL, .735], [wallR, .735], 9, 2);
+  line(back, [wallL, .743], [wallR, .743], 29);
+  poly(back, [[0, .96], [wallL, .75], [wallR, .75], [1, .96], [1, 1], [0, 1]], 13, "wood");
+  for (const x of [-.8, -.35, .05, .35, .65, .95, 1.35, 1.8]) {
+    const atBack = .5 + (x - .5) * .18;
+    line(back, [atBack, .75], [x, 1], 5);
+  }
+  for (const y of [.78, .82, .88, .96]) line(back, [0, y], [1, y], 7);
+
+  // Recessed bookcase: each shelf has a rear shadow, a side face and a worn edge.
+  const shelfX = width * (mobile ? .025 : .018) + MARGIN;
+  const shelfY = height * (mobile ? .085 : .19) + MARGIN;
+  const shelfW = width * (mobile ? .32 : compact ? .10 : .155);
+  const shelfH = height * (mobile ? .105 : .30);
+  back.rect(shelfX - 3, shelfY - 3, shelfW + 7, shelfH + 7, 8, "wood");
+  back.rect(shelfX, shelfY, shelfW, shelfH, 13);
+  const rows = mobile ? 1 : 3;
+  for (let row = 0; row < rows; row++) {
+    const bottom = shelfY + (row + 1) * shelfH / rows;
+    for (let i = 0, x = shelfX + 3; x < shelfX + shelfW - 3; i++) {
+      const bw = 3 + i % 3, bh = Math.min(shelfH / rows - 5, 9 + noise(i, row) * 18);
+      const shade = 24 + noise(i + 4, row) * 32;
+      back.rect(x + 1, bottom - bh - 1, bw, bh, 7);
+      back.rect(x, bottom - bh, bw - 1, bh, shade, "wood");
+      back.rect(x, bottom - bh + 2, 1, bh - 3, shade + 12);
+      if (i % 3) back.rect(x + 1, bottom - bh + 4, bw - 2, 1, 68);
+      back.rect(x + 1, bottom - 3, bw - 2, 1, 15);
+      x += bw + 1;
+    }
+    back.rect(shelfX - 1, bottom, shelfW + 3, 2, 49, "wood");
+    back.rect(shelfX - 1, bottom + 2, shelfW + 3, 3, 18, "wood");
+  }
+  back.rect(shelfX - 3, shelfY - 3, 2, shelfH + 9, 38, "wood");
+  back.rect(shelfX + shelfW + 2, shelfY - 3, 2, shelfH + 9, 20, "wood");
+
+  // Acoustic panels on the right wall, with a hanging set of headphones.
+  const panelX = MARGIN + width * (mobile ? .76 : compact ? .90 : .85);
+  const panelY = MARGIN + height * (mobile ? .09 : .20);
+  const panelW = width * (mobile ? .20 : compact ? .08 : .12), panelH = height * (mobile ? .105 : .26);
+  back.rect(panelX - 2, panelY - 2, panelW + 4, panelH + 4, 8);
+  back.rect(panelX, panelY, panelW, panelH, 25, "metal");
+  for (let x = panelX + 2; x < panelX + panelW - 1; x += 3) {
+    back.rect(x, panelY + 1, 1, panelH - 2, 42, "metal");
+    back.rect(x + 1, panelY + 1, 1, panelH - 2, 11);
+  }
+  if (!mobile) {
+    const hx = panelX + panelW / 2, hy = panelY + panelH * .4;
+    back.ellipse(hx, hy, 10, 13, 8); back.ellipse(hx, hy, 8, 11, 55);
+    back.ellipse(hx, hy + 2, 6, 10, 13); back.rect(hx - 8, hy + 1, 17, 14, 25, "metal");
+    back.rect(hx - 11, hy + 1, 5, 12, 9); back.rect(hx - 10, hy + 2, 3, 9, 48, "metal");
+    back.rect(hx + 7, hy + 1, 5, 12, 8); back.rect(hx + 7, hy + 2, 2, 9, 38, "metal");
+    back.line([hx + 10, hy + 13], [hx + 13, hy + 30], 8);
+  }
+
+  const deskBack = compact ? .85 : .79, deskFront = mobile ? .96 : .96;
+  // Desk legs and cables sit behind the broad, foreshortened desktop.
+  poly(front, [[.12, deskBack], [.14, deskBack], [.10, 1], [.07, 1]], 8, "metal");
+  poly(front, [[.86, deskBack], [.89, deskBack], [.96, 1], [.92, 1]], 6, "metal");
+  line(front, [.18, deskBack], [.23, 1], 21, 2);
+  line(front, [.20, deskBack], [.19, 1], 7, 2);
+  poly(front, [[.12, deskBack], [.88, deskBack], [1.06, deskFront], [-.06, deskFront]], 33, "wood");
+  poly(front, [[-.06, deskFront], [1.06, deskFront], [1.06, deskFront + .025], [-.06, deskFront + .025]], 18, "wood");
+  line(front, [.12, deskBack], [.88, deskBack], 60);
+  line(front, [0, deskFront], [1, deskFront], 49);
+  for (let y = deskBack + .025; y < deskFront; y += .028) line(front, [0, y], [1, y + .008], 28);
+
+  // Perspective monitor helper; tiny controls, screen scanlines, code and bezel screws.
+  const monitor = (x: number, y: number, mw: number, mh: number, slope: number, editor: boolean) => {
+    const at = (u: number, v: number): Point => [x + u * mw, y + v * mh + u * slope];
+    const quad = (u: number, v: number, rw: number, rh: number, shade: number, material: Material = "metal") => front.polygon([at(u, v), at(u + rw, v), at(u + rw, v + rh), at(u, v + rh)], shade, material);
+    quad(.44, .95, .12, .22, 13); quad(.25, 1.13, .51, .04, 31);
+    quad(-.02, .01, 1.04, 1.02, 6); quad(0, 0, 1, 1, 43); quad(.015, .02, .97, .94, 20);
+    quad(.045, .06, .91, .82, 6); quad(.06, .08, .88, .78, 14, "glass");
+    front.line(at(.02, .025), at(.97, .025), 76);
+    front.line(at(.02, .025), at(.02, .96), 55);
+    for (let v = .12; v < .84; v += .06) front.line(at(.07, v), at(.92, v), 18);
+    quad(.075, .10, .15, .73, 21);
+    for (let i = 0; i < 8; i++) quad(.09, .14 + i * .08, .08 - (i % 3) * .015, .015, 46);
+    if (editor) {
+      for (let i = 0; i < 9; i++) {
+        const indent = i % 4 === 0 ? 0 : .045;
+        quad(.27 + indent, .15 + i * .067, .20 + noise(i, 4) * .30, .014, i % 3 === 0 ? 64 : 44);
+        if (i % 3 === 1) quad(.27 + indent, .175 + i * .067, .13, .012, 31);
+      }
+    } else {
+      for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) quad(.33 + col * .065, .16 + row * .075, .065, .075, (row + col) % 2 ? 21 : 49);
+      for (const [col, row] of [[0,0],[2,0],[4,0],[7,0],[1,1],[3,1],[6,1],[0,6],[2,6],[3,6],[5,6],[7,6],[1,7],[4,7],[6,7]]) {
+        quad(.35 + col * .065, .17 + row * .075, .024, .045, row < 4 ? 8 : 83);
+      }
+    }
+    for (const u of [.03, .96]) for (const v of [.035, .94]) front.rect(...at(u, v), 1, 1, 8);
+    quad(.45, .93, .1, .012, 53);
+    return at(.87, .93);
   };
-  const keyboard = (x: number, y: number, w: number) => {
-    r(x + 1, y, w - 2, 1, P.light); r(x, y + 1, w, 7, P.mid);
-    for (let row = 0; row < 2; row++) for (let col = 0; col < Math.floor((w - 4) / 3); col++) r(x + 2 + col * 3, y + 2 + row * 2, 2, 1, P.silver);
-    r(x + Math.floor(w / 2) - 5, y + 6, 10, 1, P.silver);
+
+  const leftMonitor = mobile
+    ? monitor(MARGIN + 4, MARGIN + height * .69, width * .40, height * .14, height * .012, true)
+    : monitor(MARGIN + width * .025, MARGIN + height * (compact ? .69 : .57), width * .245, height * (compact ? .14 : .19), height * (compact ? .012 : .025), true);
+  const rightMonitor = !mobile
+    ? monitor(MARGIN + width * .75, MARGIN + height * (compact ? .69 : .56), width * .21, height * (compact ? .14 : .20), -height * .018, false)
+    : null;
+
+  // Keyboard on a dark desk mat, with individual perspective keycaps.
+  const keyX = mobile ? .09 : .25, keyY = mobile ? .88 : compact ? .90 : .84;
+  const keyW = mobile ? .41 : .25, keyH = compact ? .045 : .065;
+  poly(front, [[keyX - .035, keyY - .01], [keyX + keyW + .11, keyY - .01], [keyX + keyW + .14, keyY + keyH + .025], [keyX - .06, keyY + keyH + .025]], 15, "glass");
+  const keyAt = (u: number, v: number): Point => point(keyX + u * keyW - v * .025, keyY + v * keyH);
+  front.polygon([keyAt(0, 0), keyAt(1, 0), keyAt(1, 1), keyAt(0, 1)], 51, "metal");
+  for (let row = 0; row < 4; row++) for (let col = 0; col < 14; col++) {
+    const u = .025 + col * .068, v = .08 + row * .21;
+    front.polygon([keyAt(u, v), keyAt(u + .053, v), keyAt(u + .053, v + .15), keyAt(u, v + .15)], row === 3 && col > 3 && col < 10 ? 64 : 24, "metal");
+    front.pixel(...keyAt(u + .02, v + .04), 91);
+  }
+  const mouse = point(keyX + keyW + .065, keyY + .025);
+  front.ellipse(...mouse, mobile ? 3 : 5, mobile ? 5 : 7, 42);
+  front.line([mouse[0], mouse[1] - 5], [mouse[0], mouse[1]], 9);
+  front.rect(mouse[0] - 1, mouse[1] - 4, 1, 2, 77);
+
+  // Compact tower: mesh front, port bank, two recessed fans and machined edges.
+  const pcX = MARGIN + width * (mobile ? .74 : .925), pcY = MARGIN + height * (mobile ? .70 : compact ? .76 : .72);
+  const pcW = width * (mobile ? .22 : .07), pcH = height * (mobile ? .18 : compact ? .16 : .20);
+  front.rect(pcX + 2, pcY + 1, pcW, pcH, 5);
+  front.rect(pcX, pcY, pcW, pcH, 25, "metal");
+  front.rect(pcX, pcY, 1, pcH, 63); front.rect(pcX + 2, pcY + 2, pcW - 4, pcH - 4, 10);
+  for (let py = pcY + 5; py < pcY + pcH - 3; py += 2) for (let px = pcX + 4; px < pcX + pcW - 3; px += 2) front.pixel(px, py, 29);
+  front.rect(pcX + 4, pcY + 3, pcW - 8, 2, 38);
+  front.rect(pcX + 5, pcY + 3, 3, 1, 8);
+  const fans: Point[] = [];
+  for (let i = 0; i < 2; i++) {
+    const cx = pcX + pcW / 2, cy = pcY + pcH * (.36 + i * .36), radius = Math.min(pcW * .32, pcH * .13);
+    front.ellipse(cx, cy, radius + 1, radius + 1, 38); front.ellipse(cx, cy, radius - 1, radius - 1, 9);
+    for (let n = 0; n < 4; n++) {
+      const angle = n * Math.PI / 2;
+      front.line([cx, cy], [cx + Math.round(Math.cos(angle + .45) * (radius - 2)), cy + Math.round(Math.sin(angle + .45) * (radius - 2))], 43, 2);
+    }
+    front.ellipse(cx, cy, 2, 2, 58); fans.push([cx, cy]);
+  }
+
+  let steam: Point | null = null;
+  if (!mobile) {
+    // A real 8 × 8 board, foreshortened into the desktop.
+    const boardAt = (u: number, v: number): Point => point(.63 + u * .15 + v * .045, (compact ? .89 : .835) + v * (compact ? .06 : .09));
+    front.polygon([boardAt(-.04,-.04), boardAt(1.04,-.04), boardAt(1.04,1.04), boardAt(-.04,1.04)], 10, "wood");
+    for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
+      const u = col / 8, v = row / 8;
+      front.polygon([boardAt(u,v), boardAt(u+.125,v), boardAt(u+.125,v+.125), boardAt(u,v+.125)], (col+row)%2 ? 24 : 57, "wood");
+    }
+    for (const [u,v,light] of [[.19,.20,1],[.69,.34,0],[.43,.70,1],[.82,.82,0]]) {
+      const [x,y] = boardAt(u,v);
+      front.ellipse(x+1,y+1,4,2,8); front.rect(x-1,y-5,3,5,light ? 75 : 8);
+      front.rect(x-2,y-1,5,2,light ? 65 : 13); front.rect(x-1,y-7,3,2,light ? 86 : 16);
+    }
+    const [mx,my] = point(.84,compact ? .88 : .82);
+    front.ellipse(mx+2,my+4,8,3,17); front.ellipse(mx+6,my-4,4,4,51); front.ellipse(mx+6,my-4,2,2,25);
+    front.rect(mx-5,my-9,10,13,45,"metal"); front.rect(mx-4,my-8,2,10,61);
+    front.ellipse(mx,my-9,5,2,67); front.ellipse(mx,my-9,3,1,10); front.ellipse(mx,my+3,5,2,36);
+    steam = [mx,my-14];
+
+    // A cropped chair in the immediate foreground creates a final plane of depth.
+    poly(front, [[.42,1.05],[.43,.965],[.45,.94],[.56,.94],[.58,.965],[.60,1.05]], 8, "metal");
+    line(front, [.45,.94], [.56,.94], 35);
+    line(front, [.435,.97], [.45,.945], 24, 2);
+    for (let y = .965; y < 1; y += .014) line(front, [.45,y], [.56,y], 14);
+  }
+
+  const backCanvas = back.canvas(), frontCanvas = front.canvas();
+  return {
+    draw(ctx: CanvasRenderingContext2D, frame: number, cameraX = 0, cameraY = 0) {
+      const tick = ((frame % ROOM_LOOP_FRAMES) + ROOM_LOOP_FRAMES) % ROOM_LOOP_FRAMES;
+      const x = Math.round(cameraX), y = Math.round(cameraY);
+      const fx = -MARGIN + x * 2, fy = -MARGIN + y * 2;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(backCanvas, -MARGIN + x, -MARGIN + y);
+      ctx.drawImage(frontCanvas, fx, fy);
+      const mark = (px: number, py: number, rw: number, rh: number, color: string) => {
+        ctx.fillStyle = color; ctx.fillRect(Math.round(px + fx), Math.round(py + fy), rw, rh);
+      };
+      for (const led of [leftMonitor, rightMonitor]) if (led) mark(...led, 1, 1, tick < 48 ? "#808080" : "#484848");
+      for (const [cx,cy] of fans) {
+        const step = Math.floor(tick / 8) % 4;
+        mark(cx + [0,1,0,-1][step],cy + [-1,0,1,0][step],1,1,"#707070");
+      }
+      if (steam) {
+        const rise = [0,1,2,1][Math.floor(tick / 16)];
+        mark(steam[0],steam[1]-rise,1,2,"#484848");
+        mark(steam[0]+1,steam[1]-4-rise,1,2,"#303030");
+      }
+    },
   };
-
-  r(0, 0, width, height, P.wall);
-  // Subtle wall texture is hand-distributed by a repeatable integer pattern.
-  for (let y = 19; y < floorY; y += 11) for (let x = 4; x < width; x += 13) {
-    const quiet = x > width * .23 && x < width * .77 && y > height * .22 && y < height * .72;
-    if (!quiet && (x * 7 + y * 3) % 5 === 0) r(x, y, 2, 1, P.joint);
-  }
-  r(0, 15, width, 1, P.joint);
-  r(0, floorY - 3, width, 2, P.dark); r(0, floorY - 1, width, 1, P.black);
-  r(0, floorY, width, height - floorY, P.shade);
-  for (let y = floorY + 7, row = 0; y < height; y += 8, row++) {
-    r(0, y, width, 1, P.black);
-    for (let x = row % 2 ? 18 : 0; x < width; x += 38) r(x, y - 7, 1, 7, P.dark);
-  }
-
-  // A shelf of books and a small speaker, left of the open wall used for copy.
-  const shelfX = mobile ? 5 : 12;
-  const shelfY = mobile ? 30 : 38;
-  shelf(shelfX, shelfY, mobile ? 27 : 45);
-  book(shelfX + 3, shelfY, 4, 13, P.dark);
-  book(shelfX + 8, shelfY, 3, 16, P.mid);
-  book(shelfX + 12, shelfY, 4, 14, P.light);
-  book(shelfX + 17, shelfY, 3, 11, P.mid);
-  if (!mobile) {
-    book(shelfX + 22, shelfY, 4, 15, P.dark);
-    r(shelfX + 31, shelfY - 14, 10, 14, P.black);
-    r(shelfX + 32, shelfY - 13, 8, 12, P.dark);
-    r(shelfX + 35, shelfY - 11, 2, 2, P.silver);
-    r(shelfX + 34, shelfY - 7, 4, 4, P.mid); r(shelfX + 35, shelfY - 6, 2, 2, P.black);
-  }
-
-  // A small volleyball-court print and another shelf on the right.
-  const printX = width - (mobile ? 22 : 50);
-  const printY = 24;
-  frameOnWall(printX, printY, mobile ? 14 : 22, mobile ? 18 : 28);
-  const courtX = printX + (mobile ? 4 : 6), courtY = printY + (mobile ? 4 : 6);
-  const courtW = mobile ? 6 : 10, courtH = mobile ? 10 : 16;
-  r(courtX, courtY, courtW, courtH, P.shade);
-  r(courtX, courtY, courtW, 1, P.light); r(courtX, courtY + courtH - 1, courtW, 1, P.light);
-  r(courtX, courtY, 1, courtH, P.light); r(courtX + courtW - 1, courtY, 1, courtH, P.light);
-  r(courtX, courtY + Math.floor(courtH / 2), courtW, 1, P.silver);
-  if (!mobile) {
-    shelf(width - 65, 65, 48);
-    r(width - 60, 61, 14, 4, P.mid); r(width - 59, 60, 11, 1, P.silver);
-    book(width - 40, 65, 4, 12, P.dark); book(width - 35, 65, 5, 15, P.mid);
-    book(width - 29, 65, 3, 13, P.light);
-  }
-
-  // A low checker rug under the desk, drawn in a few flat shades.
-  const rugX = Math.round(width * .29), rugW = Math.round(width * .42);
-  r(rugX, floorY + 6, rugW, 18, P.mid);
-  r(rugX + 1, floorY + 7, rugW - 2, 16, P.dark);
-  for (let y = 0; y < 3; y++) for (let x = 0; x < Math.floor((rugW - 4) / 5); x++) {
-    if ((x + y) % 2 === 0) r(rugX + 2 + x * 5, floorY + 8 + y * 4, 5, 4, P.shade);
-  }
-
-  const left = mobile ? 4 : 10, right = width - left;
-  // Wooden desktop, drawers, supports, and a few deliberately placed grain pixels.
-  r(left + 3, deskY + 8, 4, 24, P.black); r(left + 4, deskY + 8, 2, 22, P.mid);
-  r(right - 16, deskY + 8, 13, 24, P.black);
-  r(right - 15, deskY + 8, 11, 22, P.dark);
-  for (let i = 0; i < 3; i++) { r(right - 15, deskY + 9 + i * 7, 11, 1, P.mid); r(right - 11, deskY + 12 + i * 7, 3, 1, P.light); }
-  r(left, deskY, right - left, 3, P.light); r(left - 1, deskY + 3, right - left + 2, 4, P.mid);
-  r(left, deskY + 7, right - left, 2, P.dark);
-  for (let x = left + 4; x < right - 5; x += 23) r(x, deskY + 1, 6, 1, P.silver);
-
-  const monitorX = mobile ? 8 : 14;
-  const monitorW = mobile ? 35 : Math.min(49, Math.floor(width * .16));
-  monitor(monitorX, deskY - 37, monitorW, 30);
-  keyboard(monitorX + 1, deskY - 2, mobile ? 28 : 35);
-  r(monitorX + monitorW + 4, deskY - 2, 5, 5, P.silver); r(monitorX + monitorW + 6, deskY - 2, 1, 2, P.dark);
-
-  // Desk lamp, including a stepped arm and shade rather than a smooth polygon.
-  if (width >= 266) {
-    const lampX = Math.round(width * .23);
-    r(lampX - 7, deskY - 2, 14, 2, P.dark);
-    line(lampX, deskY - 3, lampX - 4, deskY - 19, P.light);
-    line(lampX - 4, deskY - 19, lampX + 4, deskY - 29, P.light);
-    r(lampX + 2, deskY - 30, 8, 2, P.silver);
-    r(lampX, deskY - 28, 12, 2, P.light); r(lampX - 2, deskY - 26, 16, 2, P.mid);
-    r(lampX - 1, deskY - 24, 14, 1, tick === 32 ? P.light : P.white);
-  }
-
-  // A desktop tower with a pixel fan, drive slots and a tiny activity light.
-  const pcX = right - (mobile ? 26 : 34);
-  r(pcX, deskY - 38, 23, 38, P.black); r(pcX + 1, deskY - 37, 21, 36, P.dark);
-  r(pcX + 3, deskY - 35, 17, 2, P.mid); r(pcX + 4, deskY - 34, 8, 1, P.black);
-  r(pcX + 4, deskY - 29, 15, 1, P.mid);
-  r(pcX + 7, deskY - 23, 9, 1, P.light); r(pcX + 5, deskY - 21, 2, 8, P.light);
-  r(pcX + 16, deskY - 21, 2, 8, P.light); r(pcX + 7, deskY - 12, 9, 1, P.light);
-  r(pcX + 9, deskY - 19, 5, 5, P.mid);
-  if (Math.floor(tick / 8) % 2) { r(pcX + 7, deskY - 18, 9, 2, P.silver); r(pcX + 10, deskY - 21, 2, 8, P.silver); }
-  else { for (let i = 0; i < 7; i++) { r(pcX + 8 + i, deskY - 20 + i, 1, 1, P.silver); r(pcX + 8 + i, deskY - 14 - i, 1, 1, P.silver); } }
-  r(pcX + 5, deskY - 6, 12, 1, P.mid);
-  r(pcX + 18, deskY - 5, 1, 1, tick % 16 < 12 ? P.silver : P.mid);
-
-  if (!mobile) {
-    // A chessboard and mug sit between the monitor and computer.
-    const boardX = Math.round(width * .55);
-    r(boardX - 1, deskY - 5, 34, 9, P.black);
-    for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) r(boardX + col * 4, deskY - 4 + row, 4, 1, (row + col) % 2 ? P.mid : P.silver);
-    const mugX = Math.round(width * .72);
-    r(mugX, deskY - 10, 7, 9, P.silver); r(mugX + 1, deskY - 9, 5, 2, P.black);
-    r(mugX + 7, deskY - 8, 3, 5, P.light); r(mugX + 7, deskY - 7, 2, 3, P.wall);
-    const steam = [0, 1, 2, 1][Math.floor(tick / 16)];
-    r(mugX + 2, deskY - 14 - steam, 1, 2, P.mid); r(mugX + 3, deskY - 17 - steam, 1, 2, P.dark);
-  }
 }

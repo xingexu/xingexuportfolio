@@ -1,7 +1,8 @@
-/** Pixel corrosion on the sky's five-pixel grid, covering both routes and the nav. */
+/** Corrode the outgoing sky, then reconstruct the room from its own source pixels. */
 const CELL = 5;
-const CLOSE_MS = 1150;
-const REVEAL_MS = 1100;
+const ROOM_CELL = 3;
+const CLOSE_MS = 1000;
+const REVEAL_MS = 1750;
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const ease = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
 const hash = (x: number, y: number) => {
@@ -19,7 +20,7 @@ function noise(x: number, y: number) {
 }
 
 /** Coherent islands and tiny pits, rather than independent TV-static pixels. */
-function corrosion(width: number, height: number, origin?: { x: number; y: number }) {
+function corrosion(width: number, height: number) {
   const thresholds = new Float32Array(width * height);
   const grit = new Float32Array(width * height);
   let low = Infinity, high = -Infinity;
@@ -28,9 +29,8 @@ function corrosion(width: number, height: number, origin?: { x: number; y: numbe
     const grain = hash(x + 89, y + 43);
     const islands = noise(x / 32, y / 32) * .52 + noise(x / 11, y / 11) * .29
       + noise(x / 3, y / 3) * .13 + grain * .06;
-    const distance = Math.hypot((x - (origin?.x ?? width * .52)) / width,
-      (y - (origin?.y ?? height * .45)) / height);
-    const value = origin ? islands * .44 + distance * .84 : islands - distance * .42;
+    const distance = Math.hypot((x - width * .52) / width, (y - height * .45) / height);
+    const value = islands - distance * .42;
     thresholds[i] = value;
     grit[i] = grain;
     low = Math.min(low, value); high = Math.max(high, value);
@@ -85,12 +85,12 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     ctx?.clearRect(0, 0, canvas.width, canvas.height);
   }
 
-  function prepare(phase: string) {
+  function prepare(phase: string, cell = CELL) {
     if (!ctx) return false;
-    canvas.width = Math.ceil(window.innerWidth / CELL);
-    canvas.height = Math.ceil(window.innerHeight / CELL);
-    canvas.style.width = `${canvas.width * CELL}px`;
-    canvas.style.height = `${canvas.height * CELL}px`;
+    canvas.width = Math.ceil(window.innerWidth / cell);
+    canvas.height = Math.ceil(window.innerHeight / cell);
+    canvas.style.width = `${canvas.width * cell}px`;
+    canvas.style.height = `${canvas.height * cell}px`;
     ctx.imageSmoothingEnabled = false;
     root.dataset.roomTransition = phase;
     canvas.classList.add("is-drawing");
@@ -183,7 +183,7 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
   async function enter() {
     clear();
     const current = generation;
-    if (!prepare("waiting") || !ctx) { clear(); return; }
+    if (!prepare("waiting", ROOM_CELL) || !ctx) { clear(); return; }
     ctx.fillStyle = "#080808";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const ready = await waitForRoom();
@@ -194,29 +194,66 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     const bounds = field.getBoundingClientRect();
     const { width, height } = canvas;
     const scale = bounds.width / field.width;
-    const cx = (bounds.left + (Number(field.dataset.screenX) + Number(field.dataset.screenWidth) / 2) * scale) / CELL;
-    const cy = (bounds.top + (Number(field.dataset.screenY) + Number(field.dataset.screenHeight) / 2) * scale) / CELL;
-    const { thresholds, grit } = corrosion(width, height, { x: cx, y: cy });
+    const sx = (bounds.left + Number(field.dataset.screenX) * scale) / ROOM_CELL;
+    const sy = (bounds.top + Number(field.dataset.screenY) * scale) / ROOM_CELL;
+    const sw = Number(field.dataset.screenWidth) * scale / ROOM_CELL;
+    const sh = Number(field.dataset.screenHeight) * scale / ROOM_CELL;
+    const cx = sx + sw / 2, cy = sy + sh / 2;
+    const sample = document.createElement("canvas");
+    sample.width = width; sample.height = height;
+    const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
+    if (!sampleCtx) { clear(); return; }
+    sampleCtx.imageSmoothingEnabled = false;
+    sampleCtx.fillStyle = "#080808";
+    sampleCtx.fillRect(0, 0, width, height);
+    sampleCtx.drawImage(field, bounds.left / ROOM_CELL, bounds.top / ROOM_CELL,
+      bounds.width / ROOM_CELL, bounds.height / ROOM_CELL);
+    const source = sampleCtx.getImageData(0, 0, width, height).data;
+    const count = width * height;
+    const arrivals = new Float32Array(count);
+    const offsetX = new Int16Array(count), offsetY = new Int16Array(count);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      const grain = hash(x + 17, y + 91);
+      const distance = Math.hypot((x - cx) / width, (y - cy) / height);
+      const monitor = x >= sx && x < sx + sw && y >= sy && y < sy + sh;
+      const stage = monitor ? .06 : source[i * 4] > 35 ? .19 : .31;
+      // Individual cells and small clusters lock in: no dissolving contour.
+      arrivals[i] = Math.min(.9, stage + grain * .30
+        + hash(Math.floor(x / 3), Math.floor(y / 3)) * .12 + distance * .13);
+      offsetX[i] = Math.round((x - cx) * .10 + (grain - .5) * 24);
+      offsetY[i] = Math.round((y - cy) * .08 - 10 - hash(y, x) * 20);
+    }
     const mask = ctx.createImageData(width, height);
     const pixels = mask.data;
     root.dataset.roomTransition = "revealing";
 
     // Separate wrappers keep the existing eight-second floats uninterrupted.
-    const arrivals = document.querySelectorAll(".about-letter-art, .about-object-art");
-    revealEffects = Array.from(arrivals, (element, index) => element.animate([
-      { opacity: 0, transform: "translateY(12px)" },
-      { opacity: 1, transform: "translateY(0)" },
-    ], { duration: 250, delay: 440 + index * 45, easing: "steps(5, end)", fill: "both" }));
+    const details = document.querySelectorAll(".about-letter-art, .about-object-art, .about-bottom");
+    revealEffects = Array.from(details, (element, index) => element.animate([
+      { opacity: 0, clipPath: "inset(100% 0 0 0)", transform: "translateY(-12px)" },
+      { opacity: 1, clipPath: "inset(0 0 0 0)", transform: "translateY(0)" },
+    ], { duration: 320, delay: 880 + index * 55, easing: "steps(8, end)", fill: "both" }));
 
     const finished = await animate(REVEAL_MS, (elapsed) => {
       const progress = elapsed / REVEAL_MS;
-      for (let i = 0; i < thresholds.length; i++) {
-        // Light finds the monitor first, then eats through the same granular dark.
-        const light = Math.round(ease((progress - thresholds[i]) / .20) * 12) / 12;
-        const shade = 6 + Math.floor(grit[i] * 5);
+      for (let i = 0; i < count; i++) {
         const offset = i * 4;
-        pixels[offset] = shade; pixels[offset + 1] = shade; pixels[offset + 2] = shade;
-        pixels[offset + 3] = Math.round((1 - light) * 255);
+        pixels[offset] = 8; pixels[offset + 1] = 8; pixels[offset + 2] = 8;
+        // Once a pixel lands, uncover its real, live counterpart underneath.
+        pixels[offset + 3] = progress >= arrivals[i] ? 0 : 255;
+      }
+      for (let i = 0; i < count; i++) {
+        const age = (progress - arrivals[i] + .20) / .20;
+        if (age <= 0 || age >= 1 || source[i * 4] < 17) continue;
+        const travel = 1 - ease(age);
+        const x = i % width + Math.round(offsetX[i] * travel);
+        const y = Math.floor(i / width) + Math.round(offsetY[i] * travel);
+        if (x < 0 || y < 0 || x >= width || y >= height) continue;
+        const to = (y * width + x) * 4;
+        const shade = Math.round((8 + (source[i * 4] - 8) * Math.min(1, age * 3)) / 4) * 4;
+        pixels[to] = shade; pixels[to + 1] = shade; pixels[to + 2] = shade;
+        pixels[to + 3] = 255;
       }
       ctx.putImageData(mask, 0, 0);
     });

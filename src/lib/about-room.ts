@@ -355,6 +355,13 @@ export function createAboutRoom(width: number, height: number) {
   }
 
   const backCanvas = back.canvas(), frontCanvas = front.canvas();
+  // Sparse fragments rise against gravity, fading before the eight-second wrap.
+  const suspended = Array.from({ length: mobile ? 18 : 38 }, (_, i) => ({
+    x: width * (.04 + noise(i, 231) * .92),
+    y: height * (.14 + noise(i, 512) * .70),
+    phase: Math.floor(noise(i, 34) * ROOM_LOOP_FRAMES),
+    drift: noise(i, 76) > .5 ? 1 : -1,
+  }));
   return {
     display: { x: displayX - MARGIN, y: displayY - MARGIN, width: displayW, height: displayH },
     draw(ctx: CanvasRenderingContext2D, frame: number, cameraX = 0, cameraY = 0) {
@@ -389,6 +396,19 @@ export function createAboutRoom(width: number, height: number) {
         const rise = [0,1,2,1][Math.floor(tick / 16)];
         mark(steam[0],steam[1]-rise,1,2,"#484848");
         mark(steam[0]+1,steam[1]-4-rise,1,2,"#303030");
+      }
+      for (const mote of suspended) {
+        const age = (tick + mote.phase) % ROOM_LOOP_FRAMES;
+        const light = Math.min(1, age / 12, (ROOM_LOOP_FRAMES - age) / 12);
+        const shade = 16 + Math.floor(light * 6) * 4;
+        const mx = Math.round(mote.x + Math.floor(age / 16) * mote.drift + x * 2);
+        const my = Math.round(mote.y - Math.floor(age / 4) + y * 2);
+        ctx.fillStyle = `rgb(${shade} ${shade} ${shade})`;
+        ctx.fillRect(mx, my, 1, 1);
+        if (age > 18 && age < 42 && mote.phase % 4 === 0) {
+          ctx.fillStyle = "#181818";
+          ctx.fillRect(mx, my + 2, 1, 2);
+        }
       }
     },
   };

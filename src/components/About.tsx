@@ -5,6 +5,7 @@ import { LINKS } from "@/app/data";
 import AboutField from "./AboutField";
 import AboutName from "./AboutName";
 import AboutSprite, { type AboutSpriteKind } from "./AboutSprites";
+import { TransitionLink } from "./PageTransitions";
 
 const OBJECTS: { id: string; kind: AboutSpriteKind; href: string; label: string; delay: string }[] = [
   { id: "knight", kind: "knight", href: LINKS.lichess, label: "Play zinger6767 on Lichess", delay: "0s" },
@@ -36,6 +37,11 @@ export default function About() {
         ))}
       </div>
       <div className="about-bottom">
+        <TransitionLink href="/" className="about-exit" aria-label="Return to home">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" shapeRendering="crispEdges" aria-hidden="true">
+            <path d="M10 2h6v14h-6v-2h4V4h-4zM6 4h2v2H6v2h6v2H6v2h2v2H6v-2H4v-2H2V8h2V6h2z" />
+          </svg>
+        </TransitionLink>
         <button
           type="button"
           className="about-motion-toggle"

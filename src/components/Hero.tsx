@@ -301,14 +301,6 @@ function PixelArrow() {
   return <span className="pixel-arrow" aria-hidden="true" />;
 }
 
-function AboutLink() {
-  return (
-    <Link href="/about" className="hero-about-link font-pixel" aria-label="click here to learn about Xinge Xu">
-      click here <span aria-hidden="true">→</span>
-    </Link>
-  );
-}
-
 // --- Reading the current sky phase from the DOM ----------------------------
 // Some other part of the app owns the actual day/night cycle and reflects it
 // as `data-sky-phase` on <html>. Rather than duplicating that logic here, we
@@ -655,7 +647,6 @@ function PlaneBanner() {
           onClick={illuminateToronto}
         />
       )}
-      <AboutLink />
     </div>
   );
 }
@@ -1003,7 +994,6 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
                 />
               ))}
             </span>
-            <AboutLink />
           </h1>
 
           <div className="hero-supporting-layout">

@@ -29,7 +29,7 @@
 .about-field { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: -1; }
 .about-name {
   --letter-pixel: 5px;
-  --letter-jump: 12px;
+  --letter-drift: 12px;
   position: absolute;
   top: 15%;
   left: 50%;
@@ -47,18 +47,17 @@
 .about-letter {
   display: block;
   margin-top: calc(var(--letter-row) * var(--letter-pixel));
-  animation: about-letter-jitter 2s steps(1, end) var(--letter-delay) infinite;
+  animation: about-letter-float var(--loop-duration) ease-in-out var(--letter-delay) infinite;
 }
 .about-letter:nth-child(even) { animation-direction: reverse; }
 .about-letter-art { display: block; width: calc(var(--letter-pixel) * 13); height: calc(var(--letter-pixel) * 15); image-rendering: pixelated; }
-.about-letter-glow { animation: about-letter-glow var(--loop-duration) steps(4, end) var(--glow-delay) infinite; }
+.about-letter-glow { animation: about-letter-glow var(--loop-duration) ease-in-out var(--glow-delay) infinite; }
 .about-letter-spark { animation: about-letter-spark var(--loop-duration) steps(1, end) var(--glow-delay) infinite; }
-@keyframes about-letter-jitter {
+@keyframes about-letter-float {
   0%, 100% { transform: translate(0, 0); }
-  12.5%, 87.5% { transform: translateY(calc(-2 * var(--letter-jump))); }
-  25%, 62.5% { transform: translateY(calc(-1 * var(--letter-jump))); }
-  37.5%, 75% { transform: translateY(var(--letter-jump)); }
-  50% { transform: translateY(calc(-3 * var(--letter-jump))); }
+  25% { transform: translate(2px, calc(-.5 * var(--letter-drift))); }
+  50% { transform: translate(0, calc(-1 * var(--letter-drift))); }
+  75% { transform: translate(-2px, calc(-.5 * var(--letter-drift))); }
 }
 @keyframes about-letter-glow { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
 @keyframes about-letter-spark { 0%, 37.5%, 62.5%, 100% { opacity: 0; } 50% { opacity: .7; } }
@@ -77,25 +76,21 @@
   z-index: 3;
 }
 .about-object-art { display: grid; place-items: center; width: 100%; height: 80px; }
-.about-object-motion { display: inline-block; animation: about-float var(--loop-duration) steps(4, end) var(--float-delay) infinite; }
+.about-object-motion { display: inline-block; animation: about-float var(--loop-duration) ease-in-out var(--float-delay) infinite; }
 .about-sprite { display: block; overflow: visible; image-rendering: pixelated; }
 .about-sprite-knight { width: 60px; height: 72px; }
 .about-sprite-volleyball { width: 60px; height: 60px; }
 .about-object:hover .about-object-motion, .about-object:focus-visible .about-object-motion { animation-play-state: paused; }
 .about-object:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 5px; }
 .about-object-knight { left: calc(50% - 465px); top: 29%; }
-.about-object-knight .about-object-motion { animation-name: about-knight; animation-timing-function: steps(3, end); }
 .about-object-ball { right: calc(50% - 440px); top: 25%; }
-.about-object-ball .about-sprite { animation: about-ball-turn var(--loop-duration) steps(1, end) var(--float-delay) infinite; }
 .about-bottom { position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 24px; right: 24px; display: flex; align-items: center; justify-content: space-between; }
 .about-exit, .about-motion-toggle { font: inherit; color: #777; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .about-exit:hover, .about-motion-toggle:hover { color: #fff; }
 .about-exit:focus-visible, .about-motion-toggle:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 4px; }
 .about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-letter, .about-letter-glow, .about-letter-spark) { animation-play-state: paused !important; }
 
-@keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(8px, -8px); } 50% { transform: translate(0, -16px); } 75% { transform: translate(-8px, -8px); } }
-@keyframes about-knight { 0%, 12.5%, 100% { transform: translate(0, 0); } 37.5% { transform: translate(0, -18px); } 50%, 62.5% { transform: translate(18px, -18px); } 87.5% { transform: translate(18px, 0); } }
-@keyframes about-ball-turn { 0% { transform: rotate(0); } 25% { transform: rotate(90deg); } 50% { transform: rotate(180deg); } 75% { transform: rotate(270deg); } 100% { transform: rotate(360deg); } }
+@keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(3px, -5px); } 50% { transform: translate(0, -10px); } 75% { transform: translate(-3px, -5px); } }
 
 @media (min-width: 1500px) {
   .about-object-knight { left: 14%; }
@@ -103,13 +98,13 @@
 }
 
 @media (max-width: 1050px) {
-  .about-name { --letter-pixel: 4px; --letter-jump: 8px; top: 18%; width: 66%; }
+  .about-name { --letter-pixel: 4px; --letter-drift: 8px; top: 18%; width: 66%; }
   .about-object-knight { left: 0; top: 14%; }
   .about-object-ball { right: 0; top: 13%; }
 }
 
 @media (max-width: 600px) {
-  .about-name { --letter-pixel: 3px; --letter-jump: 6px; top: calc(64% - 18px); width: 94%; }
+  .about-name { --letter-pixel: 3px; --letter-drift: 6px; top: calc(64% - 18px); width: 94%; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
   .about-object-knight { left: 8%; top: 18.5%; }

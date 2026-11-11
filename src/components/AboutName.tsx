@@ -29,7 +29,7 @@ export default function AboutName() {
           <span
             key={letter}
             className="about-letter"
-            style={{ "--letter-delay": `${-index * .31}s`, "--glow-delay": `${-index * 1.25}s`, "--letter-row": HEIGHTS[index] } as CSSProperties}
+            style={{ "--letter-delay": `${-index * 1.2}s`, "--glow-delay": `${-index * 1.25}s`, "--letter-row": HEIGHTS[index] } as CSSProperties}
             aria-hidden="true"
           >
             <svg className="about-letter-art" viewBox="0 0 13 15" width="65" height="75" shapeRendering="crispEdges" aria-hidden="true">

@@ -2,7 +2,7 @@
 const CELL = 5;
 const ROOM_CELL = 3;
 const CLOSE_MS = 1000;
-const REVEAL_MS = 1450;
+const REVEAL_MS = 2800;
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const ease = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
 const hash = (x: number, y: number) => {
@@ -43,20 +43,37 @@ function corrosion(width: number, height: number) {
 function inkSplotches(width: number, height: number, cx: number, cy: number) {
   const scale = Math.min(width, height);
   const seeds = [
-    [cx, cy, 0], [width * .19, height * .23, .10], [width * .82, height * .29, .13],
-    [width * .28, height * .80, .19], [width * .80, height * .76, .23],
-    [width * .49, height * .10, .16], [cx - scale * .10, cy + scale * .13, .055],
+    [cx, cy, 0], [width * .21, height * .22, .16], [width * .80, height * .28, .28],
+    [width * .28, height * .79, .39], [width * .79, height * .77, .47],
   ];
+  const drops = seeds.flatMap(([sx, sy, delay], seed) => Array.from({ length: 5 }, (_, index) => {
+    const angle = (index / 5 + hash(seed, 73)) * Math.PI * 2;
+    const distance = scale * (.13 + hash(index, seed + 91) * .07);
+    return { x: sx + Math.cos(angle) * distance, y: sy + Math.sin(angle) * distance,
+      radius: scale * (.012 + hash(index + 24, seed) * .015), delay: delay + .07 };
+  }));
   const thresholds = new Float32Array(width * height);
-  let low = Infinity, high = -Infinity;
+  let high = 0;
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     let value = Infinity;
-    for (const [sx, sy, delay] of seeds) value = Math.min(value, Math.hypot(x - sx, (y - sy) * 1.06) / scale + delay);
-    value += (noise(x / 17, y / 17) - .5) * .12 + (noise(x / 5, y / 5) - .5) * .035;
+    const edge = (noise(x / 19, y / 19) - .5) * .10;
+    seeds.forEach(([sx, sy, delay], seed) => {
+      const dx = x - sx, dy = (y - sy) * 1.06;
+      const angle = Math.atan2(dy, dx);
+      const lobes = 1 + .16 * Math.sin(angle * 3 + seed * 2) + .10 * Math.sin(angle * 5 - seed);
+      const radius = Math.max(0, Math.hypot(dx, dy) / (scale * .10 * lobes) + edge);
+      // A small initial impact, followed by a longer, continuous outward bleed.
+      const arrival = delay + Math.min(radius, 1) * .09 + Math.max(0, radius - 1) * .14;
+      value = Math.min(value, arrival);
+    });
+    for (const drop of drops) {
+      const distance = Math.hypot(x - drop.x, y - drop.y) / drop.radius;
+      if (distance < 1) value = Math.min(value, drop.delay + distance * .06);
+    }
     thresholds[y * width + x] = value;
-    low = Math.min(low, value); high = Math.max(high, value);
+    high = Math.max(high, value);
   }
-  for (let i = 0; i < thresholds.length; i++) thresholds[i] = (thresholds[i] - low) / (high - low || 1) * .88;
+  for (let i = 0; i < thresholds.length; i++) thresholds[i] = thresholds[i] / (high || 1) * .91;
   return thresholds;
 }
 
@@ -123,12 +140,10 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     return new Promise<boolean>((resolve) => {
       settle = resolve;
       const start = performance.now();
-      let previous = -1;
       const tick = (now: number) => {
         const elapsed = Math.min(duration, now - start);
-        // 30 discrete frames per second; edges always land on whole pixels.
-        const step = Math.floor(elapsed / (1000 / 30));
-        if (step !== previous || elapsed === duration) { draw(elapsed); previous = step; }
+        // Continuous opacity at display refresh rate; all geometry stays on the pixel grid.
+        draw(elapsed);
         if (elapsed < duration) frame = requestAnimationFrame(tick);
         else { settle = null; resolve(true); }
       };
@@ -156,8 +171,7 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     const finished = await animate(CLOSE_MS, (elapsed) => {
       const progress = elapsed / CLOSE_MS;
       for (let i = 0; i < thresholds.length; i++) {
-        // Quantized darkening preserves the source colors at each eroding edge.
-        const decay = Math.round(ease((progress - thresholds[i]) / .16) * 12) / 12;
+        const decay = ease((progress - thresholds[i]) / .16);
         const shade = 6 + Math.floor(grit[i] * 5);
         const offset = i * 4;
         pixels[offset] = shade; pixels[offset + 1] = shade; pixels[offset + 2] = shade;
@@ -168,7 +182,7 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
       for (const fragment of fragments) {
         const age = (progress - fragment.onset - .065) / .15;
         if (age <= 0 || age >= 1) continue;
-        ctx.globalAlpha = Math.round((1 - age) * 6) / 6;
+        ctx.globalAlpha = 1 - ease(age);
         ctx.fillStyle = fragment.color;
         const drift = Math.floor(age * 5);
         ctx.fillRect(fragment.x + Math.round((fragment.grain - .5) * drift * 2), fragment.y - drift, 1, 1);
@@ -220,12 +234,12 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     root.dataset.roomTransition = "revealing";
 
     const finished = await animate(REVEAL_MS, (elapsed) => {
-      const progress = ease(elapsed / REVEAL_MS);
+      const progress = elapsed / REVEAL_MS;
       for (let i = 0; i < thresholds.length; i++) {
         const offset = i * 4;
         pixels[offset] = 8; pixels[offset + 1] = 8; pixels[offset + 2] = 8;
-        // A narrow, stepped wet edge; the room and letters appear together inside each blot.
-        const opened = Math.round(clamp((progress - thresholds[i]) / .035) * 3) / 3;
+        // Softly wet pixel edges, without blur or stepped opacity jumps.
+        const opened = ease((progress - thresholds[i]) / .075);
         pixels[offset + 3] = Math.round((1 - opened) * 255);
       }
       ctx.putImageData(mask, 0, 0);

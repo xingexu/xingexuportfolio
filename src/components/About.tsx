@@ -16,9 +16,19 @@ export default function About() {
   const [paused, setPaused] = useState(false);
 
   return (
-    <section className="about-page" aria-label="Xinge's pixel room with illustrative stock charts" data-paused={paused}>
+    <section className="about-page" aria-label="About Xinge" data-paused={paused}>
       <AboutField paused={paused} />
       <AboutName />
+      <div className="about-bio">
+        <section className="about-bio-intro" aria-labelledby="about-intro-heading">
+          <h2 id="about-intro-heading">hey, I’m Xinge.</h2>
+          <p>I’m an <strong>18-year-old CS + Ivey student</strong> at Western. I love coding and building projects.</p>
+        </section>
+        <section className="about-bio-interests" aria-labelledby="about-interests-heading">
+          <h2 id="about-interests-heading">off the keyboard</h2>
+          <p>You’ll find me playing <strong>chess or volleyball</strong>, trying new food spots, or doing cool stuff just for the fun of it.</p>
+        </section>
+      </div>
       <div className="about-objects" aria-label="My interests and profiles">
         {OBJECTS.map((object) => (
           <a

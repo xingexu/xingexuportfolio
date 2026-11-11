@@ -20,7 +20,7 @@
   position: relative;
   isolation: isolate;
   min-height: 100svh;
-  height: 100svh;
+  height: max(100svh, 720px);
   padding: 0;
   background: #101010;
   color: #eeeeee;
@@ -67,6 +67,27 @@
   0%, 100% { transform: translateX(calc(-1 * var(--letter-sway))); }
   50% { transform: translateX(var(--letter-sway)); }
 }
+.about-bio { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.about-bio section { position: absolute; top: 37%; width: 24%; max-width: 350px; pointer-events: auto; }
+.about-bio-intro { left: 4.5%; }
+.about-bio-interests { right: 4.5%; }
+.about-bio h2 {
+  margin: 0 0 20px;
+  font-family: var(--font-pixel), monospace;
+  font-size: clamp(10px, .9vw, 13px);
+  font-weight: 400;
+  line-height: 1.8;
+  color: #f2f2f2;
+}
+.about-bio p {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: clamp(16px, 1.35vw, 19px);
+  line-height: 1.8;
+  color: #bcbcbc;
+  text-wrap: pretty;
+}
+.about-bio strong { color: #eee; font-weight: 500; }
 .about-objects { position: absolute; inset: 0; pointer-events: none; }
 .about-object {
   position: absolute;
@@ -104,17 +125,26 @@
 }
 
 @media (max-width: 1050px) {
-  .about-name { --letter-pixel: 6px; --letter-drift: 28px; --letter-sway: 8px; top: 15%; width: 72%; }
-  .about-object-knight { left: 0; top: 14%; }
-  .about-object-ball { right: 0; top: 13%; }
+  .about-page { height: max(100svh, 960px); }
+  .about-name { --letter-pixel: 6px; --letter-drift: 28px; --letter-sway: 8px; top: 4%; width: 72%; }
+  .about-bio { inset: 25% auto auto 50%; width: min(84%, 560px); transform: translateX(-50%); }
+  .about-bio section { position: static; width: auto; max-width: none; }
+  .about-bio section + section { margin-top: 24px; }
+  .about-bio h2 { margin-bottom: 10px; font-size: 11px; }
+  .about-bio p { font-size: 17px; line-height: 1.7; }
+  .about-bottom { position: fixed; z-index: 4; }
+  .about-object-knight { left: 18%; top: 13%; }
+  .about-object-ball { right: 18%; top: 13%; }
 }
 
 @media (max-width: 600px) {
-  .about-name { --letter-pixel: 4px; --letter-drift: 18px; --letter-sway: 4px; top: calc(64% - 10px); width: 94%; }
+  .about-name { --letter-pixel: 4px; --letter-drift: 18px; --letter-sway: 4px; width: 94%; }
+  .about-bio { width: 86%; }
+  .about-bio p { font-size: 16px; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
-  .about-object-knight { left: 8%; top: 8%; }
-  .about-object-ball { right: 8%; top: 8%; }
+  .about-object-knight { left: 8%; top: 12%; }
+  .about-object-ball { right: 8%; top: 12%; }
   .about-bottom { left: 12px; right: 12px; }
 }
 

@@ -4,7 +4,7 @@ import "./about.css";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "A little about Xinge Xu: computer science, chess, volleyball, and the things he builds.",
+  description: "Meet Xinge Xu, an 18-year-old CS + Ivey student at Western who loves coding, building projects, chess, volleyball, and finding new food spots.",
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About · Xinge Xu",

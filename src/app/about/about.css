@@ -43,49 +43,13 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   --loop-duration: 8s;
   position: relative;
   isolation: isolate;
-  display: grid;
-  place-items: center;
   min-height: max(920px, calc(100svh - 76px));
-  padding: 240px 24px 290px;
+  padding: 0;
   background: #101010;
   color: #eeeeee;
   overflow: clip;
 }
 .about-field { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: -1; }
-.about-copy { width: min(100%, 540px); position: relative; z-index: 2; }
-.about-eyebrow { color: #919191; font-size: 11px; letter-spacing: .08em; margin-bottom: 26px; }
-.about-eyebrow > span { color: #e3e3e3; margin-right: 10px; }
-.about-copy h1 {
-  position: relative;
-  width: max-content;
-  max-width: 100%;
-  font-family: var(--font-pixel);
-  font-size: clamp(32px, 3.7vw, 50px);
-  font-weight: 400;
-  letter-spacing: -.07em;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-.about-alias { color: #d0d0d0; font-size: 16px; margin-top: 14px; }
-.about-bio { margin-top: 32px; max-width: 510px; font-size: 15px; line-height: 1.9; color: #a6a6a6; }
-.about-bio p + p { margin-top: 18px; }
-.about-typed-text { display: block; position: relative; }
-.about-text-reserve { visibility: hidden; }
-.about-text-output { position: absolute; inset: 0; }
-.about-heading-reserve { visibility: hidden; padding-right: .7em; }
-.about-heading-typed {
-  position: absolute;
-  left: 0;
-  top: 0;
-  overflow: hidden;
-  width: 0;
-  border-right: .28em solid #e3e3e3;
-  animation: about-heading-type 1.19s steps(14, end) .25s both, about-heading-caret 1s step-end infinite;
-}
-.about-text-links { display: flex; flex-wrap: wrap; gap: 16px 32px; margin-top: 28px; font-size: 12px; }
-.about-text-links a { color: #d9d9d9; text-decoration: underline; text-decoration-color: #4a4a4a; text-underline-offset: 7px; transition: text-decoration-color 120ms; min-height: 44px; display: inline-flex; align-items: center; gap: 10px; }
-.about-text-links a:hover { color: #fff; text-decoration-color: #fff; }
-
 .about-objects { position: absolute; inset: 0; pointer-events: none; }
 .about-object {
   position: absolute;
@@ -103,8 +67,6 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 .about-object-art { display: grid; place-items: center; width: 100%; height: 80px; }
 .about-object-motion { display: inline-block; animation: about-float var(--loop-duration) steps(4, end) var(--float-delay) infinite; }
 .about-sprite { display: block; overflow: visible; image-rendering: pixelated; }
-.about-object-caption { opacity: 0; font-size: 10px; letter-spacing: .015em; color: #9a9a9a; white-space: nowrap; transition: color 120ms; }
-.about-object:hover .about-object-caption, .about-object:focus-visible .about-object-caption { opacity: 1; color: #fff; text-decoration: underline; text-underline-offset: 4px; }
 .about-object:hover .about-object-motion, .about-object:focus-visible .about-object-motion { animation-play-state: paused; }
 .about-object:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 5px; }
 .about-object-knight { left: calc(50% - 465px); top: 29%; }
@@ -116,28 +78,20 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 .about-object-rook .about-sprite { width: 32px; height: 40px; }
 .about-object-ball-small { left: calc(50% - 165px); top: 16%; }
 .about-object-ball-small .about-sprite { width: 20px; height: 20px; }
-.about-object-ball-small .about-object-caption, .about-object-pawn .about-object-caption { opacity: 0; }
-.about-object-ball-small:is(:hover, :focus-visible) .about-object-caption, .about-object-pawn:is(:hover, :focus-visible) .about-object-caption { opacity: 1; }
 .about-object-pawn { right: calc(50% - 210px); bottom: 13%; }
 .about-object-pawn .about-sprite { width: 28px; height: 40px; }
 .about-laptop-cursor { animation: about-blink 2s step-end infinite; }
-.about-bottom { position: absolute; bottom: 28px; left: max(28px, calc(50% - 500px)); right: max(28px, calc(50% - 500px)); display: flex; align-items: center; justify-content: space-between; gap: 24px; font-size: 10px; color: #949494; }
-.about-explore > span { color: #c0c0c0; }
-.about-motion-toggle { font: inherit; color: #acacac; background: none; border: none; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.about-bottom { position: absolute; bottom: 28px; left: max(28px, calc(50% - 500px)); right: max(28px, calc(50% - 500px)); display: flex; align-items: center; justify-content: flex-end; }
+.about-motion-toggle { font: inherit; color: #acacac; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .about-motion-toggle:hover { color: #fff; }
 .about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-laptop-cursor) { animation-play-state: paused !important; }
 
-@keyframes about-heading-type { from { width: 0; } to { width: 100%; } }
-@keyframes about-heading-caret { 0%, 49% { border-color: #e3e3e3; } 50%, 100% { border-color: transparent; } }
 @keyframes about-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(8px, -8px); } 50% { transform: translate(0, -16px); } 75% { transform: translate(-8px, -8px); } }
 @keyframes about-knight { 0%, 12.5%, 100% { transform: translate(0, 0); } 37.5% { transform: translate(0, -18px); } 50%, 62.5% { transform: translate(18px, -18px); } 87.5% { transform: translate(18px, 0); } }
 @keyframes about-ball-turn { 0% { transform: rotate(0); } 25% { transform: rotate(90deg); } 50% { transform: rotate(180deg); } 75% { transform: rotate(270deg); } 100% { transform: rotate(360deg); } }
 
 @media (min-width: 1500px) {
-  .about-copy { width: 590px; }
-  .about-copy h1 { font-size: 52px; }
-  .about-bio { font-size: 15px; max-width: 560px; }
   .about-object-knight { left: 14%; }
   .about-object-ball { right: 16%; }
   .about-object-laptop { right: 12%; }
@@ -149,19 +103,14 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   .about-object-ball { right: 22%; top: 13%; }
   .about-object-laptop { left: calc(50% - 70px); right: auto; top: 7%; bottom: auto; }
   .about-object-rook, .about-object-ball-small, .about-object-pawn { display: none; }
-  .about-page { min-height: max(1020px, calc(100svh - 76px)); padding: 265px 36px 340px; }
+  .about-page { min-height: max(1020px, calc(100svh - 76px)); padding: 0; }
 }
 
 @media (max-width: 600px) {
   .nav-bar-about > nav { justify-content: space-between !important; padding-inline: 20px !important; }
   .about-home-link { font-size: 10px; gap: 8px; }
   .nav-bar-about .nav-link { font-size: 11px; padding-inline: 5px; }
-  .about-page { min-height: max(1040px, calc(100svh - 76px)); padding: 270px 28px 350px; }
-  .about-copy h1 { font-size: clamp(23px, 6.1vw, 35px); }
-  .about-eyebrow { font-size: 10px; margin-bottom: 20px; }
-  .about-alias { font-size: 12px; margin-top: 16px; }
-  .about-bio { font-size: 12px; line-height: 1.95; margin-top: 26px; }
-  .about-text-links { gap: 20px; font-size: 11px; margin-top: 20px; }
+  .about-page { min-height: max(1040px, calc(100svh - 76px)); padding: 0; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
   .about-object-knight { left: 8%; top: 21%; }
@@ -170,16 +119,10 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   .about-object-ball .about-sprite { width: 40px; height: 40px; }
   .about-object-laptop { left: calc(50% - 60px); right: auto; top: auto; bottom: 24%; }
   .about-object-laptop .about-sprite { width: 40px; height: 28px; }
-  .about-object-caption { opacity: 1; font-size: 9px; }
   .about-bottom { left: 24px; right: 24px; bottom: 20px; gap: 12px; font-size: 9px; }
-  .about-explore { max-width: 140px; line-height: 1.8; }
-  .about-explore > span { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .about-page *, .about-page *::before, .about-page *::after { animation: none !important; transition: none !important; }
-  .about-heading-typed { width: 100%; border-color: transparent; }
-  .about-text-reserve { visibility: visible; }
-  .about-text-output { display: none; }
   .about-motion-toggle { display: none; }
 }

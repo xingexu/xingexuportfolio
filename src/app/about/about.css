@@ -51,16 +51,12 @@
 }
 .about-letter:nth-child(even) { animation-direction: reverse; }
 .about-letter-art { display: block; width: calc(var(--letter-pixel) * 13); height: calc(var(--letter-pixel) * 15); image-rendering: pixelated; }
-.about-letter-glow { animation: about-letter-glow var(--loop-duration) ease-in-out var(--glow-delay) infinite; }
-.about-letter-spark { animation: about-letter-spark var(--loop-duration) steps(1, end) var(--glow-delay) infinite; }
 @keyframes about-letter-float {
   0%, 100% { transform: translate(0, 0); }
   25% { transform: translate(2px, calc(-.5 * var(--letter-drift))); }
   50% { transform: translate(0, calc(-1 * var(--letter-drift))); }
   75% { transform: translate(-2px, calc(-.5 * var(--letter-drift))); }
 }
-@keyframes about-letter-glow { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
-@keyframes about-letter-spark { 0%, 37.5%, 62.5%, 100% { opacity: 0; } 50% { opacity: .7; } }
 .about-objects { position: absolute; inset: 0; pointer-events: none; }
 .about-object {
   position: absolute;
@@ -82,13 +78,13 @@
 .about-sprite-volleyball { width: 60px; height: 60px; }
 .about-object:hover .about-object-motion, .about-object:focus-visible .about-object-motion { animation-play-state: paused; }
 .about-object:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 5px; }
-.about-object-knight { left: calc(50% - 465px); top: 29%; }
-.about-object-ball { right: calc(50% - 440px); top: 25%; }
+.about-object-knight { left: 8%; top: 16%; }
+.about-object-ball { right: 8%; top: 16%; }
 .about-bottom { position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 24px; right: 24px; display: flex; align-items: center; justify-content: space-between; }
 .about-exit, .about-motion-toggle { font: inherit; color: #777; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .about-exit:hover, .about-motion-toggle:hover { color: #fff; }
 .about-exit:focus-visible, .about-motion-toggle:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 4px; }
-.about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-letter, .about-letter-glow, .about-letter-spark) { animation-play-state: paused !important; }
+.about-page[data-paused="true"] :is(.about-object-motion, .about-letter) { animation-play-state: paused !important; }
 
 @keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(3px, -5px); } 50% { transform: translate(0, -10px); } 75% { transform: translate(-3px, -5px); } }
 
@@ -107,8 +103,8 @@
   .about-name { --letter-pixel: 3px; --letter-drift: 6px; top: calc(64% - 18px); width: 94%; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
-  .about-object-knight { left: 8%; top: 18.5%; }
-  .about-object-ball { right: 8%; top: 18.5%; }
+  .about-object-knight { left: 8%; top: 8%; }
+  .about-object-ball { right: 8%; top: 8%; }
   .about-bottom { left: 12px; right: 12px; }
 }
 

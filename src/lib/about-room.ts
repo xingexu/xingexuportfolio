@@ -116,7 +116,7 @@ function pixelGlow(width: number, height: number, lights: PixelLight[]) {
 
 export function createAboutRoom(width: number, height: number) {
   const w = width + MARGIN * 2, h = height + MARGIN * 2;
-  const mobile = width < 210;
+  const mobile = width < 210 || (width < 350 && width / height < .9);
   const compact = width < 350;
   const back = new Pixels(w, h), front = new Pixels(w, h);
   const point = (x: number, y: number): Point => [MARGIN + width * x, MARGIN + height * y];
@@ -208,11 +208,27 @@ export function createAboutRoom(width: number, height: number) {
     back.line([hx + 10, hy + 13], [hx + 13, hy + 30], 8);
   }
 
-  // Wall-mounted trading display. All charts are illustrative and contain no text.
-  const displayX = MARGIN + width * (mobile ? .06 : compact ? .17 : .245);
-  const displayY = MARGIN + height * (mobile ? .32 : .27);
-  const displayW = width * (mobile ? .88 : compact ? .66 : .51);
-  const displayH = height * (mobile ? .27 : .36);
+  // Three screens form one workstation. Portrait layouts stack the two wings
+  // above the trading screen so every display remains recognizable.
+  const displayX = MARGIN + width * (mobile ? .06 : .325);
+  const displayY = MARGIN + height * (mobile ? .40 : .33);
+  const displayW = width * (mobile ? .88 : .35);
+  const displayH = height * (mobile ? .21 : .34);
+
+  // Articulated arms, cable sleeves and a central desk clamp behind the screens.
+  const armY = mobile ? .65 : .73;
+  line(back, [.49, mobile ? .37 : .64], [.49, mobile ? .86 : .79], 9, 5);
+  line(back, [.49, mobile ? .37 : .64], [.49, mobile ? .86 : .79], 45, 2);
+  if (!mobile) {
+    for (const side of [-1, 1]) {
+      const a: Point = [.50, armY], b: Point = [.50 + side * .19, armY - .025], c: Point = [.50 + side * .32, .64];
+      line(back, a, b, 9, 5); line(back, b, c, 9, 5);
+      line(back, a, b, 43, 2); line(back, b, c, 38, 2);
+      back.ellipse(...point(...b), 3, 3, 53); back.ellipse(...point(...b), 1, 1, 12);
+      line(back, [.50, armY + .025], [b[0], b[1] + .025], 8, 2);
+    }
+  }
+  poly(back, [[.46,.78],[.54,.78],[.56,.80],[.44,.80]], 19, "metal");
   back.rect(displayX + 3, displayY + 4, displayW, displayH, 6);
   back.rect(displayX + displayW * .43, displayY + displayH, displayW * .14, 4, 13, "metal");
   back.rect(displayX, displayY, displayW, displayH, 39, "metal");
@@ -225,7 +241,7 @@ export function createAboutRoom(width: number, height: number) {
   for (let i = 0; i < 3; i++) back.rect(...screen(.89 + i * .025, .065), 1, 1, 53);
 
   const plotX = displayX + displayW * .065, plotY = displayY + displayH * .16;
-  const plotW = displayW * (mobile ? .86 : .61), plotH = displayH * .50;
+  const plotW = displayW * .86, plotH = displayH * .50;
   const volumeBottom = displayY + displayH * .88;
   for (let row = 0; row <= 5; row++) back.line([plotX, plotY + plotH * row / 5], [plotX + plotW, plotY + plotH * row / 5], 24);
   for (let col = 0; col <= 8; col++) back.line([plotX + plotW * col / 8, plotY], [plotX + plotW * col / 8, volumeBottom], 20);
@@ -255,21 +271,6 @@ export function createAboutRoom(width: number, height: number) {
     back.rect(x - Math.floor(bodyW / 2), volumeBottom - volume, bodyW, volume, close >= open ? 52 : 30, "metal");
   }
 
-  if (!mobile) {
-    const sx = displayX + displayW * .74, sw = displayW * .19;
-    back.line([sx - 3, plotY - 2], [sx - 3, volumeBottom], 31);
-    for (let panel = 0; panel < 3; panel++) {
-      const sy = displayY + displayH * (.16 + panel * .25), sh = displayH * .17;
-      for (let row = 0; row < 3; row++) back.line([sx, sy + row * sh / 2], [sx + sw, sy + row * sh / 2], 23);
-      let previous: Point | null = null;
-      for (let i = 0; i < 13; i++) {
-        const value = panel === 1 ? 1 - prices[i * 2] : prices[(i * 2 + panel * 3) % prices.length];
-        const next: Point = [sx + i * sw / 12, sy + (1 - value) * sh];
-        if (previous) back.line(previous, next, panel === 1 ? 53 : 74);
-        previous = next;
-      }
-    }
-  }
   back.rect(...screen(.47, .965), displayW * .06, 1, 48);
 
   const deskBack = compact ? .85 : .79, deskFront = .96;
@@ -284,16 +285,17 @@ export function createAboutRoom(width: number, height: number) {
   line(front, [0, deskFront], [1, deskFront], 49);
   for (let y = deskBack + .025; y < deskFront; y += .028) line(front, [0, y], [1, y + .008], 28);
 
-  // Perspective monitor helper; tiny controls, screen scanlines, code and bezel screws.
+  // Angled side displays share the center screen’s height, bezel and mounting rail.
+  const monitorLights: PixelLight[] = [];
   const monitor = (x: number, y: number, mw: number, mh: number, slope: number, editor: boolean) => {
     const at = (u: number, v: number): Point => [x + u * mw, y + v * mh + u * slope];
-    const quad = (u: number, v: number, rw: number, rh: number, shade: number, material: Material = "metal") => front.polygon([at(u, v), at(u + rw, v), at(u + rw, v + rh), at(u, v + rh)], shade, material);
-    quad(.44, .95, .12, .22, 13); quad(.25, 1.13, .51, .04, 31);
+    const quad = (u: number, v: number, rw: number, rh: number, shade: number, material: Material = "metal") => back.polygon([at(u, v), at(u + rw, v), at(u + rw, v + rh), at(u, v + rh)], shade, material);
+    monitorLights.push({ x, y: y + Math.min(0, slope), width: mw, height: mh + Math.abs(slope), reach: 8, strength: .13, hollow: true });
     quad(-.02, .01, 1.04, 1.02, 6); quad(0, 0, 1, 1, 43); quad(.015, .02, .97, .94, 20);
     quad(.045, .06, .91, .82, 6); quad(.06, .08, .88, .78, 14, "glass");
-    front.line(at(.02, .025), at(.97, .025), 76);
-    front.line(at(.02, .025), at(.02, .96), 55);
-    for (let v = .12; v < .84; v += .06) front.line(at(.07, v), at(.92, v), 18);
+    back.line(at(.02, .025), at(.97, .025), 76);
+    back.line(at(.02, .025), at(.02, .96), 55);
+    for (let v = .12; v < .84; v += .06) back.line(at(.07, v), at(.92, v), 18);
     quad(.075, .10, .15, .73, 21);
     for (let i = 0; i < 8; i++) quad(.09, .14 + i * .08, .08 - (i % 3) * .015, .015, 46);
     if (editor) {
@@ -308,17 +310,17 @@ export function createAboutRoom(width: number, height: number) {
         quad(.35 + col * .065, .17 + row * .075, .024, .045, row < 4 ? 8 : 83);
       }
     }
-    for (const u of [.03, .96]) for (const v of [.035, .94]) front.rect(...at(u, v), 1, 1, 8);
+    for (const u of [.03, .96]) for (const v of [.035, .94]) back.rect(...at(u, v), 1, 1, 8);
     quad(.45, .93, .1, .012, 53);
     return at(.87, .93);
   };
 
   const leftMonitor = mobile
-    ? monitor(MARGIN + 4, MARGIN + height * .69, width * .40, height * .14, height * .012, true)
-    : monitor(MARGIN + width * .025, MARGIN + height * (compact ? .69 : .57), width * .245, height * (compact ? .14 : .19), height * (compact ? .012 : .025), true);
-  const rightMonitor = !mobile
-    ? monitor(MARGIN + width * .75, MARGIN + height * (compact ? .69 : .56), width * .21, height * (compact ? .14 : .20), -height * .018, false)
-    : null;
+    ? monitor(MARGIN + width * .035, MARGIN + height * .245, width * .44, height * .13, height * .012, true)
+    : monitor(MARGIN + width * .055, MARGIN + height * .31, width * .26, height * .34, height * .02, true);
+  const rightMonitor = mobile
+    ? monitor(MARGIN + width * .525, MARGIN + height * .257, width * .44, height * .13, -height * .012, false)
+    : monitor(MARGIN + width * .685, MARGIN + height * .33, width * .26, height * .34, -height * .02, false);
 
   // Keyboard on a dark desk mat, with individual perspective keycaps.
   const keyX = mobile ? .09 : .25, keyY = mobile ? .88 : compact ? .90 : .84;
@@ -356,7 +358,6 @@ export function createAboutRoom(width: number, height: number) {
     front.ellipse(cx, cy, 2, 2, 58); fans.push([cx, cy]);
   }
 
-  let steam: Point | null = null;
   if (!mobile) {
     // A real 8 × 8 board, foreshortened into the desktop.
     const boardAt = (u: number, v: number): Point => point(.63 + u * .15 + v * .045, (compact ? .89 : .835) + v * (compact ? .06 : .09));
@@ -370,12 +371,6 @@ export function createAboutRoom(width: number, height: number) {
       front.ellipse(x+1,y+1,4,2,8); front.rect(x-1,y-5,3,5,light ? 75 : 8);
       front.rect(x-2,y-1,5,2,light ? 65 : 13); front.rect(x-1,y-7,3,2,light ? 86 : 16);
     }
-    const [mx,my] = point(.84,compact ? .88 : .82);
-    front.ellipse(mx+2,my+4,8,3,17); front.ellipse(mx+6,my-4,4,4,51); front.ellipse(mx+6,my-4,2,2,25);
-    front.rect(mx-5,my-9,10,13,45,"metal"); front.rect(mx-4,my-8,2,10,61);
-    front.ellipse(mx,my-9,5,2,67); front.ellipse(mx,my-9,3,1,10); front.ellipse(mx,my+3,5,2,36);
-    steam = [mx,my-14];
-
     // A cropped chair in the immediate foreground creates a final plane of depth.
     poly(front, [[.42,1.05],[.43,.965],[.45,.94],[.56,.94],[.58,.965],[.60,1.05]], 8, "metal");
     line(front, [.45,.94], [.56,.94], 35);
@@ -383,15 +378,39 @@ export function createAboutRoom(width: number, height: number) {
     for (let y = .965; y < 1; y += .014) line(front, [.45,y], [.56,y], 14);
   }
 
+  // A slim black Monster can: rolled aluminum rims, pull tab, three torn claws.
+  // The silver emblem keeps the room monochrome without adding label text.
+  const [canX, canBottom] = point(mobile ? .28 : .855, mobile ? .875 : compact ? .89 : .85);
+  const canW = mobile ? 10 : 13, canH = mobile ? 20 : 24;
+  const canTop = canBottom - canH;
+  front.ellipse(canX + 2, canBottom + 1, canW * .75, 2, 12, "glass");
+  front.rect(canX - canW / 2, canTop + 2, canW, canH - 3, 8, "metal");
+  front.rect(canX - canW / 2 + 1, canTop + 3, 1, canH - 5, 43, "metal");
+  front.rect(canX - canW / 2 + 2, canTop + 4, 1, canH - 6, 22, "metal");
+  front.rect(canX + canW / 2 - 2, canTop + 3, 1, canH - 5, 24, "metal");
+  front.ellipse(canX, canTop + 1, canW / 2, 2, 77);
+  front.ellipse(canX, canTop + 1, canW / 2 - 1, 1, 33);
+  front.rect(canX - 1, canTop, 3, 1, 95); front.rect(canX, canTop + 1, 1, 1, 9);
+  front.ellipse(canX, canBottom - 1, canW / 2, 1, 50);
+  front.rect(canX - canW / 2 + 2, canBottom - 2, canW - 4, 1, 19);
+  const claw = [
+    "110011011", "011011011", "011001011", "010011010", "011011011",
+    "001011011", "001001011", "011001010", "010001010", "010001010", "010000010",
+  ];
+  const clawX = Math.round(canX - 4), clawY = Math.round(canTop + 6);
+  claw.forEach((row, y) => [...row].forEach((cell, x) => {
+    if (cell === "1") front.pixel(clawX + x, clawY + y, x % 3 === 0 ? 104 : 80, "glass");
+  }));
+
   const backCanvas = back.canvas(), frontCanvas = front.canvas();
   const backGlow = pixelGlow(w, h, [
-    { x: displayX, y: displayY, width: displayW, height: displayH, reach: 14, strength: .21, hollow: true },
+    { x: displayX, y: displayY, width: displayW, height: displayH, reach: 12, strength: .18, hollow: true },
+    ...monitorLights,
     { x: MARGIN + width * .28, y: MARGIN + height * .12, width: width * .15, height: 1, reach: 8, strength: .26 },
     { x: MARGIN + width * .57, y: MARGIN + height * .12, width: width * .15, height: 1, reach: 8, strength: .20 },
   ]);
   const frontGlow = pixelGlow(w, h, [
     ...fans.map(([x, y]) => ({ x, y, width: 1, height: 1, reach: Math.min(12, pcW * .6), strength: .19 })),
-    ...[leftMonitor, rightMonitor].flatMap(led => led ? [{ x: led[0], y: led[1], width: 1, height: 1, reach: 5, strength: .20 }] : []),
   ]);
   // Sparse fragments rise against gravity, fading before the eight-second wrap.
   const suspended = Array.from({ length: mobile ? 18 : 38 }, (_, i) => ({
@@ -436,15 +455,10 @@ export function createAboutRoom(width: number, height: number) {
       chartMark(lastCandle.x - Math.floor(bodyW / 2), volumeBottom - lastCandle.volume - Math.abs(drift), bodyW, lastCandle.volume + Math.abs(drift), "#383838");
       for (let px = lastCandle.x + bodyW; px < plotX + plotW + 2; px += 3) chartMark(px, close, 1, 1, "#444444");
       chartMark(displayX + displayW - 5, displayY + displayH - 3, 1, 1, tick < 48 ? "#707070" : "#404040");
-      for (const led of [leftMonitor, rightMonitor]) if (led) mark(...led, 1, 1, tick < 48 ? "#808080" : "#484848");
+      for (const led of [leftMonitor, rightMonitor]) chartMark(...led, 1, 1, tick < 48 ? "#808080" : "#484848");
       for (const [cx,cy] of fans) {
         const step = Math.floor(tick / 8) % 4;
         mark(cx + [0,1,0,-1][step],cy + [-1,0,1,0][step],1,1,"#707070");
-      }
-      if (steam) {
-        const rise = [0,1,2,1][Math.floor(tick / 16)];
-        mark(steam[0],steam[1]-rise,1,2,"#484848");
-        mark(steam[0]+1,steam[1]-4-rise,1,2,"#303030");
       }
       for (const mote of suspended) {
         const age = (tick + mote.phase) % ROOM_LOOP_FRAMES;

@@ -23,9 +23,9 @@ class Pixels {
   pixel(x: number, y: number, shade: number, material: Material = "paint") {
     x = Math.round(x); y = Math.round(y);
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
-    const grain = (noise(x, y) - .5) * (material === "glass" ? 3 : 8);
-    const clusters = (noise(Math.floor(x / 5), Math.floor(y / 4)) - .5) * 4;
-    const surface = material === "wood" ? (noise(Math.floor(x / 13), y) - .5) * 9
+    const grain = (noise(x, y) - .5) * (material === "glass" ? 2 : 4);
+    const clusters = (noise(Math.floor(x / 5), Math.floor(y / 4)) - .5) * 2;
+    const surface = material === "wood" ? (noise(Math.floor(x / 13), y) - .5) * 6
       : material === "metal" ? (y % 3 === 0 ? 2 : -1) : clusters;
     const threshold = BAYER[(y & 3) * 4 + (x & 3)] / 16;
     const value = Math.max(4, Math.min(112, Math.floor((shade + grain + surface) / 4 + threshold) * 4));
@@ -84,6 +84,35 @@ class Pixels {
 }
 
 export type AboutRoom = ReturnType<typeof createAboutRoom>;
+
+type PixelLight = { x: number; y: number; width: number; height: number; reach: number; strength: number; hollow?: boolean };
+
+/** Five dithered light bands on the same source grid. No canvas shadows or CSS blur. */
+function pixelGlow(width: number, height: number, lights: PixelLight[]) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  const image = ctx.createImageData(width, height);
+  for (const light of lights) {
+    for (let y = Math.max(0, Math.floor(light.y - light.reach)); y < Math.min(height, light.y + light.height + light.reach); y++) {
+      for (let x = Math.max(0, Math.floor(light.x - light.reach)); x < Math.min(width, light.x + light.width + light.reach); x++) {
+        const dx = Math.max(light.x - x, 0, x - light.x - light.width + 1);
+        const dy = Math.max(light.y - y, 0, y - light.y - light.height + 1);
+        if (light.hollow && dx === 0 && dy === 0) continue;
+        const distance = Math.hypot(dx, dy);
+        if (distance >= light.reach) continue;
+        const band = Math.floor((1 - distance / light.reach) * 5 + BAYER[(y & 3) * 4 + (x & 3)] / 16);
+        const alpha = Math.round(band / 5 * light.strength * 255);
+        const i = (y * width + x) * 4;
+        image.data[i] = 255; image.data[i + 1] = 255; image.data[i + 2] = 255;
+        image.data[i + 3] = Math.max(image.data[i + 3], alpha);
+      }
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
 
 export function createAboutRoom(width: number, height: number) {
   const w = width + MARGIN * 2, h = height + MARGIN * 2;
@@ -183,7 +212,7 @@ export function createAboutRoom(width: number, height: number) {
   const displayX = MARGIN + width * (mobile ? .06 : compact ? .17 : .245);
   const displayY = MARGIN + height * (mobile ? .32 : .27);
   const displayW = width * (mobile ? .88 : compact ? .66 : .51);
-  const displayH = height * (mobile ? .29 : .36);
+  const displayH = height * (mobile ? .27 : .36);
   back.rect(displayX + 3, displayY + 4, displayW, displayH, 6);
   back.rect(displayX + displayW * .43, displayY + displayH, displayW * .14, 4, 13, "metal");
   back.rect(displayX, displayY, displayW, displayH, 39, "metal");
@@ -355,6 +384,15 @@ export function createAboutRoom(width: number, height: number) {
   }
 
   const backCanvas = back.canvas(), frontCanvas = front.canvas();
+  const backGlow = pixelGlow(w, h, [
+    { x: displayX, y: displayY, width: displayW, height: displayH, reach: 14, strength: .21, hollow: true },
+    { x: MARGIN + width * .28, y: MARGIN + height * .12, width: width * .15, height: 1, reach: 8, strength: .26 },
+    { x: MARGIN + width * .57, y: MARGIN + height * .12, width: width * .15, height: 1, reach: 8, strength: .20 },
+  ]);
+  const frontGlow = pixelGlow(w, h, [
+    ...fans.map(([x, y]) => ({ x, y, width: 1, height: 1, reach: Math.min(12, pcW * .6), strength: .19 })),
+    ...[leftMonitor, rightMonitor].flatMap(led => led ? [{ x: led[0], y: led[1], width: 1, height: 1, reach: 5, strength: .20 }] : []),
+  ]);
   // Sparse fragments rise against gravity, fading before the eight-second wrap.
   const suspended = Array.from({ length: mobile ? 18 : 38 }, (_, i) => ({
     x: width * (.04 + noise(i, 231) * .92),
@@ -370,7 +408,18 @@ export function createAboutRoom(width: number, height: number) {
       const fx = -MARGIN + x * 2, fy = -MARGIN + y * 2;
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(backCanvas, -MARGIN + x, -MARGIN + y);
+      const glow = [.72, .82, .94, 1, .94, .82, .72, .68][Math.floor(tick / 8)];
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = glow;
+      ctx.drawImage(backGlow, -MARGIN + x, -MARGIN + y);
+      ctx.restore();
       ctx.drawImage(frontCanvas, fx, fy);
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = glow;
+      ctx.drawImage(frontGlow, fx, fy);
+      ctx.restore();
       const mark = (px: number, py: number, rw: number, rh: number, color: string) => {
         ctx.fillStyle = color; ctx.fillRect(Math.round(px + fx), Math.round(py + fy), rw, rh);
       };

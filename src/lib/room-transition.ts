@@ -1,8 +1,8 @@
-/** Corrode the outgoing sky, then reconstruct the room from its own source pixels. */
+/** Corrode the outgoing sky, then spread pixel-edged ink openings over the room. */
 const CELL = 5;
 const ROOM_CELL = 3;
 const CLOSE_MS = 1000;
-const REVEAL_MS = 1750;
+const REVEAL_MS = 1450;
 const clamp = (value: number) => Math.max(0, Math.min(1, value));
 const ease = (value: number) => { const t = clamp(value); return t * t * (3 - 2 * t); };
 const hash = (x: number, y: number) => {
@@ -39,6 +39,27 @@ function corrosion(width: number, height: number) {
   return { thresholds, grit };
 }
 
+/** Several wet blots grow into each other, with lobed edges and small satellite drops. */
+function inkSplotches(width: number, height: number, cx: number, cy: number) {
+  const scale = Math.min(width, height);
+  const seeds = [
+    [cx, cy, 0], [width * .19, height * .23, .10], [width * .82, height * .29, .13],
+    [width * .28, height * .80, .19], [width * .80, height * .76, .23],
+    [width * .49, height * .10, .16], [cx - scale * .10, cy + scale * .13, .055],
+  ];
+  const thresholds = new Float32Array(width * height);
+  let low = Infinity, high = -Infinity;
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    let value = Infinity;
+    for (const [sx, sy, delay] of seeds) value = Math.min(value, Math.hypot(x - sx, (y - sy) * 1.06) / scale + delay);
+    value += (noise(x / 17, y / 17) - .5) * .12 + (noise(x / 5, y / 5) - .5) * .035;
+    thresholds[y * width + x] = value;
+    low = Math.min(low, value); high = Math.max(high, value);
+  }
+  for (let i = 0; i < thresholds.length; i++) thresholds[i] = (thresholds[i] - low) / (high - low || 1) * .88;
+  return thresholds;
+}
+
 /** Read only our same-origin sky canvas once; no screen capture or extra assets. */
 function skyPixels(width: number, height: number) {
   const source = document.querySelector<HTMLCanvasElement>("canvas[data-pixel-sky]");
@@ -62,7 +83,6 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
   const root = document.documentElement;
   let frame = 0;
   let settle: ((finished: boolean) => void) | null = null;
-  let revealEffects: Animation[] = [];
   let deadline: ReturnType<typeof setTimeout> | undefined;
   let waitCleanup: (() => void) | undefined;
   let generation = 0;
@@ -78,8 +98,6 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     stopAnimation();
     waitCleanup?.();
     clearTimeout(deadline);
-    revealEffects.forEach((animation) => animation.cancel());
-    revealEffects = [];
     delete root.dataset.roomTransition;
     canvas.classList.remove("is-drawing");
     ctx?.clearRect(0, 0, canvas.width, canvas.height);
@@ -194,66 +212,21 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     const bounds = field.getBoundingClientRect();
     const { width, height } = canvas;
     const scale = bounds.width / field.width;
-    const sx = (bounds.left + Number(field.dataset.screenX) * scale) / ROOM_CELL;
-    const sy = (bounds.top + Number(field.dataset.screenY) * scale) / ROOM_CELL;
-    const sw = Number(field.dataset.screenWidth) * scale / ROOM_CELL;
-    const sh = Number(field.dataset.screenHeight) * scale / ROOM_CELL;
-    const cx = sx + sw / 2, cy = sy + sh / 2;
-    const sample = document.createElement("canvas");
-    sample.width = width; sample.height = height;
-    const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
-    if (!sampleCtx) { clear(); return; }
-    sampleCtx.imageSmoothingEnabled = false;
-    sampleCtx.fillStyle = "#080808";
-    sampleCtx.fillRect(0, 0, width, height);
-    sampleCtx.drawImage(field, bounds.left / ROOM_CELL, bounds.top / ROOM_CELL,
-      bounds.width / ROOM_CELL, bounds.height / ROOM_CELL);
-    const source = sampleCtx.getImageData(0, 0, width, height).data;
-    const count = width * height;
-    const arrivals = new Float32Array(count);
-    const offsetX = new Int16Array(count), offsetY = new Int16Array(count);
-    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-      const i = y * width + x;
-      const grain = hash(x + 17, y + 91);
-      const distance = Math.hypot((x - cx) / width, (y - cy) / height);
-      const monitor = x >= sx && x < sx + sw && y >= sy && y < sy + sh;
-      const stage = monitor ? .06 : source[i * 4] > 35 ? .19 : .31;
-      // Individual cells and small clusters lock in: no dissolving contour.
-      arrivals[i] = Math.min(.9, stage + grain * .30
-        + hash(Math.floor(x / 3), Math.floor(y / 3)) * .12 + distance * .13);
-      offsetX[i] = Math.round((x - cx) * .10 + (grain - .5) * 24);
-      offsetY[i] = Math.round((y - cy) * .08 - 10 - hash(y, x) * 20);
-    }
+    const cx = (bounds.left + (Number(field.dataset.screenX) + Number(field.dataset.screenWidth) / 2) * scale) / ROOM_CELL;
+    const cy = (bounds.top + (Number(field.dataset.screenY) + Number(field.dataset.screenHeight) / 2) * scale) / ROOM_CELL;
+    const thresholds = inkSplotches(width, height, cx, cy);
     const mask = ctx.createImageData(width, height);
     const pixels = mask.data;
     root.dataset.roomTransition = "revealing";
 
-    // Separate wrappers keep the existing eight-second floats uninterrupted.
-    const details = document.querySelectorAll(".about-letter-art, .about-object-art, .about-bottom");
-    revealEffects = Array.from(details, (element, index) => element.animate([
-      { opacity: 0, clipPath: "inset(100% 0 0 0)", transform: "translateY(-12px)" },
-      { opacity: 1, clipPath: "inset(0 0 0 0)", transform: "translateY(0)" },
-    ], { duration: 320, delay: 880 + index * 55, easing: "steps(8, end)", fill: "both" }));
-
     const finished = await animate(REVEAL_MS, (elapsed) => {
-      const progress = elapsed / REVEAL_MS;
-      for (let i = 0; i < count; i++) {
+      const progress = ease(elapsed / REVEAL_MS);
+      for (let i = 0; i < thresholds.length; i++) {
         const offset = i * 4;
         pixels[offset] = 8; pixels[offset + 1] = 8; pixels[offset + 2] = 8;
-        // Once a pixel lands, uncover its real, live counterpart underneath.
-        pixels[offset + 3] = progress >= arrivals[i] ? 0 : 255;
-      }
-      for (let i = 0; i < count; i++) {
-        const age = (progress - arrivals[i] + .20) / .20;
-        if (age <= 0 || age >= 1 || source[i * 4] < 17) continue;
-        const travel = 1 - ease(age);
-        const x = i % width + Math.round(offsetX[i] * travel);
-        const y = Math.floor(i / width) + Math.round(offsetY[i] * travel);
-        if (x < 0 || y < 0 || x >= width || y >= height) continue;
-        const to = (y * width + x) * 4;
-        const shade = Math.round((8 + (source[i * 4] - 8) * Math.min(1, age * 3)) / 4) * 4;
-        pixels[to] = shade; pixels[to + 1] = shade; pixels[to + 2] = shade;
-        pixels[to + 3] = 255;
+        // A narrow, stepped wet edge; the room and letters appear together inside each blot.
+        const opened = Math.round(clamp((progress - thresholds[i]) / .035) * 3) / 3;
+        pixels[offset + 3] = Math.round((1 - opened) * 255);
       }
       ctx.putImageData(mask, 0, 0);
     });

@@ -27,7 +27,17 @@ export default function AboutField({ paused }: { paused: boolean }) {
     function draw() {
       if (!canvas) return;
       room?.draw(ctx, Math.floor(elapsedRef.current / ROOM_FRAME_MS), camera.x, camera.y);
+      surface?.style.setProperty("--room-camera-x", `${camera.x * ROOM_CELL}px`);
+      surface?.style.setProperty("--room-camera-y", `${camera.y * ROOM_CELL}px`);
       if (room && canvas.dataset.ready !== "true") {
+        room.bio.forEach((monitor, index) => {
+          const key = index === 0 ? "intro" : "interests";
+          for (const property of ["x", "y", "width", "height"] as const) {
+            surface?.style.setProperty(`--bio-${key}-${property}`, `${monitor[property] * ROOM_CELL}px`);
+          }
+          surface?.style.setProperty(`--bio-${key}-tilt`, `${monitor.tilt}deg`);
+        });
+        if (surface) surface.dataset.roomReady = "true";
         canvas.dataset.screenX = String(room.display.x);
         canvas.dataset.screenY = String(room.display.y);
         canvas.dataset.screenWidth = String(room.display.width);

@@ -67,12 +67,30 @@
   0%, 100% { transform: translateX(calc(-1 * var(--letter-sway))); }
   50% { transform: translateX(var(--letter-sway)); }
 }
-.about-bio { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-.about-bio section { position: absolute; top: 37%; width: 24%; max-width: 350px; pointer-events: auto; }
-.about-bio-intro { left: 4.5%; }
-.about-bio-interests { right: 4.5%; }
+.about-bio { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; }
+.about-page[data-room-ready="true"] .about-bio { opacity: 1; }
+.about-bio section {
+  position: absolute;
+  left: var(--monitor-x);
+  top: var(--monitor-y);
+  width: var(--monitor-width);
+  height: var(--monitor-height);
+  transform: translate(var(--room-camera-x, 0px), var(--room-camera-y, 0px)) skewY(var(--monitor-tilt));
+  transform-origin: top left;
+  pointer-events: auto;
+}
+.about-bio-intro {
+  --monitor-x: var(--bio-intro-x); --monitor-y: var(--bio-intro-y);
+  --monitor-width: var(--bio-intro-width); --monitor-height: var(--bio-intro-height);
+  --monitor-tilt: var(--bio-intro-tilt);
+}
+.about-bio-interests {
+  --monitor-x: var(--bio-interests-x); --monitor-y: var(--bio-interests-y);
+  --monitor-width: var(--bio-interests-width); --monitor-height: var(--bio-interests-height);
+  --monitor-tilt: var(--bio-interests-tilt);
+}
 .about-bio h2 {
-  margin: 0 0 20px;
+  margin: 0 0 14px;
   font-family: var(--font-pixel), monospace;
   font-size: clamp(10px, .9vw, 13px);
   font-weight: 400;
@@ -82,9 +100,9 @@
 .about-bio p {
   margin: 0;
   font-family: var(--font-mono), monospace;
-  font-size: clamp(16px, 1.35vw, 19px);
-  line-height: 1.8;
-  color: #bcbcbc;
+  font-size: clamp(15px, 1.25vw, 19px);
+  line-height: 1.65;
+  color: #c6c6c6;
   text-wrap: pretty;
 }
 .about-bio strong { color: #eee; font-weight: 500; }
@@ -125,22 +143,18 @@
 }
 
 @media (max-width: 1050px) {
-  .about-page { height: max(100svh, 960px); }
+  .about-page { height: max(100svh, 1000px); }
   .about-name { --letter-pixel: 6px; --letter-drift: 28px; --letter-sway: 8px; top: 4%; width: 72%; }
-  .about-bio { inset: 25% auto auto 50%; width: min(84%, 560px); transform: translateX(-50%); }
-  .about-bio section { position: static; width: auto; max-width: none; }
-  .about-bio section + section { margin-top: 24px; }
-  .about-bio h2 { margin-bottom: 10px; font-size: 11px; }
-  .about-bio p { font-size: 17px; line-height: 1.7; }
+  .about-bio h2 { font-size: 11px; }
+  .about-bio p { font-size: 16px; }
   .about-bottom { position: fixed; z-index: 4; }
   .about-object-knight { left: 18%; top: 13%; }
   .about-object-ball { right: 18%; top: 13%; }
 }
 
 @media (max-width: 600px) {
+  .about-page { height: max(100svh, 1280px); }
   .about-name { --letter-pixel: 4px; --letter-drift: 18px; --letter-sway: 4px; width: 94%; }
-  .about-bio { width: 86%; }
-  .about-bio p { font-size: 16px; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
   .about-object-knight { left: 8%; top: 12%; }

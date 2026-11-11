@@ -8,13 +8,14 @@ export default function Footer() {
   const pathname = usePathname();
   // Computed on the fly so the copyright year never goes stale.
   const year = new Date().getFullYear();
+  if (pathname === "/about") return null;
 
   return (
     <footer className="site-footer">
       <div className="site-footer-inner">
         <span className="site-footer-copyright">© {year} xinge xu</span>
 
-        {pathname !== "/" && <SocialLinks showGitHub={pathname !== "/about"} />}
+        {pathname !== "/" && <SocialLinks />}
       </div>
     </footer>
   );

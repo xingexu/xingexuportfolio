@@ -15,35 +15,12 @@
   --chrome-accent: #eeeeee;
 }
 
-.nav-bar-about { background: transparent; }
-.nav-bar-about::after { display: none; }
-.nav-bar-about .nav-link {
-  color: #a4a4a4;
-  text-shadow: none;
-  font-size: 13px;
-}
-.nav-bar-about .nav-link:hover { color: #fff; text-shadow: none; }
-.nav-bar-about .nav-link[aria-current="page"] { color: #fff; background: transparent; border-color: transparent; border-bottom-color: #c3c3c3; }
-.about-home-link {
-  margin-right: auto;
-  color: #c3c3c3;
-  font-family: var(--font-pixel);
-  font-size: 12px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-}
-.about-home-link:hover { color: #fff; }
-body:has(.about-page) .site-footer { border-top: 1px solid #202020; box-shadow: none; }
-body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; border-color: transparent; }
-
 .about-page {
   --loop-duration: 8s;
   position: relative;
   isolation: isolate;
-  min-height: max(920px, calc(100svh - 76px));
+  min-height: 100svh;
+  height: 100svh;
   padding: 0;
   background: #101010;
   color: #eeeeee;
@@ -103,9 +80,10 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 .about-object-knight .about-object-motion { animation-name: about-knight; animation-timing-function: steps(3, end); }
 .about-object-ball { right: calc(50% - 440px); top: 25%; }
 .about-object-ball .about-sprite { animation: about-ball-turn var(--loop-duration) steps(1, end) var(--float-delay) infinite; }
-.about-bottom { position: absolute; bottom: 28px; left: max(28px, calc(50% - 500px)); right: max(28px, calc(50% - 500px)); display: flex; align-items: center; justify-content: flex-end; }
-.about-motion-toggle { font: inherit; color: #acacac; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-.about-motion-toggle:hover { color: #fff; }
+.about-bottom { position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 24px; right: 24px; display: flex; align-items: center; justify-content: space-between; }
+.about-exit, .about-motion-toggle { font: inherit; color: #777; background: none; border: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.about-exit:hover, .about-motion-toggle:hover { color: #fff; }
+.about-exit:focus-visible, .about-motion-toggle:focus-visible { outline: 1px dashed #cdcdcd; outline-offset: 4px; }
 .about-page[data-paused="true"] :is(.about-object-motion, .about-sprite-volleyball, .about-letter) { animation-play-state: paused !important; }
 
 @keyframes about-float { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(8px, -8px); } 50% { transform: translate(0, -16px); } 75% { transform: translate(-8px, -8px); } }
@@ -121,22 +99,17 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
   .about-name { --letter-pixel: 3px; --letter-travel: 6px; top: 23%; width: 60%; }
   .about-object-knight { left: 24%; top: 14%; }
   .about-object-ball { right: 22%; top: 13%; }
-  .about-page { min-height: max(1020px, calc(100svh - 76px)); padding: 0; }
 }
 
 @media (max-width: 600px) {
   .about-name { --letter-pixel: 3px; --letter-travel: 6px; top: 64%; width: 80%; }
-  .nav-bar-about > nav { justify-content: space-between !important; padding-inline: 20px !important; }
-  .about-home-link { font-size: 10px; gap: 8px; }
-  .nav-bar-about .nav-link { font-size: 11px; padding-inline: 5px; }
-  .about-page { min-height: max(1040px, calc(100svh - 76px)); padding: 0; }
   .about-object { width: 120px; min-height: 100px; }
   .about-object-art { height: 72px; }
   .about-object-knight { left: 8%; top: 21%; }
   .about-object-knight .about-sprite { width: 40px; height: 48px; }
   .about-object-ball { right: 8%; top: 21%; }
   .about-object-ball .about-sprite { width: 40px; height: 40px; }
-  .about-bottom { left: 24px; right: 24px; bottom: 20px; gap: 12px; font-size: 9px; }
+  .about-bottom { left: 12px; right: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -57,7 +57,7 @@ export default function AboutField({ paused }: { paused: boolean }) {
     }
 
     function moveCamera(event: PointerEvent) {
-      if (!surface || paused || reducedMotion.matches || !finePointer.matches) return;
+      if (!surface || paused || reducedMotion.matches || !finePointer.matches || document.documentElement.dataset.roomTransition) return;
       const bounds = surface.getBoundingClientRect();
       camera.x = Math.round((event.clientX / bounds.width - .5) * 4);
       camera.y = Math.round(((event.clientY - bounds.top) / bounds.height - .5) * 4);

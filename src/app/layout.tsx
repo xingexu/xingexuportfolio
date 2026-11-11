@@ -38,6 +38,9 @@ const themeInit = `(function(){var p=null;try{var s=localStorage.getItem("xinge-
  */
 const introInit = `(function(){try{if(location.pathname==="/"&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.dataset.intro="playing"}catch(e){}})();`;
 
+// Cover direct About loads before hydration, matching the client-side shutter.
+const roomIntroInit = `(function(){try{if(location.pathname==="/about"&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.dataset.roomTransition="waiting"}catch(e){}})();`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
@@ -130,6 +133,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       >
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <script dangerouslySetInnerHTML={{ __html: introInit }} />
+        <script dangerouslySetInnerHTML={{ __html: roomIntroInit }} />
         {/* HomeIntro's white cover. First in <body> so it's parsed (and painted) before
             any page content, and outside #page-content so that wrapper's load fade
             can't trap it under the nav. */}

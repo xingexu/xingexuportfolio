@@ -33,4 +33,4 @@ The `/about` page uses a layered grayscale pixel-art computer room with an eight
 
 The parser verifies all dates and checks that daily counts add up to GitHub's headline total. If GitHub changes its calendar markup or is unavailable, the tracker shows a retry option and a link to the profile instead of an incorrect total.
 
-Page links fade out before navigating and fade in after the new route renders. Project sections reveal as they enter the viewport. These effects respect `prefers-reduced-motion`.
+Entering About closes pixel shutters over the outgoing page, then powers on the trading display and opens into the room. The overlay waits for the first room frame; ZINGER and the two profile sprites arrive in sequence. The full entrance takes about two seconds on a loaded route, also runs on direct About loads, and can be skipped with Escape. Reduced motion skips the sequence entirely; navigation recovery and a CSS timeout keep interrupted loads usable. Other page links retain their short fades. Project sections reveal as they enter the viewport.

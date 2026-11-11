@@ -356,6 +356,7 @@ export function createAboutRoom(width: number, height: number) {
 
   const backCanvas = back.canvas(), frontCanvas = front.canvas();
   return {
+    display: { x: displayX - MARGIN, y: displayY - MARGIN, width: displayW, height: displayH },
     draw(ctx: CanvasRenderingContext2D, frame: number, cameraX = 0, cameraY = 0) {
       const tick = ((frame % ROOM_LOOP_FRAMES) + ROOM_LOOP_FRAMES) % ROOM_LOOP_FRAMES;
       const x = Math.round(cameraX), y = Math.round(cameraY);

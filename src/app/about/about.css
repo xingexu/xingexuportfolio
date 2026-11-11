@@ -145,11 +145,11 @@ body:has(.about-page) .icon-btn { background: transparent; box-shadow: none; bor
 }
 
 @media (max-width: 1050px) {
-  .about-object-knight { left: 3%; top: 18%; }
-  .about-object-ball { right: 17%; top: 15%; }
+  .about-object-knight { left: 24%; top: 14%; }
+  .about-object-ball { right: 22%; top: 13%; }
   .about-object-laptop { left: calc(50% - 70px); right: auto; top: 7%; bottom: auto; }
   .about-object-rook, .about-object-ball-small, .about-object-pawn { display: none; }
-  .about-page { min-height: 850px; padding: 235px 36px 245px; }
+  .about-page { min-height: max(850px, calc(100svh - 76px)); padding: 235px 36px 245px; }
 }
 
 @media (max-width: 600px) {

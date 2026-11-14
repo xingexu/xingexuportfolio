@@ -29,12 +29,12 @@ The `/about` page is a playable pixel world. Use **WASD or arrow keys** to walk,
 
 - `src/lib/life-world.ts` draws the grayscale islands, bridges, props, and four-direction walking sprite on an integer pixel grid. It also defines collision geometry and normalized movement. Static artwork is cached; the camera follows the character. Ambient motion can be paused, respects reduced motion, and stops when the tab is hidden.
 - `src/components/LifeWorld.tsx` handles input, camera, resizing, readiness, and the minimap. Opening a story or losing focus clears held movement keys.
-- `src/lib/life-stories.ts` contains the real biography, project screenshots, profile links, and story positions. These locations are interests, not an invented chronological life history.
+- `src/lib/life-stories.ts` contains the real biography, project screenshots, profile links, and story positions. The opening is the supplied age-six arrival in Canada; later areas represent present-day interests. No intermediate events or dates are invented.
 - `src/components/About.tsx` provides accessible story dialogs, discovery progress, controls, and the no-JavaScript biography.
 
-To add a personal photo, put the approved image in `public/images/memories/`, then add `{ src: "/images/memories/name.jpg", alt: "Description of the photo", caption: "The memory and date" }` to the relevant story’s `photos` array. Only supplied photos and confirmed events should be added. The initial world covers the introduction, coding/projects, Western, volleyball, chess, and food.
+To add a personal photo, put the approved image in `public/images/memories/`, then add `{ src: "/images/memories/name.jpg", alt: "Description of the photo", caption: "The memory and date" }` to the relevant story’s `photos` array. Only supplied photos and confirmed events should be added. The opening starts a small child with a backpack on the boarding stairs of an unbranded plane, beside a grayscale Canadian flag. Hold S or the down control to step onto the tarmac. Crossing the first bridge grows the character into the present-day avatar; revisiting the arrival does not reverse growth. The other areas cover coding/projects, Western, volleyball, chess, and food.
 
-Run `npm run test:world` to check that every story is reachable, diagonal speed is normalized, obstacles and edges hold the player, and the first bridge can be crossed continuously.
+Run `npm run test:world` to check that every story is reachable, diagonal speed is normalized, obstacles and edges hold the player, the first bridge can be crossed continuously, and character growth persists when revisiting childhood.
 
 ## GitHub activity
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, type RefObject } from "react";
 import { advanceWalker, closestStory, createLifeWorld, START, type Direction, type Walker } from "@/lib/life-world";
 
 export type WorldControls = { input: (direction: Direction, held: boolean) => void; focus: () => void };
+export type LifeEra = "childhood" | "growing" | "today";
 type Props = {
   controls: RefObject<WorldControls | null>;
   blocked: boolean;
@@ -13,6 +14,7 @@ type Props = {
   onInteract: (id: string) => void;
   onMap: () => void;
   onMove: () => void;
+  onEra: (era: LifeEra) => void;
 };
 const KEY_DIRECTIONS: Record<string, Direction> = { w: "up", a: "left", s: "down", d: "right", ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right" };
 
@@ -30,13 +32,14 @@ export default function LifeWorld(props: Props) {
     const world = createLifeWorld();
     if (!world) return;
     const scene = world;
-    const player: Walker = { ...START, direction: "down", distance: 0, moving: false };
+    const player: Walker = { ...START, direction: "down", distance: 0, moving: false, growth: 0 };
     const camera = { x: player.x, y: player.y - 36 };
     const held = new Set<Direction>();
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const minimap = document.getElementById("world-map-player");
     let frame = 0, previous = 0, ambientTime = 0, lastId = "", lastNear: string | null | undefined, hasMoved = false;
     let disposed = false;
+    let lastEra: LifeEra = "childhood";
 
     function focus() { region.focus({ preventScroll: true }); }
     function clearInput() { held.clear(); player.moving = false; }
@@ -55,6 +58,9 @@ export default function LifeWorld(props: Props) {
       const covered = !!document.documentElement.dataset.roomTransition;
       if (live.current.blocked || covered) clearInput();
       advanceWalker(player, held, dt);
+      const growth = player.growth ?? 0;
+      const era: LifeEra = growth >= 1 ? "today" : growth > .01 ? "growing" : "childhood";
+      if (era !== lastEra) { lastEra = era; live.current.onEra(era); }
       if (player.moving && !hasMoved) { hasMoved = true; live.current.onMove(); }
       const follow = motion.matches ? 1 : 1 - Math.exp(-dt * 8);
       camera.x += (player.x - camera.x) * follow;
@@ -67,6 +73,7 @@ export default function LifeWorld(props: Props) {
       minimap?.setAttribute("x", String(Math.round(player.x - 15)));
       minimap?.setAttribute("y", String(Math.round(player.y - 15)));
       region.dataset.playerX = String(Math.round(player.x)); region.dataset.playerY = String(Math.round(player.y));
+      region.dataset.era = era;
       if (field.dataset.ready !== "true") {
         field.dataset.screenX = String(field.width / 2 - 20); field.dataset.screenY = String(field.height / 2 - 20);
         field.dataset.screenWidth = "40"; field.dataset.screenHeight = "40";

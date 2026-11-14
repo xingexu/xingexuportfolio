@@ -1,7 +1,9 @@
 import { LINKS } from "@/app/data";
 
 export type MemoryPhoto = { src: string; alt: string; caption?: string };
+export type LifeChapter = "airport" | "holsworthy";
 export type LifeStory = {
+  chapter?: LifeChapter;
   id: string;
   number: string;
   place: string;
@@ -13,13 +15,19 @@ export type LifeStory = {
   link?: { href: string; label: string };
 };
 
-// Only the supplied childhood arrival is playable. Later interests are kept
+// Only supplied childhood memories are playable. Later interests are kept
 // separately until the owner adds the memories that connect the chapters.
 export const LIFE_STORIES: LifeStory[] = [
   {
-    id: "arrival", number: "01", place: "Arriving in Canada", title: "Six years old. A new country.",
+    id: "arrival", chapter: "airport", number: "01", place: "Arriving in Canada", title: "Six years old. A new country.",
     description: "I came to Canada when I was six. This is where the walk begins: getting off the plane, with the rest of my life still ahead of me.",
     x: 365, y: 625, photos: [],
+  },
+  {
+    id: "first-home", chapter: "holsworthy", number: "02", place: "18 Holsworthy · Markham, Ontario", title: "My first home. My first moves.",
+    description: "18 Holsworthy was my first house in Markham, Ontario. This is where I learned to play chess.",
+    x: 612, y: 418, photos: [],
+    link: { href: LINKS.lichess, label: "Play me on Lichess" },
   },
 ];
 

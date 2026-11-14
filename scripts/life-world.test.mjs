@@ -18,9 +18,12 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(localRequire, result, result.exports);
   return result.exports;
 }
-const { advanceWalker, canWalk, airportPlace, AIRPORT_PLACES, START, WORLD } = load('src/lib/life-world.ts');
+const { advanceWalker, canWalk, airportPlace, atAirportExit, closestStory, AIRPORT_PLACES, START, WORLD } = load('src/lib/life-world.ts');
 const { LIFE_STORIES } = load('src/lib/life-stories.ts');
 const { emptyAirportProgress, recordAirportProgress, getAirportGuide, nextAirportWaypoint } = load('src/lib/airport-guide.ts');
+const airportStories = LIFE_STORIES.filter(s => (s.chapter ?? 'airport') === 'airport');
+const { HOME_START, HOME_CHESS, HOME_OBSTACLES, canWalkHome, atHomeReturn, getHomeGuide } = load('src/lib/home-world.ts');
+const { chessPieceAt } = load('src/lib/pixel-chess.ts');
 const walker = () => ({ ...START, direction: 'down', distance: 0, moving: false, growth: 0 });
 
 test('the arrival memory and every airport area are reachable on foot', () => {
@@ -30,14 +33,14 @@ test('the arrival memory and every airport area are reachable on foot', () => {
   const found = new Set();
   for (let i = 0; i < queue.length; i++) {
     const p = queue[i];
-    for (const story of [...LIFE_STORIES, ...AIRPORT_PLACES]) if (Math.hypot(p.x - story.x, p.y - story.y) < 20) found.add(story.id);
+    for (const story of [...airportStories, ...AIRPORT_PLACES]) if (Math.hypot(p.x - story.x, p.y - story.y) < 20) found.add(story.id);
     for (const [dx, dy] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
       const next = { x: p.x + dx, y: p.y + dy }, id = key(next.x, next.y);
       if (next.x < 0 || next.y < 0 || next.x > WORLD.width || next.y > WORLD.height || seen.has(id) || !canWalk(next)) continue;
       seen.add(id); queue.push(next);
     }
   }
-  assert.deepEqual([...found].sort(), [...LIFE_STORIES, ...AIRPORT_PLACES].map(s => s.id).sort());
+  assert.deepEqual([...found].sort(), [...airportStories, ...AIRPORT_PLACES].map(s => s.id).sort());
 });
 test('diagonal movement has the same speed, and opposite directions cancel', () => {
   const straight = walker(), diagonal = walker(), opposed = walker();
@@ -75,7 +78,7 @@ test('the child stays six everywhere, including after a legacy growth value', ()
     advanceWalker(p, new Set(), .02);
     assert.equal(p.growth, 0);
   }
-  assert.deepEqual(LIFE_STORIES.map(s => s.id), ['arrival']);
+  assert.deepEqual(LIFE_STORIES.map(s => s.id), ['arrival', 'first-home']);
 });
 
 test('acceleration is frame-rate independent and releasing input stops without drift', () => {
@@ -91,7 +94,7 @@ test('acceleration is frame-rate independent and releasing input stops without d
   assert.ok(Math.max(...positions) - Math.min(...positions) < .00001);
 });
 
-test('the guide leads a first-time visitor through every step to a clear ending', () => {
+test('the airport guide leads through every step to the exit for the next chapter', () => {
   const p = walker(), progress = emptyAirportProgress(), stages = new Set();
   let readArrival = false, complete = false;
   for (let frame = 0; frame < 6000; frame++) {
@@ -99,14 +102,14 @@ test('the guide leads a first-time visitor through every step to a clear ending'
     const guide = getAirportGuide(p, progress, readArrival);
     stages.add(guide.id);
     assert.ok(guide.hint.length > 0 && guide.touchHint.length > 0);
-    if (guide.id === 'complete') { complete = true; assert.equal(guide.target, null); break; }
+    if (atAirportExit(p)) { complete = true; assert.equal(guide.id, 'exit'); break; }
     if (guide.id === 'memory' && Math.hypot(p.x - LIFE_STORIES[0].x, p.y - LIFE_STORIES[0].y) <= 48) readArrival = true;
     const direction = { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' }[guide.arrow];
     assert.ok(canWalk(guide.waypoint));
     advanceWalker(p, new Set([direction]), 1 / 60);
   }
   assert.equal(complete, true, `Guide stopped near ${p.x}, ${p.y}`);
-  assert.deepEqual([...stages], ['stairs', 'memory', 'arrivals', 'baggage', 'meeting', 'complete']);
+  assert.deepEqual([...stages], ['stairs', 'memory', 'arrivals', 'baggage', 'meeting', 'exit']);
 });
 
 test('off-route guidance can lead back around airport obstacles to the memory', () => {
@@ -123,4 +126,42 @@ test('off-route guidance can lead back around airport obstacles to the memory', 
     }
     assert.equal(arrived, true, `Could not return from ${location.x}, ${location.y}; stopped at ${p.x}, ${p.y}`);
   }
+});
+
+test('the first-home guide reaches the chessboard through the front door', () => {
+  const p = { ...walker(), ...HOME_START }, stages = new Set();
+  let entered = false, read = false, complete = false;
+  for (let frame = 0; frame < 2000; frame++) {
+    entered ||= p.y < 525;
+    const guide = getHomeGuide(p, entered, read); stages.add(guide.id);
+    if (guide.id === 'home-complete') { complete = true; break; }
+    assert.ok(canWalkHome(guide.waypoint));
+    if (entered && Math.hypot(p.x - HOME_CHESS.x, p.y - HOME_CHESS.y) <= 48) read = true;
+    const direction = { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' }[guide.arrow];
+    advanceWalker(p, new Set([direction]), 1 / 60, canWalkHome);
+    assert.ok(canWalkHome(p)); assert.equal(p.growth, 0);
+  }
+  assert.equal(complete, true, `Stopped at ${p.x}, ${p.y}`);
+  assert.deepEqual([...stages], ['home-door', 'home-chess', 'home-complete']);
+});
+
+test('home furniture is solid and both chapter gates have reachable thresholds', () => {
+  for (const obstacle of HOME_OBSTACLES) assert.equal(canWalkHome({ x: obstacle.x + obstacle.w / 2, y: obstacle.y + obstacle.h / 2 }), false);
+  assert.ok(canWalkHome({ x: 500, y: 540 }));
+  assert.equal(canWalkHome({ x: 450, y: 540 }), false);
+  assert.ok(atAirportExit({ x: 1240, y: 286 }) && canWalk({ x: 1240, y: 286 }));
+  assert.equal(atAirportExit({ x: 1240, y: 600 }), false);
+  assert.ok(atHomeReturn({ x: 500, y: 650 }) && canWalkHome({ x: 500, y: 650 }));
+  assert.equal(atHomeReturn(HOME_START), false);
+});
+
+test('memories belong to their own chapter, and the chessboard starts correctly', () => {
+  assert.equal(closestStory(HOME_CHESS, 'holsworthy').id, 'first-home');
+  assert.equal(closestStory(HOME_CHESS, 'airport').id, 'arrival');
+  const pieces = Array.from({ length: 64 }, (_, i) => chessPieceAt(Math.floor(i / 8), i % 8)).filter(Boolean);
+  assert.equal(pieces.length, 32);
+  assert.equal(pieces.filter(p => p.white).length, 16);
+  assert.deepEqual(chessPieceAt(7, 4), { piece: 'k', white: true });
+  assert.deepEqual(chessPieceAt(0, 3), { piece: 'q', white: false });
+  assert.equal(chessPieceAt(4, 4), null);
 });

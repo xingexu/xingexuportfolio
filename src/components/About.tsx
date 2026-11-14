@@ -29,7 +29,7 @@ export default function About() {
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const atHome = chapter === "holsworthy", chapterNumber = atHome ? "02" : "01";
-  const homeNames: Record<string, string> = { "home-garden": "18 Holsworthy", "home-door": "My first home", "home-living": "The living room", "home-chess": "Where I learned chess" };
+  const homeNames: Record<string, string> = { "home-door": "My room · 18 Holsworthy", "home-lego": "LEGO sets & Star Wars", "home-computer": "One more game of agar.io", "home-chess": "Where I learned chess" };
   const locationName = atHome ? homeNames[place] ?? "18 Holsworthy" : (AIRPORT_PLACES.find((area) => area.id === place) ?? AIRPORT_PLACES[0]).name;
   const near = LIFE_STORIES.find((story) => story.id === nearby);
   const story = LIFE_STORIES.find((item) => item.id === opened);
@@ -74,8 +74,8 @@ export default function About() {
       <div className="world-topline">
         <TransitionLink href="/" className="world-exit" aria-label="Return to home">↖</TransitionLink>
         <div className="world-title"><span>ZINGER</span><p>age 6 · {atHome ? "Markham, Ontario" : "Canada"}</p></div>
-        <button type="button" className="world-index" onClick={openMap} aria-label={atHome ? "Chapter two — open home map" : "Chapter one — open airport map"}>
-          <span>{chapterNumber}</span><small>{atHome ? "FIRST HOME" : "ARRIVAL"}</small>
+        <button type="button" className="world-index" onClick={openMap} aria-label={atHome ? "Chapter two — open room map" : "Chapter one — open airport map"}>
+          <span>{chapterNumber}</span><small>{atHome ? "MY ROOM" : "ARRIVAL"}</small>
         </button>
       </div>
       <div className="world-location" aria-live="polite" aria-atomic="true">
@@ -97,9 +97,9 @@ export default function About() {
           <div className="world-touch" aria-label="Movement controls">{DIRECTIONS.map(directionButton)}</div>
           <button type="button" className="world-pause" aria-label={paused ? "Resume ambient animation" : "Pause ambient animation"} aria-pressed={paused} onClick={() => { setPaused((p) => !p); controls.current?.focus(); }}>{paused ? "▷" : "Ⅱ"}</button>
         </div>
-        <button type="button" className="world-map-toggle" onClick={openMap} aria-label={atHome ? "Open home map" : "Open airport map"}>
+        <button type="button" className="world-map-toggle" onClick={openMap} aria-label={atHome ? "Open room map" : "Open airport map"}>
           {atHome ? <HomeMap live guide={guide} /> : <AirportMap live guide={guide} />}
-          <span>{atHome ? "Home map" : "Airport map"} <span aria-hidden="true">↗</span></span>
+          <span>{atHome ? "Room map" : "Airport map"} <span aria-hidden="true">↗</span></span>
         </button>
       </div>
       <dialog ref={dialog} className="world-dialog" aria-labelledby="world-dialog-title" onCancel={(event) => { event.preventDefault(); close(); }} onClick={(event) => { if (event.target === event.currentTarget) { const r = event.currentTarget.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); } }}>
@@ -109,28 +109,32 @@ export default function About() {
           {atHome ? <HomeMap guide={guide} /> : <AirportMap guide={guide} />}
           <p className="world-map-legend"><span>■ You are here</span><span>□ Next stop</span></p>
           <p className="world-map-next"><strong>{guide.title}</strong> {guide.hint}</p>
-          <p className="world-dialog-intro">{atHome ? "Walk through the front door and find the chess table on the right. Walk down the garden path to revisit the airport." : "Follow the yellow path into arrivals. Baggage claim is on the left; the meeting point and exit are on the right. Walk through the exit to visit my first home."}</p>
+          <p className="world-dialog-intro">{atHome ? "You’re inside my room at 18 Holsworthy. The chessboard and LEGO are on the left; agar.io, candy, and badminton rackets are on the right. Walk down through the doorway to revisit the airport." : "Walk down the plane stairs, follow the yellow path right, then head up to the nearby terminal doors. They take you straight into my childhood room — no airport detour."}</p>
           <div className="world-story-list">{LIFE_STORIES.filter(item => (item.chapter ?? "airport") === chapter).map((item) => <button type="button" key={item.id} onClick={() => readStory(item.id)}><span>{item.number}</span><span><strong>{item.place}</strong><small>{item.title}</small></span><span aria-label={visited.has(item.id) ? "Discovered" : "Unread"}>{visited.has(item.id) ? "◆" : "◇"}</span></button>)}</div>
         </> : story ? <StoryContent story={story} /> : <h2 id="world-dialog-title" className="sr-only">Stories</h2>}
-        {story && <p className="world-memory-next">{guide.id.endsWith("complete") ? "Keep exploring, or return to the airport through the garden gate." : `Next: ${guide.title}`}</p>}
+        {story && <p className="world-memory-next">{guide.id.endsWith("complete") ? "Keep exploring my room, or return to the airport through the doorway." : `Next: ${guide.title}`}</p>}
         {opened && <button type="button" className="world-continue" onClick={close}>Keep walking <span aria-hidden="true">→</span></button>}
       </dialog>
-      {travelling && <div className="world-chapter-transition" key={travelling} role="status"><small>CHAPTER {travelling === "holsworthy" ? "02" : "01"}</small><strong>{travelling === "holsworthy" ? "18 HOLSWORTHY" : "ARRIVING IN CANADA"}</strong><span>{travelling === "holsworthy" ? "Markham, Ontario · My first home" : "Back where the walk began"}</span></div>}
+      {travelling && <div className="world-chapter-transition" key={travelling} role="status"><small>CHAPTER {travelling === "holsworthy" ? "02" : "01"}</small><strong>{travelling === "holsworthy" ? "18 HOLSWORTHY" : "ARRIVING IN CANADA"}</strong><span>{travelling === "holsworthy" ? "My room · Markham, Ontario" : "Back where the walk began"}</span></div>}
       <noscript><div className="world-nojs"><h2>Six years old. A new country.</h2><p>I came to Canada when I was six. Enable JavaScript to walk off the plane and explore the airport in this first chapter of my life.</p><TransitionLink href="/">Return home</TransitionLink></div></noscript>
     </section>
   );
 }
 
 function HomeMap({ live = false, guide }: { live?: boolean; guide: AirportGuide }) {
-  return <svg viewBox="0 0 1000 720" aria-hidden="true" className={live ? "world-minimap" : "world-airport-plan"}>
-    <rect width="1000" height="720" fill="#7d906a" /><rect x="130" y="120" width="740" height="430" fill="#bb9568" stroke="#8c664c" strokeWidth="20" />
-    <rect x="475" y="522" width="50" height="140" fill="#d9c5a0" /><rect x="197" y="231" width="224" height="222" fill="#ac7659" />
-    <rect x="230" y="244" width="160" height="62" fill="#75876b" /><rect x="260" y="350" width="100" height="50" fill="#7b5d45" />
-    <rect x="552" y="260" width="120" height="108" fill="#546e60" />
-    {Array.from({length:64},(_,i)=><rect key={i} x={564+i%8*12} y={265+Math.floor(i/8)*12} width="12" height="12" fill={(i%8+Math.floor(i/8))%2 ? "#687b65" : "#e5d5ad"} />)}
-    {guide.target && <rect x={guide.target.x-25} y={guide.target.y-25} width="50" height="50" fill="none" stroke="#f7d06b" strokeWidth="12" />}
+  return <svg viewBox="80 160 680 400" aria-hidden="true" className={live ? "world-minimap" : "world-airport-plan"}>
+    <rect x="80" y="160" width="680" height="400" fill="#29383e" />
+    <rect x="100" y="180" width="640" height="355" fill="#b78c62" stroke="#546e70" strokeWidth="10" />
+    <rect x="108" y="180" width="624" height="120" fill="#7d9b9b" />
+    <rect x="118" y="305" width="110" height="155" fill="#698e9b" /><rect x="124" y="315" width="98" height="29" fill="#ded3af" />
+    <rect x="237" y="453" width="39" height="31" fill="#c69a59" /><rect x="234" y="378" width="42" height="42" fill="#7a986d" />
+    <rect x="312" y="336" width="116" height="110" fill="#876241" />
+    {Array.from({length:64},(_,i)=><rect key={i} x={322+i%8*12} y={340+Math.floor(i/8)*12} width="12" height="12" fill={(i%8+Math.floor(i/8))%2 ? "#687b65" : "#e5d5ad"} />)}
+    <rect x="526" y="310" width="171" height="74" fill="#c1a477" /><rect x="553" y="279" width="116" height="65" fill="#d5dfcf" stroke="#263944" strokeWidth="5" />
+    <rect x="584" y="403" width="40" height="35" fill="#568184" /><rect x="444" y="520" width="44" height="24" fill="#d9c5a0" />
+    {guide.target && <rect x={guide.target.x-18} y={guide.target.y-18} width="36" height="36" fill="none" stroke="#f7d06b" strokeWidth="7" />}
     <rect data-world-map-player="" x={HOME_START.x-15} y={HOME_START.y-15} width="30" height="30" fill="#d8794d" stroke="#233e51" strokeWidth="7" />
-    {!live && <><text x="300" y="487" textAnchor="middle">LIVING ROOM</text><text x="630" y="460" textAnchor="middle">CHESS</text><text x="500" y="699" textAnchor="middle">BACK TO AIRPORT</text></>}
+    {!live && <><text x="190" y="490" textAnchor="middle">LEGO</text><text x="370" y="322" textAnchor="middle">CHESS</text><text x="610" y="462" textAnchor="middle">AGAR.IO</text></>}
   </svg>;
 }
 

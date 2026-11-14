@@ -25,8 +25,8 @@ export const LIFE_STORIES: LifeStory[] = [
   },
   {
     id: "first-home", chapter: "holsworthy", number: "02", place: "18 Holsworthy · Markham, Ontario", title: "My first home. My first moves.",
-    description: "18 Holsworthy was my first house in Markham, Ontario. This is where I learned to play chess.",
-    x: 612, y: 418, photos: [],
+    description: "18 Holsworthy was my first house in Markham, Ontario. This is where I learned to play chess. My room had LEGO sets, Star Wars posters, badminton rackets, candy, and a computer playing agar.io.",
+    x: 370, y: 488, photos: [],
     link: { href: LINKS.lichess, label: "Play me on Lichess" },
   },
 ];

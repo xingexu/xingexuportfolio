@@ -18,11 +18,11 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(localRequire, result, result.exports);
   return result.exports;
 }
-const { advanceWalker, canWalk, airportPlace, atAirportExit, closestStory, AIRPORT_PLACES, START, WORLD } = load('src/lib/life-world.ts');
+const { advanceWalker, canWalk, airportPlace, atAirportExit, closestStory, AIRPORT_PLACES, START, WORLD, AIRPORT_EXIT, AIRPORT_RETURN } = load('src/lib/life-world.ts');
 const { LIFE_STORIES } = load('src/lib/life-stories.ts');
 const { emptyAirportProgress, recordAirportProgress, getAirportGuide, nextAirportWaypoint } = load('src/lib/airport-guide.ts');
 const airportStories = LIFE_STORIES.filter(s => (s.chapter ?? 'airport') === 'airport');
-const { HOME_START, HOME_CHESS, HOME_OBSTACLES, canWalkHome, atHomeReturn, getHomeGuide } = load('src/lib/home-world.ts');
+const { HOME_START, HOME_CHESS, HOME_OBSTACLES, canWalkHome, atHomeReturn, getHomeGuide, nextHomeWaypoint } = load('src/lib/home-world.ts');
 const { chessPieceAt } = load('src/lib/pixel-chess.ts');
 const walker = () => ({ ...START, direction: 'down', distance: 0, moving: false, growth: 0 });
 
@@ -94,22 +94,21 @@ test('acceleration is frame-rate independent and releasing input stops without d
   assert.ok(Math.max(...positions) - Math.min(...positions) < .00001);
 });
 
-test('the airport guide leads through every step to the exit for the next chapter', () => {
+test('the nearby terminal exit reaches the room in under ten seconds without reading a memory', () => {
   const p = walker(), progress = emptyAirportProgress(), stages = new Set();
-  let readArrival = false, complete = false;
-  for (let frame = 0; frame < 6000; frame++) {
+  const readArrival = false; let complete = false;
+  for (let frame = 0; frame < 600; frame++) {
     recordAirportProgress(progress, p);
     const guide = getAirportGuide(p, progress, readArrival);
     stages.add(guide.id);
     assert.ok(guide.hint.length > 0 && guide.touchHint.length > 0);
     if (atAirportExit(p)) { complete = true; assert.equal(guide.id, 'exit'); break; }
-    if (guide.id === 'memory' && Math.hypot(p.x - LIFE_STORIES[0].x, p.y - LIFE_STORIES[0].y) <= 48) readArrival = true;
     const direction = { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' }[guide.arrow];
     assert.ok(canWalk(guide.waypoint));
     advanceWalker(p, new Set([direction]), 1 / 60);
   }
   assert.equal(complete, true, `Guide stopped near ${p.x}, ${p.y}`);
-  assert.deepEqual([...stages], ['stairs', 'memory', 'arrivals', 'baggage', 'meeting', 'exit']);
+  assert.deepEqual([...stages], ['stairs', 'exit']);
 });
 
 test('off-route guidance can lead back around airport obstacles to the memory', () => {
@@ -128,10 +127,10 @@ test('off-route guidance can lead back around airport obstacles to the memory', 
   }
 });
 
-test('the first-home guide reaches the chessboard through the front door', () => {
+test('arrival starts inside the bedroom and guides the child to the nearby chessboard', () => {
   const p = { ...walker(), ...HOME_START }, stages = new Set();
   let entered = false, read = false, complete = false;
-  for (let frame = 0; frame < 2000; frame++) {
+  for (let frame = 0; frame < 180; frame++) {
     entered ||= p.y < 525;
     const guide = getHomeGuide(p, entered, read); stages.add(guide.id);
     if (guide.id === 'home-complete') { complete = true; break; }
@@ -142,17 +141,20 @@ test('the first-home guide reaches the chessboard through the front door', () =>
     assert.ok(canWalkHome(p)); assert.equal(p.growth, 0);
   }
   assert.equal(complete, true, `Stopped at ${p.x}, ${p.y}`);
-  assert.deepEqual([...stages], ['home-door', 'home-chess', 'home-complete']);
+  assert.deepEqual([...stages], ['home-chess', 'home-complete']);
 });
 
 test('home furniture is solid and both chapter gates have reachable thresholds', () => {
   for (const obstacle of HOME_OBSTACLES) assert.equal(canWalkHome({ x: obstacle.x + obstacle.w / 2, y: obstacle.y + obstacle.h / 2 }), false);
-  assert.ok(canWalkHome({ x: 500, y: 540 }));
-  assert.equal(canWalkHome({ x: 450, y: 540 }), false);
-  assert.ok(atAirportExit({ x: 1240, y: 286 }) && canWalk({ x: 1240, y: 286 }));
+  assert.ok(canWalkHome({ x: 466, y: 540 }));
+  assert.equal(canWalkHome({ x: 430, y: 540 }), false);
+  assert.ok(atAirportExit(AIRPORT_EXIT) && canWalk(AIRPORT_EXIT));
   assert.equal(atAirportExit({ x: 1240, y: 600 }), false);
-  assert.ok(atHomeReturn({ x: 500, y: 650 }) && canWalkHome({ x: 500, y: 650 }));
+  assert.ok(atHomeReturn({ x: 466, y: 540 }) && canWalkHome({ x: 466, y: 540 }));
   assert.equal(atHomeReturn(HOME_START), false);
+  assert.ok(canWalk(AIRPORT_RETURN));
+  assert.equal(atAirportExit(AIRPORT_RETURN), false);
+  assert.ok(canWalkHome(HOME_START));
 });
 
 test('memories belong to their own chapter, and the chessboard starts correctly', () => {
@@ -164,4 +166,21 @@ test('memories belong to their own chapter, and the chessboard starts correctly'
   assert.deepEqual(chessPieceAt(7, 4), { piece: 'k', white: true });
   assert.deepEqual(chessPieceAt(0, 3), { piece: 'q', white: false });
   assert.equal(chessPieceAt(4, 4), null);
+});
+
+test('the bedroom objects and return doorway remain reachable around the furniture', () => {
+  for (const destination of [{ x: 466, y: 540 }, { x: 520, y: 408 }, { x: 690, y: 425 }, { x: 258, y: 343 }, { x: 290, y: 465 }]) {
+    const p = { ...walker(), ...HOME_START };
+    assert.ok(canWalkHome(destination));
+    let arrived = false;
+    for (let frame = 0; frame < 1200; frame++) {
+      if (Math.hypot(p.x - destination.x, p.y - destination.y) < 10) { arrived = true; break; }
+      const waypoint = nextHomeWaypoint(p, destination);
+      const dx = waypoint.x - p.x, dy = waypoint.y - p.y;
+      const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      advanceWalker(p, new Set([direction]), 1 / 60, canWalkHome);
+      assert.ok(canWalkHome(p));
+    }
+    assert.equal(arrived, true, `Cannot reach ${JSON.stringify(destination)}; stopped at ${p.x}, ${p.y}`);
+  }
 });

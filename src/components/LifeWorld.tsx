@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import { advanceWalker, airportPlace, atAirportExit, canWalk, closestStory, createLifeWorld, START, WORLD, type Direction, type Walker } from "@/lib/life-world";
+import { advanceWalker, airportPlace, atAirportExit, canWalk, closestStory, createLifeWorld, AIRPORT_RETURN, START, WORLD, type Direction, type Walker } from "@/lib/life-world";
 import { emptyAirportProgress, getAirportGuide, recordAirportProgress, type AirportGuide } from "@/lib/airport-guide";
 import { atHomeReturn, canWalkHome, createHomeWorld, getHomeGuide, homePlace, HOME_START, HOME_WORLD, CHESS_TABLE } from "@/lib/home-world";
 import type { LifeChapter } from "@/lib/life-stories";
@@ -64,10 +64,14 @@ export default function LifeWorld(props: Props) {
       live.current.onTransition?.(to);
     }
     function worldSize() { return chapter === "airport" ? WORLD : HOME_WORLD; }
+    function cameraTarget() {
+      if (chapter === "holsworthy" && field.width >= 600 && field.height >= 340) return { x: HOME_WORLD.width / 2, y: 355 };
+      return { x: player.x, y: player.y - 36 };
+    }
     function centerCamera() {
-      const size = worldSize();
-      camera.x = Math.max(field.width / 2, Math.min(size.width - field.width / 2, player.x));
-      camera.y = Math.max(field.height / 2, Math.min(size.height - field.height / 2, player.y - 36));
+      const size = worldSize(), aim = cameraTarget();
+      camera.x = Math.max(field.width / 2, Math.min(size.width - field.width / 2, aim.x));
+      camera.y = Math.max(field.height / 2, Math.min(size.height - field.height / 2, aim.y));
     }
     const control = { input, focus, travel };
     const handle = live.current.controls;
@@ -88,7 +92,7 @@ export default function LifeWorld(props: Props) {
         transition.elapsed += dt * 1000;
         if (!transition.switched && transition.elapsed >= (motion.matches ? 120 : 750)) {
           chapter = transition.to; transition.switched = true;
-          Object.assign(player, chapter === "holsworthy" ? HOME_START : { x: 1195, y: 286 }, { direction: chapter === "holsworthy" ? "up" : "left", moving: false, vx: 0, vy: 0, distance: 0 });
+          Object.assign(player, chapter === "holsworthy" ? HOME_START : AIRPORT_RETURN, { direction: chapter === "holsworthy" ? "up" : "down", moving: false, vx: 0, vy: 0, distance: 0 });
           centerCamera(); lastId = ""; lastNear = undefined; lastGuide = "";
           live.current.onChapter?.(chapter);
         }
@@ -96,9 +100,9 @@ export default function LifeWorld(props: Props) {
       }
       if (player.moving && !hasMoved) { hasMoved = true; live.current.onMove(); }
       const follow = motion.matches ? 1 : 1 - Math.exp(-dt * 10);
-      const size = worldSize();
-      const targetX = Math.max(field.width / 2, Math.min(size.width - field.width / 2, player.x));
-      const targetY = Math.max(field.height / 2, Math.min(size.height - field.height / 2, player.y - 36));
+      const size = worldSize(), aim = cameraTarget();
+      const targetX = Math.max(field.width / 2, Math.min(size.width - field.width / 2, aim.x));
+      const targetY = Math.max(field.height / 2, Math.min(size.height - field.height / 2, aim.y));
       camera.x += (targetX - camera.x) * follow;
       camera.y += (targetY - camera.y) * follow;
       if (!live.current.paused && !motion.matches && !live.current.blocked) ambientTime += dt * 1000;

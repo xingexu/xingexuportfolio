@@ -8,8 +8,9 @@ export type Direction = "up" | "down" | "left" | "right";
 export type Walker = Point & { direction: Direction; distance: number; moving: boolean; growth?: number; vx?: number; vy?: number };
 export const WORLD = { width: 1280, height: 800 };
 export const START: Point = { x: 329, y: 560 };
-export const AIRPORT_EXIT: Point = { x: 1240, y: 286 };
-export const atAirportExit = (p: Point) => p.x >= 1234 && p.y >= 260 && p.y <= 313;
+export const AIRPORT_EXIT: Point = { x: 650, y: 350 };
+export const AIRPORT_RETURN: Point = { x: 650, y: 401 };
+export const atAirportExit = (p: Point) => p.x >= 611 && p.x <= 689 && p.y >= 310 && p.y <= 355;
 export const TERMINAL = { x: 50, y: 65, w: 1180, h: 320 };
 export const AIRPORT_PLACES = [
   { id: "apron", name: "Off the plane", x: 365, y: 625, hint: "Follow the yellow path to arrivals." },
@@ -172,7 +173,7 @@ export function createLifeWorld() {
     rect(start,383,end-start,3,"#d2ded6");
   }
   rect(605,363,90,24,"#a6bcb9");rect(606,363,3,20,"#284c60");rect(692,363,3,20,"#284c60");
-  rect(610,382,80,4,"#f3e7c0");sign(601,330,99,"ARRIVALS");
+  rect(610,382,80,4,"#f3e7c0");sign(594,330,114,"TERMINAL EXIT");
   rect(617,389,65,1,"#f8e9b3");
   rect(1218,89,12,161,"#577784");rect(1218,320,12,65,"#577784");
   sign(1188,221,42,"EXIT");rect(1221,251,8,67,"#e5dcb7");

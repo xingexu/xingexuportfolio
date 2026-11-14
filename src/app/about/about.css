@@ -183,7 +183,7 @@
   .world-welcome { display: none; }
 }
 
-.world-page[data-chapter="holsworthy"] { background: #708063; }
+.world-page[data-chapter="holsworthy"] { background: #29383e; }
 .world-page[data-chapter="holsworthy"] :is(.world-title,.world-exit,.world-index,.world-map-toggle,.world-pause,.world-keyboard-help,.world-guide,.world-read-memory,.world-guide-home) { background: #354b3cf5; }
 .world-page[data-chapter="holsworthy"] .world-location { background: #42533ee8; }
 .world-page[data-chapter="holsworthy"] .world-direction { background: #354b3cf0; }
@@ -198,3 +198,7 @@
 .world-chess-memory figcaption { margin-top: 12px; text-align: center; font-size: 10px; color: #64735c; }
 @keyframes chapter-title { 0%,28% { opacity: 0; } 40%,68% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .world-chapter-transition { animation: none; } }
+
+@media (min-width: 1000px) and (min-height: 680px) {
+  .world-page[data-chapter="holsworthy"] .world-interact { left: 28px; transform: none; width: 300px; bottom: 118px; }
+}

@@ -147,3 +147,38 @@
 .world-airport-plan text { font: 29px var(--font-pixel), monospace; fill: #28495c; }
 .world-page ::-webkit-scrollbar-thumb { background: #71929b; border-color: #d5ddcf; }
 .world-page ::-webkit-scrollbar-track { background: #d5ddcf; }
+
+/* A persistent next step stays separate from the optional memory action. */
+.world-interact { bottom: 118px; width: min(420px, calc(100% - 32px)); max-width: none; display: grid; gap: 7px; }
+.world-guide { display: flex; gap: 12px; align-items: flex-start; padding: 12px 15px; background: #183a50f5; border-left: 2px solid #efcf83; box-shadow: 2px 2px 0 #395b65; }
+.world-guide-arrow { font-size: 25px; line-height: 1; min-width: 25px; padding-top: 14px; color: #f4d280; }
+.world-guide small { display: block; font-size: 8px; letter-spacing: .12em; color: #c9c9a8; margin-bottom: 5px; }
+.world-guide strong { display: block; color: #fff1d2; font-size: 12px; font-weight: 500; }
+.world-guide p { margin-top: 5px; color: #d4e0d9; font-size: 10px; line-height: 1.6; }
+.world-guide-touch { display: none; }
+.world-interact .world-read-memory { width: 100%; min-height: 40px; justify-content: flex-start; font-size: 11px; }
+.world-read-memory > span:last-child { margin-left: auto; }
+.world-welcome { bottom: 226px; }
+.world-guide-home { display: flex; justify-content: space-between; color: #fff1d2; text-decoration: none; padding: 10px 14px; background: #24465cf2; font-size: 11px; border: 1px solid #9ab3b0; }
+.world-map-legend { display: flex; gap: 22px; font-size: 10px; margin: -12px 0 18px; color: #395a6b; }
+.world-map-legend span:first-child { color: #9c4f2d; }
+.world-map-next { background: #d9dfcb; border-left: 2px solid #b39044; padding: 12px; margin-bottom: 16px; font-size: 12px; line-height: 1.7; color: #385767; }
+.world-map-next strong { display: block; color: #234256; }
+.world-continue { margin-top: 24px; width: 100%; padding: 13px 16px; background: #244b61; color: #fff0ce; border: 1px solid #51747e; display: flex; justify-content: space-between; font-size: 12px; cursor: pointer; }
+.world-continue:hover { background: #315e73; }
+.world-memory-next { margin-top: 20px; color: #385767; font-size: 11px; line-height: 1.7; }
+.world-guide-home:focus-visible, .world-continue:focus-visible, .world-read-memory:focus-visible { outline: 2px solid #efc876; outline-offset: 3px; }
+@media (pointer: coarse), (max-width: 600px) {
+  .world-interact { bottom: 129px; width: calc(100% - 32px); }
+  .world-guide { padding: 10px 12px; gap: 9px; }
+  .world-guide-desktop { display: none; }
+  .world-guide-touch { display: block; }
+  .world-guide strong { font-size: 11px; }
+  .world-guide p { font-size: 10px; }
+  .world-welcome { bottom: 245px; }
+  .world-read-memory kbd { display: none; }
+}
+@media (max-height: 560px) and (min-width: 601px) {
+  .world-interact { left: auto; right: 20px; bottom: 114px; transform: none; width: 300px; }
+  .world-welcome { display: none; }
+}

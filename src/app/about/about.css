@@ -182,3 +182,19 @@
   .world-interact { left: auto; right: 20px; bottom: 114px; transform: none; width: 300px; }
   .world-welcome { display: none; }
 }
+
+.world-page[data-chapter="holsworthy"] { background: #708063; }
+.world-page[data-chapter="holsworthy"] :is(.world-title,.world-exit,.world-index,.world-map-toggle,.world-pause,.world-keyboard-help,.world-guide,.world-read-memory,.world-guide-home) { background: #354b3cf5; }
+.world-page[data-chapter="holsworthy"] .world-location { background: #42533ee8; }
+.world-page[data-chapter="holsworthy"] .world-direction { background: #354b3cf0; }
+.world-page[data-travelling="true"] > :is(.world-topline,.world-location,.world-interact,.world-bottomline,.world-welcome) { opacity: 0; pointer-events: none; }
+.world-page[data-travelling="true"] > :is(.world-topline,.world-bottomline) * { pointer-events: none; }
+.world-chapter-transition { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 24px; text-align: center; pointer-events: none; color: #f8e4b9; animation: chapter-title 1.6s both; }
+.world-chapter-transition small { font-size: 10px; letter-spacing: .25em; color: #bfc6a6; }
+.world-chapter-transition strong { font-family: var(--font-pixel),monospace; font-size: clamp(20px,4vw,34px); font-weight: 400; line-height: 1.5; }
+.world-chapter-transition > span { font-size: 11px; color: #d7d4b7; }
+.world-chess-memory { margin: 25px auto 0; width: min(100%,300px); }
+.world-chess-memory svg { display: block; width: 100%; border: 7px solid #795d40; box-shadow: 3px 3px 0 #b7a27a; }
+.world-chess-memory figcaption { margin-top: 12px; text-align: center; font-size: 10px; color: #64735c; }
+@keyframes chapter-title { 0%,28% { opacity: 0; } 40%,68% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .world-chapter-transition { animation: none; } }

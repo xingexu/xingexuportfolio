@@ -1,4 +1,4 @@
-import { LIFE_STORIES } from "./life-stories";
+import { LIFE_STORIES, type LifeChapter } from "./life-stories";
 import { paintAirportPerson } from "./pixel-person";
 
 export type Point = { x: number; y: number };
@@ -8,6 +8,8 @@ export type Direction = "up" | "down" | "left" | "right";
 export type Walker = Point & { direction: Direction; distance: number; moving: boolean; growth?: number; vx?: number; vy?: number };
 export const WORLD = { width: 1280, height: 800 };
 export const START: Point = { x: 329, y: 560 };
+export const AIRPORT_EXIT: Point = { x: 1240, y: 286 };
+export const atAirportExit = (p: Point) => p.x >= 1234 && p.y >= 260 && p.y <= 313;
 export const TERMINAL = { x: 50, y: 65, w: 1180, h: 320 };
 export const AIRPORT_PLACES = [
   { id: "apron", name: "Off the plane", x: 365, y: 625, hint: "Follow the yellow path to arrivals." },
@@ -45,7 +47,7 @@ export function canWalk(p: Point) {
   if (!inside(p, { x: 25, y: 88, w: 1230, h: 678 }, 7)) return false;
   return !OBSTACLES.some(r => inside(p, { x: r.x - 5, y: r.y - 3, w: r.w + 10, h: r.h + 8 }));
 }
-export function advanceWalker(player: Walker, input: ReadonlySet<Direction>, seconds: number) {
+export function advanceWalker(player: Walker, input: ReadonlySet<Direction>, seconds: number, walkable: (point: Point) => boolean = canWalk) {
   const dx = Number(input.has("right")) - Number(input.has("left"));
   const dy = Number(input.has("down")) - Number(input.has("up"));
   const dt = Math.min(Math.max(seconds, 0), .04);
@@ -66,13 +68,13 @@ export function advanceWalker(player: Walker, input: ReadonlySet<Direction>, sec
     if (dx) player.direction = dx > 0 ? "right" : "left";
     else if (dy) player.direction = dy > 0 ? "down" : "up";
   }
-  if (canWalk({ x: player.x + stepX, y: player.y })) player.x += stepX; else player.vx = 0;
-  if (canWalk({ x: player.x, y: player.y + stepY })) player.y += stepY; else player.vy = 0;
+  if (walkable({ x: player.x + stepX, y: player.y })) player.x += stepX; else player.vx = 0;
+  if (walkable({ x: player.x, y: player.y + stepY })) player.y += stepY; else player.vy = 0;
   const distance = Math.hypot(player.x - oldX, player.y - oldY);
   player.distance += distance; player.moving = distance > .01; player.growth = 0;
 }
-export function closestStory(p: Point) {
-  return LIFE_STORIES.reduce((closest, story) => Math.hypot(p.x - story.x, p.y - story.y) < Math.hypot(p.x - closest.x, p.y - closest.y) ? story : closest);
+export function closestStory(p: Point, chapter: LifeChapter = "airport") {
+  return LIFE_STORIES.filter(story => (story.chapter ?? "airport") === chapter).reduce((closest, story) => Math.hypot(p.x - story.x, p.y - story.y) < Math.hypot(p.x - closest.x, p.y - closest.y) ? story : closest);
 }
 const hash = (x: number, y: number) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
 const FONT: Record<string, string[]> = {
@@ -243,7 +245,7 @@ export function createLifeWorld() {
       const bx=Math.round(x+ox),by=Math.round(y+oy);target.fillStyle="#263e4d";target.fillRect(bx+2,by-2,6,2);
       target.fillStyle=["#cb8767","#729b91","#b7a477","#8d809c"][n%4];target.fillRect(bx,by,11,8);target.fillStyle="#d0d6bd";target.fillRect(bx+3,by+1,1,6);
     }
-    for(const story of LIFE_STORIES){const x=ox+story.x,y=oy+story.y,bob=reduced?0:Math.round(Math.sin(time*.002)*2);target.fillStyle=visited.has(story.id)?"#779a9b":"#fff1af";for(let r=-3;r<=3;r++)target.fillRect(x-(3-Math.abs(r)),y-12+r+bob,(3-Math.abs(r))*2+1,1);target.fillStyle="#485f70";target.fillRect(x-8,y+3,17,1);}
+    for(const story of LIFE_STORIES.filter(s=>(s.chapter??"airport")==="airport")){const x=ox+story.x,y=oy+story.y,bob=reduced?0:Math.round(Math.sin(time*.002)*2);target.fillStyle=visited.has(story.id)?"#779a9b":"#fff1af";for(let r=-3;r<=3;r++)target.fillRect(x-(3-Math.abs(r)),y-12+r+bob,(3-Math.abs(r))*2+1,1);target.fillStyle="#485f70";target.fillRect(x-8,y+3,17,1);}
     if(waypoint && Math.hypot(waypoint.x-player.x,waypoint.y-player.y)>18){
       const x=Math.round(ox+waypoint.x),y=Math.round(oy+waypoint.y);target.fillStyle="#ffebae";
       for(const side of [-1,1]){target.fillRect(x+side*5-(side<0?0:2),y-4,3,1);target.fillRect(x+side*5,y-4,1,3);target.fillRect(x+side*5-(side<0?0:2),y+4,3,1);}

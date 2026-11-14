@@ -13,12 +13,12 @@ export type LifeStory = {
   link?: { href: string; label: string };
 };
 
-// Locations are interests, not an invented chronology. Personal photos and
-// dated memories can be added here without changing movement or the map.
+// The first memory is the supplied age-six arrival in Canada. The remaining
+// areas are present-day interests; no events or dates are invented in between.
 export const LIFE_STORIES: LifeStory[] = [
   {
-    id: "hello", number: "01", place: "The starting point", title: "Hey, I’m Xinge.",
-    description: "I’m 18, studying CS + Ivey at Western, and I love making things. This is a little world of the things I spend my time on. Take a walk around.",
+    id: "arrival", number: "01", place: "Arriving in Canada", title: "Six years old. A new country.",
+    description: "I came to Canada when I was six. This is where the walk begins: getting off the plane, with the rest of my life still ahead of me.",
     x: 180, y: 570, photos: [],
   },
   {
@@ -33,7 +33,7 @@ export const LIFE_STORIES: LifeStory[] = [
   },
   {
     id: "western", number: "03", place: "Campus", title: "CS + Ivey. Western.",
-    description: "I’m a CS + Ivey student at Western. Coding, building projects, and trying new things are a big part of my life here.",
+    description: "Today, I’m 18 and a CS + Ivey student at Western. Coding, building projects, and trying new things are a big part of my life here.",
     x: 940, y: 570, photos: [],
   },
   {

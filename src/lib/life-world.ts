@@ -3,9 +3,9 @@ import { LIFE_STORIES } from "./life-stories";
 export type Point = { x: number; y: number };
 export type Rect = Point & { w: number; h: number };
 export type Direction = "up" | "down" | "left" | "right";
-export type Walker = Point & { direction: Direction; distance: number; moving: boolean };
+export type Walker = Point & { direction: Direction; distance: number; moving: boolean; growth?: number };
 export const WORLD = { width: 1120, height: 760 };
-export const START: Point = { x: 180, y: 585 };
+export const START: Point = { x: 202, y: 541 };
 export const ISLANDS: Rect[] = LIFE_STORIES.map((story) => ({ x: story.x - 135, y: story.y - 135, w: 270, h: 230 }));
 export const BRIDGES: Rect[] = [
   { x: 299, y: 565, w: 142, h: 40 }, { x: 679, y: 565, w: 142, h: 40 },
@@ -14,7 +14,11 @@ export const BRIDGES: Rect[] = [
 ];
 
 const OBSTACLES: Rect[] = [
-  { x: 129, y: 493, w: 102, h: 51 },
+  { x: 79, y: 489, w: 204, h: 33 },
+  { x: 135, y: 458, w: 51, h: 76 },
+  { x: 122, y: 524, w: 55, h: 30 },
+  { x: 186, y: 529, w: 3, h: 33 },
+  { x: 218, y: 529, w: 3, h: 33 },
   { x: 474, y: 480, w: 171, h: 66 },
   { x: 858, y: 463, w: 164, h: 82 },
   { x: 864, y: 147, w: 152, h: 30 },
@@ -46,6 +50,9 @@ export function advanceWalker(player: Walker, input: ReadonlySet<Direction>, sec
   const distance = Math.hypot(player.x - beforeX, player.y - beforeY);
   player.distance += distance;
   player.moving = distance > .01;
+  // Leaving the first memory grows the sprite toward the present-day avatar.
+  // Growth stays unlocked when revisiting childhood; it does not invent dates.
+  player.growth = Math.max(player.growth ?? 0, Math.min(1, Math.max(0, (player.x - 290) / 145, (435 - player.y) / 125)));
 }
 export function closestStory(p: Point) {
   return LIFE_STORIES.reduce((closest, story) => Math.hypot(p.x - story.x, p.y - story.y) < Math.hypot(p.x - closest.x, p.y - closest.y) ? story : closest);
@@ -82,6 +89,18 @@ export function createLifeWorld() {
   }
   function outline(x: number, y: number, w: number, h: number, shade: number) {
     rect(x, y, w, 1, shade); rect(x, y + h - 1, w, 1, shade); rect(x, y, 1, h, shade); rect(x + w - 1, y, 1, h, shade);
+  }
+  function polygon(points: [number, number][], shade: number) {
+    const top = Math.min(...points.map((point) => point[1])), bottom = Math.max(...points.map((point) => point[1]));
+    for (let y = top; y <= bottom; y++) {
+      const intersections: number[] = [];
+      points.forEach(([x1, y1], i) => {
+        const [x2, y2] = points[(i + 1) % points.length];
+        if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) intersections.push(x1 + (y - y1) / (y2 - y1) * (x2 - x1));
+      });
+      intersections.sort((a, b) => a - b);
+      for (let i = 0; i + 1 < intersections.length; i += 2) rect(Math.ceil(intersections[i]), y, Math.floor(intersections[i + 1]) - Math.ceil(intersections[i]) + 1, 1, shade);
+    }
   }
   function ellipse(x: number, y: number, rx: number, ry: number, shade: number) {
     for (let row = -ry; row <= ry; row++) {
@@ -169,18 +188,44 @@ export function createLifeWorld() {
     // Low back wall and architectural ribs.
     block(x + 25, y + 12, w - 50, 11, 17, 50);
     for (let i = 30; i < w - 30; i += 24) rect(x + i, y + 17, 2, 20, 63);
-    plant(x + 27, y + h - 38); plant(x + w - 27, y + h - 38);
+    if (island !== ISLANDS[0]) { plant(x + 27, y + h - 38); plant(x + w - 27, y + h - 38); }
     lamp(x + 25, y + 82); lamp(x + w - 25, y + 82);
     bench(x + w - 75, y + h - 35);
   }
 
-  // Origin: a luminous portal and an open plinth.
-  glow(180, 537, 80, 42, 57);
-  block(131, 517, 98, 22, 7, 47);
-  rect(148, 472, 6, 48, 91); rect(206, 472, 6, 48, 72); rect(148, 470, 64, 5, 136);
-  rect(155, 477, 50, 38, 12); rect(158, 481, 44, 1, 58);
-  rect(163, 485, 34, 1, 37); rect(167, 490, 26, 1, 28);
-  block(170, 508, 20, 10, 5, 95);
+  // Age six: an aircraft on a Canadian apron, with a walkable boarding stair.
+  // The plane is intentionally unbranded; no airline or airport was supplied.
+  for (let n = 0; n < 8; n++) rect(64 + n * 29, 621, 15, 2, 99);
+  rect(65, 593, 84, 1, 72); rect(65, 573, 1, 21, 72);
+  ellipse(177, 522, 108, 17, 15);
+  polygon([[148, 496], [131, 453], [148, 451], [191, 495]], 114);
+  polygon([[145, 496], [135, 457], [146, 455], [179, 496]], 153);
+  polygon([[151, 508], [119, 555], [144, 558], [194, 511]], 133);
+  polygon([[155, 512], [126, 552], [139, 551], [179, 513]], 174);
+  block(151, 530, 21, 8, 4, 101); rect(168, 531, 5, 7, 38); rect(151, 530, 18, 1, 203);
+  block(156, 479, 20, 7, 2, 126); rect(173, 480, 4, 6, 44);
+  polygon([[76, 499], [90, 487], [245, 487], [263, 492], [279, 503], [275, 511], [260, 517], [100, 517], [78, 510]], 111);
+  polygon([[80, 498], [94, 489], [245, 489], [262, 494], [277, 502], [263, 509], [101, 508]], 193);
+  rect(101, 489, 142, 2, 228); rect(104, 511, 153, 2, 145);
+  // Tailplane and vertical fin, cockpit and a row of distinct dark windows.
+  polygon([[84, 500], [72, 470], [88, 470], [111, 501]], 157);
+  polygon([[83, 504], [62, 523], [77, 524], [113, 510]], 123);
+  polygon([[253, 492], [263, 497], [259, 500], [251, 496]], 35);
+  rect(247, 492, 3, 5, 39);
+  for (let n = 0; n < 14; n++) { rect(114 + n * 9, 496, 4, 4, 46); rect(114 + n * 9, 495, 3, 1, 105); }
+  // Open doorway; the child starts on the upper steps and walks toward camera.
+  rect(197, 502, 13, 15, 23); rect(199, 503, 9, 11, 12);
+  block(191, 518, 26, 50, 5, 50);
+  for (let n = 0; n < 10; n++) { rect(192, 520 + n * 5, 24, 2, 106 - n * 3); rect(192, 523 + n * 5, 24, 1, 31); }
+  rect(188, 518, 2, 46, 163); rect(218, 518, 2, 46, 163);
+  for (let n = 0; n < 4; n++) { rect(186, 527 + n * 11, 2, 8, 89); rect(220, 527 + n * 11, 2, 8, 89); }
+  rect(189, 569, 31, 3, 88);
+  // Canadian flag beside the arrival path, entirely in the grayscale palette.
+  rect(268, 550, 2, 55, 110); rect(270, 551, 31, 18, 181);
+  rect(270, 551, 6, 18, 58); rect(295, 551, 6, 18, 58);
+  polygon([[285, 553], [287, 557], [290, 555], [289, 559], [293, 559], [289, 563], [286, 563], [286, 567], [284, 567], [284, 563], [281, 563], [277, 559], [281, 559], [280, 555], [283, 557]], 53);
+  block(73, 597, 35, 15, 4, 54); rect(77, 593, 3, 4, 79); rect(100, 593, 3, 4, 79);
+  block(78, 582, 13, 13, 2, 88); rect(81, 579, 7, 3, 121); block(94, 586, 9, 10, 2, 65);
 
   // Workshop: three luminous displays, keyboard, PC and a silver Monster can.
   block(476, 507, 168, 34, 8, 60);
@@ -239,7 +284,14 @@ export function createLifeWorld() {
   function paintPlayer(target: CanvasRenderingContext2D, player: Walker, offsetX: number, offsetY: number) {
     const x = Math.round(player.x + offsetX), y = Math.round(player.y + offsetY);
     const step = player.moving ? Math.sin(player.distance * .35) : 0;
-    const p = (xx: number, yy: number, w: number, h: number, color: number) => { target.fillStyle = grey(color); target.fillRect(x + xx, y + yy, w, h); };
+    // The body grows from 19 to 27 source pixels while keeping every edge on-grid.
+    const growth = player.growth ?? 0;
+    const scaleY = .70 + growth * .30, scaleX = .82 + growth * .18;
+    const p = (xx: number, yy: number, w: number, h: number, color: number) => {
+      const left = Math.round(xx * scaleX), top = Math.round(yy * scaleY);
+      target.fillStyle = grey(color);
+      target.fillRect(x + left, y + top, Math.max(1, Math.round((xx + w) * scaleX) - left), Math.max(1, Math.round((yy + h) * scaleY) - top));
+    };
     p(-7, -1, 14, 3, 12); p(-5, 2, 10, 1, 17);
     // Shoes and independently alternating legs.
     p(-4, -7 + Math.round(step), 3, 7, 57); p(1, -7 - Math.round(step), 3, 7, 57);
@@ -252,6 +304,13 @@ export function createLifeWorld() {
     else if (player.direction === "left") { p(-5, -21, 3, 4, 196); p(-4, -21, 1, 1, 29); p(2, -23, 3, 6, 28); }
     else if (player.direction === "right") { p(2, -21, 3, 4, 196); p(3, -21, 1, 1, 29); p(-5, -23, 3, 6, 28); }
     else { p(-3, -21, 1, 1, 26); p(2, -21, 1, 1, 26); p(-1, -18, 2, 1, 125); }
+    if (growth < .45) {
+      // A small travel backpack remains visible from behind and from the side.
+      if (player.direction === "up") { p(-3, -15, 6, 7, 75); p(-2, -14, 4, 4, 110); }
+      else if (player.direction === "right") p(-7, -15, 3, 7, 74);
+      else if (player.direction === "left") p(4, -15, 3, 7, 74);
+      else { p(-4, -15, 1, 7, 78); p(3, -15, 1, 7, 78); }
+    }
   }
 
   return {
@@ -265,8 +324,8 @@ export function createLifeWorld() {
         const bob = reduced ? 0 : Math.round(Math.sin(time * .0008 + index * .8) * 3);
         rows.forEach((row, y) => [...row].forEach((value, x) => {
           if (value !== "1") return;
-          target.fillStyle = "#484848"; target.fillRect(ox + 94 + index * 29 + x * 3 + 2, oy + 447 + y * 3 + bob + 2, 3, 3);
-          target.fillStyle = y === 0 ? "#ededed" : "#aaaaaa"; target.fillRect(ox + 94 + index * 29 + x * 3, oy + 447 + y * 3 + bob, 3, 3);
+          target.fillStyle = "#484848"; target.fillRect(ox + 94 + index * 29 + x * 3 + 2, oy + 412 + y * 3 + bob + 2, 3, 3);
+          target.fillStyle = y === 0 ? "#ededed" : "#aaaaaa"; target.fillRect(ox + 94 + index * 29 + x * 3, oy + 412 + y * 3 + bob, 3, 3);
         }));
       });
       for (const story of LIFE_STORIES) {

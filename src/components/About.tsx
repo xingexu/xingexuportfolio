@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { LIFE_STORIES, type LifeStory } from "@/lib/life-stories";
 import { type Direction } from "@/lib/life-world";
-import LifeWorld, { type WorldControls } from "./LifeWorld";
+import LifeWorld, { type LifeEra, type WorldControls } from "./LifeWorld";
 import { TransitionLink } from "./PageTransitions";
 
 const DIRECTIONS: { direction: Direction; symbol: string }[] = [
@@ -13,8 +13,9 @@ const DIRECTIONS: { direction: Direction; symbol: string }[] = [
 ];
 
 export default function About() {
-  const [nearby, setNearby] = useState<string | null>("hello");
-  const [place, setPlace] = useState("hello");
+  const [nearby, setNearby] = useState<string | null>("arrival");
+  const [place, setPlace] = useState("arrival");
+  const [era, setEra] = useState<LifeEra>("childhood");
   const [opened, setOpened] = useState<string | "map" | null>(null);
   const [visited, setVisited] = useState<Set<string>>(() => new Set());
   const [paused, setPaused] = useState(false);
@@ -62,10 +63,10 @@ export default function About() {
     <section className="about-page world-page" aria-label="Xinge’s playable world">
       <h1 className="sr-only">ZINGER — a walk through my world</h1>
       <LifeWorld controls={controls} blocked={opened !== null} paused={paused} visited={visited}
-        onLocation={updateLocation} onInteract={readStory} onMap={openMap} onMove={didMove} />
+        onLocation={updateLocation} onInteract={readStory} onMap={openMap} onMove={didMove} onEra={setEra} />
       <div className="world-topline">
         <TransitionLink href="/" className="world-exit" aria-label="Return to home">↖</TransitionLink>
-        <div className="world-title"><span>ZINGER</span><p>a walk through my world</p></div>
+        <div className="world-title"><span>ZINGER</span><p aria-live="polite">{era === "childhood" ? "age 6 · Canada" : era === "growing" ? "growing up…" : "age 18 · today"}</p></div>
         <button type="button" className="world-index" onClick={openMap} aria-label={`Open map and stories, ${visited.size} of ${LIFE_STORIES.length} discovered`}>
           <span>{String(visited.size).padStart(2, "0")} <i>/ {String(LIFE_STORIES.length).padStart(2, "0")}</i></span><small>discovered</small>
         </button>
@@ -73,7 +74,7 @@ export default function About() {
       <div className="world-location" aria-live="polite" aria-atomic="true">
         <span>{current.number} <i>—</i></span><h2>{current.place}</h2>
       </div>
-      {!moved && <div className="world-welcome"><p>Hey, I’m Xinge.<br /><em>Welcome to my world.</em></p><span>Walk up to a diamond. There’s a story there.</span></div>}
+      {!moved && <div className="world-welcome"><p>Six years old.<br /><em>Welcome to Canada.</em></p><span>Hold S or ↓ to step off the plane.</span></div>}
       <div className="world-interact" aria-live="polite">
         {near ? <button type="button" onClick={() => readStory(near.id)}><kbd>E</kbd><span>{near.title}</span><span aria-hidden="true">↗</span></button> : <span className="world-walk-hint">Follow the lit bridges.</span>}
       </div>
@@ -95,7 +96,7 @@ export default function About() {
       <dialog ref={dialog} className="world-dialog" aria-labelledby="world-dialog-title" onCancel={(event) => { event.preventDefault(); close(); }} onClick={(event) => { if (event.target === event.currentTarget) { const r = event.currentTarget.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); } }}>
         <button ref={closeButton} type="button" className="world-dialog-close" onClick={close} aria-label="Back to walking">×</button>
         {opened === "map" ? <>
-          <p className="world-eyebrow">An open world. My little corner of it.</p><h2 id="world-dialog-title">Take a look around.</h2>
+          <p className="world-eyebrow">From six years old to today.</p><h2 id="world-dialog-title">Take a look around.</h2>
           <p className="world-dialog-intro">Walk between places, or open a story here.</p>
           <div className="world-story-list">{LIFE_STORIES.map((item) => <button type="button" key={item.id} onClick={() => readStory(item.id)}><span>{item.number}</span><span><strong>{item.place}</strong><small>{item.title}</small></span><span aria-label={visited.has(item.id) ? "Discovered" : "Unread"}>{visited.has(item.id) ? "◆" : "◇"}</span></button>)}</div>
         </> : story ? <StoryContent story={story} /> : <h2 id="world-dialog-title" className="sr-only">Stories</h2>}

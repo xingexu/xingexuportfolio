@@ -20,7 +20,7 @@ function load(file) {
 }
 const { advanceWalker, canWalk, closestStory, START, WORLD } = load('src/lib/life-world.ts');
 const { LIFE_STORIES } = load('src/lib/life-stories.ts');
-const walker = () => ({ ...START, direction: 'down', distance: 0, moving: false });
+const walker = () => ({ ...START, direction: 'down', distance: 0, moving: false, growth: 0 });
 
 test('all six story markers are reachable on foot from the spawn', () => {
   const step = 3;
@@ -49,7 +49,7 @@ test('diagonal movement has the same speed, and opposite directions cancel', () 
 test('walking cannot cross a solid object or the island edge', () => {
   const p = walker();
   for (let i = 0; i < 300; i++) advanceWalker(p, new Set(['up']), 1 / 60);
-  assert.ok(p.y > 549 && p.y < START.y);
+  assert.ok(p.y > 527 && p.y < START.y);
   assert.ok(canWalk(p));
   for (let i = 0; i < 600; i++) advanceWalker(p, new Set(['down']), 1 / 60);
   assert.ok(p.y < 665);
@@ -57,10 +57,22 @@ test('walking cannot cross a solid object or the island edge', () => {
 });
 test('the first bridge can be crossed continuously without a collision gap', () => {
   const p = walker();
+  for (let i = 0; i < 32; i++) advanceWalker(p, new Set(['down']), 1 / 60);
   for (let i = 0; i < 280; i++) advanceWalker(p, new Set(['right']), 1 / 60);
   assert.equal(closestStory(p).id, 'building');
   assert.ok(p.x > 550);
   const before = p.x;
   advanceWalker(p, new Set(), 1000);
   assert.equal(p.x, before);
+});
+test('the child grows toward today and stays grown when revisiting the arrival', () => {
+  const p = walker();
+  assert.equal(p.growth, 0);
+  for (let i = 0; i < 32; i++) advanceWalker(p, new Set(['down']), 1 / 60);
+  for (let i = 0; i < 120; i++) advanceWalker(p, new Set(['right']), 1 / 60);
+  assert.ok(p.growth > 0 && p.growth < 1);
+  for (let i = 0; i < 100; i++) advanceWalker(p, new Set(['right']), 1 / 60);
+  assert.equal(p.growth, 1);
+  for (let i = 0; i < 180; i++) advanceWalker(p, new Set(['left']), 1 / 60);
+  assert.equal(p.growth, 1);
 });

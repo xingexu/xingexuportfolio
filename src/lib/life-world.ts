@@ -229,21 +229,21 @@ export function createLifeWorld() {
   function paintChild(target: CanvasRenderingContext2D,p: Walker,ox:number,oy:number) {
     const x=Math.round(ox+p.x),y=Math.round(oy+p.y),step=p.moving?Math.round(Math.sin(p.distance*.34)):0;
     const r=(xx:number,yy:number,w:number,h:number,color:string)=>{target.fillStyle=color;target.fillRect(x+xx,y+yy,w,h);};
-    r(-6,0,13,2,"#60767d");r(-4,2,9,1,"#70878d");
-    // Short bare legs, shorts, a black tee, and a large rounded head.
-    r(-4,-6+step,3,5,"#e7b28c");r(2,-6-step,3,5,"#e7b28c");
-    r(-5,-1+step,5,2,"#fff1d5");r(1,-1-step,5,2,"#fff1d5");
-    r(-5,-9,11,4,"#334451");r(0,-7,1,3,"#202d3d");
-    r(-5,-15,11,7,"#191f29");r(-3,-14,7,5,"#232b35");
-    r(-7,-14-step,2,4,"#161f29");r(6,-14+step,2,4,"#161f29");
-    r(-7,-10-step,2,3,"#e7b28c");r(6,-10+step,2,3,"#e7b28c");
-    r(-1,-16,3,2,"#dc9c79");
-    r(-5,-24,11,8,"#edbb91");r(-6,-22,13,5,"#edbb91");
-    r(-5,-26,11,4,"#282c36");r(-6,-24,13,3,"#242b35");r(-3,-27,7,2,"#353943");
-    if(p.direction==="up"){r(-5,-23,11,7,"#242b35");r(-4,-17,9,1,"#39404a");}
-    else if(p.direction==="left"){r(-6,-22,2,5,"#efbf96");r(-5,-22,2,2,"#242d38");r(3,-23,3,7,"#282e37");r(-5,-19,2,1,"#dc927f");}
-    else if(p.direction==="right"){r(5,-22,2,5,"#efbf96");r(4,-22,2,2,"#242d38");r(-5,-23,3,7,"#282e37");r(5,-19,2,1,"#dc927f");}
-    else {r(-4,-22,2,2,"#28333e");r(3,-22,2,2,"#28333e");r(-4,-22,1,1,"#fff4da");r(3,-22,1,1,"#fff4da");r(-5,-19,2,1,"#df9580");r(4,-19,2,1,"#df9580");r(0,-18,2,1,"#b97063");}
+    r(-5,0,11,2,"#60767d");r(-3,2,7,1,"#70878d");
+    // Keep the child short, with slim limbs and a narrow, straight-sided face.
+    r(-3,-6+step,2,5,"#e7b28c");r(2,-6-step,2,5,"#e7b28c");
+    r(-4,-1+step,3,2,"#fff1d5");r(2,-1-step,3,2,"#fff1d5");
+    r(-3,-9,7,4,"#334451");r(0,-7,1,3,"#202d3d");
+    r(-3,-15,7,7,"#191f29");r(-2,-14,5,5,"#232b35");
+    r(-5,-14-step,2,4,"#161f29");r(4,-14+step,2,4,"#161f29");
+    r(-5,-10-step,1,3,"#e7b28c");r(5,-10+step,1,3,"#e7b28c");
+    r(-1,-17,3,3,"#dc9c79");
+    r(-3,-24,7,7,"#edbb91");r(-2,-17,5,1,"#e7b28c");
+    r(-3,-26,7,3,"#282c36");r(-4,-25,9,3,"#242b35");r(-2,-27,4,2,"#353943");
+    if(p.direction==="up"){r(-3,-23,7,7,"#242b35");r(-2,-17,5,1,"#39404a");}
+    else if(p.direction==="left"){r(-4,-21,1,2,"#efbf96");r(-3,-21,1,1,"#242d38");r(2,-23,2,6,"#282e37");}
+    else if(p.direction==="right"){r(4,-21,1,2,"#efbf96");r(3,-21,1,1,"#242d38");r(-3,-23,2,6,"#282e37");}
+    else {r(-3,-23,2,1,"#242b35");r(1,-23,2,1,"#242b35");r(-2,-21,1,1,"#28333e");r(2,-21,1,1,"#28333e");r(0,-18,1,1,"#b97063");}
   }
   return { draw(target:CanvasRenderingContext2D,camera:Point,player:Walker,time:number,visited:ReadonlySet<string>,reduced:boolean){
     const ox=Math.round(target.canvas.width/2-camera.x),oy=Math.round(target.canvas.height/2-camera.y);

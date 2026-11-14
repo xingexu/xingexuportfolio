@@ -20,6 +20,7 @@ function load(file) {
 }
 const { advanceWalker, canWalk, airportPlace, AIRPORT_PLACES, START, WORLD } = load('src/lib/life-world.ts');
 const { LIFE_STORIES } = load('src/lib/life-stories.ts');
+const { emptyAirportProgress, recordAirportProgress, getAirportGuide, nextAirportWaypoint } = load('src/lib/airport-guide.ts');
 const walker = () => ({ ...START, direction: 'down', distance: 0, moving: false, growth: 0 });
 
 test('the arrival memory and every airport area are reachable on foot', () => {
@@ -75,4 +76,51 @@ test('the child stays six everywhere, including after a legacy growth value', ()
     assert.equal(p.growth, 0);
   }
   assert.deepEqual(LIFE_STORIES.map(s => s.id), ['arrival']);
+});
+
+test('acceleration is frame-rate independent and releasing input stops without drift', () => {
+  const positions = [30, 60, 120].map(rate => {
+    const p = { ...walker(), x: 700, y: 600 };
+    for (let i = 0; i < rate; i++) advanceWalker(p, new Set(['right']), 1 / rate);
+    const stopped = { x: p.x, y: p.y };
+    for (let i = 0; i < 30; i++) advanceWalker(p, new Set(), 1 / 60);
+    assert.deepEqual({ x: p.x, y: p.y }, stopped);
+    assert.equal(p.moving, false);
+    return p.x;
+  });
+  assert.ok(Math.max(...positions) - Math.min(...positions) < .00001);
+});
+
+test('the guide leads a first-time visitor through every step to a clear ending', () => {
+  const p = walker(), progress = emptyAirportProgress(), stages = new Set();
+  let readArrival = false, complete = false;
+  for (let frame = 0; frame < 6000; frame++) {
+    recordAirportProgress(progress, p);
+    const guide = getAirportGuide(p, progress, readArrival);
+    stages.add(guide.id);
+    assert.ok(guide.hint.length > 0 && guide.touchHint.length > 0);
+    if (guide.id === 'complete') { complete = true; assert.equal(guide.target, null); break; }
+    if (guide.id === 'memory' && Math.hypot(p.x - LIFE_STORIES[0].x, p.y - LIFE_STORIES[0].y) <= 48) readArrival = true;
+    const direction = { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' }[guide.arrow];
+    assert.ok(canWalk(guide.waypoint));
+    advanceWalker(p, new Set([direction]), 1 / 60);
+  }
+  assert.equal(complete, true, `Guide stopped near ${p.x}, ${p.y}`);
+  assert.deepEqual([...stages], ['stairs', 'memory', 'arrivals', 'baggage', 'meeting', 'complete']);
+});
+
+test('off-route guidance can lead back around airport obstacles to the memory', () => {
+  for (const location of [{ x: 1120, y: 290 }, { x: 820, y: 120 }, { x: 160, y: 320 }]) {
+    const p = { ...walker(), ...location }, destination = LIFE_STORIES[0];
+    assert.ok(canWalk(p));
+    let arrived = false;
+    for (let frame = 0; frame < 6000; frame++) {
+      if (Math.hypot(p.x - destination.x, p.y - destination.y) < 30) { arrived = true; break; }
+      const waypoint = nextAirportWaypoint(p, destination);
+      const dx = waypoint.x - p.x, dy = waypoint.y - p.y;
+      const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      advanceWalker(p, new Set([direction]), 1 / 60);
+    }
+    assert.equal(arrived, true, `Could not return from ${location.x}, ${location.y}; stopped at ${p.x}, ${p.y}`);
+  }
 });

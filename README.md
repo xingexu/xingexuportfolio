@@ -25,16 +25,18 @@ npm run dev
 
 Then open `http://localhost:3000` and you're good to go.
 
-The `/about` page is a colorful, connected pixel airport: the first chapter of arriving in Canada at age six. Use **WASD or arrow keys** to walk, **E** to open a nearby story, **M** for the airport map, and **Escape** to close a story or skip the entrance. Phones show a hold-to-walk directional pad. The map also provides all stories as ordinary buttons, so visitors can read without playing.
+The `/about` page is a colorful, connected pixel airport: the first chapter of arriving in Canada at age six. Use **WASD or arrow keys** to walk, **E** to open a nearby story, **M** for the airport map, and **Escape** to close a story or skip the entrance. Phones show a hold-to-walk directional pad. A persistent next-step guide leads through the stairs, memory, arrivals, baggage claim, and meeting point; its arrow routes around obstacles if visitors wander. The map shows the player and next destination and provides stories as ordinary buttons, so visitors can read without playing.
 
-- `src/lib/life-world.ts` draws a continuous apron and terminal with blue glass, cream floors, yellow markings, red aircraft accents, moving baggage, carts, seating, plants, and travellers. Its integer pixel grid also defines collisions, normalized movement, and the camera bounds. Static artwork is cached. The short child has a large head, black tee, shorts, bare legs, and light sneakers. Ambient motion can be paused, respects reduced motion, and stops when the tab is hidden.
+- `src/lib/life-world.ts` draws a continuous apron and terminal with blue glass, cream floors, yellow markings, red aircraft accents, moving baggage, carts, seating, plants, and travellers. Its integer pixel grid also defines collisions, normalized movement, and the camera bounds. Static artwork is cached. Ambient motion can be paused, respects reduced motion, and stops when the tab is hidden.
 - `src/components/LifeWorld.tsx` handles input, camera, resizing, readiness, and the minimap. Opening a story or losing focus clears held movement keys.
 - `src/lib/life-stories.ts` exposes only the supplied age-six arrival memory. Present-day interests and existing project screenshots are retained in inactive `LATER_STORIES`, ready for later chapters; they do not appear in the current airport. No intermediate events or dates are invented.
 - `src/components/About.tsx` provides accessible story dialogs, the airport map, controls, and the no-JavaScript arrival story.
 
 To add a personal photo, put the approved image in `public/images/memories/`, then add `{ src: "/images/memories/name.jpg", alt: "Description of the photo", caption: "The memory and date" }` to the relevant story’s `photos` array. Only supplied photos and confirmed events should be added. The child starts on the stairs of an unbranded plane. Hold S or the down control to step onto the apron, follow the yellow path right and then up into arrivals, and explore baggage claim and the meeting area. This is one connected environment, with walkable doors and solid walls. The character stays six everywhere, with no automatic growth or jump to adult chapters.
 
-Run `npm run test:world` to check that the memory and all airport areas are reachable, diagonal speed is normalized, walls and props hold the player, the plane-to-terminal route is continuous, and the child stays six.
+All travellers share `src/lib/pixel-person.ts` for consistent faces, limbs, and pixel proportions. The tiny player wears a black tee, long pants, and a propeller cap, and holds a rainbow lollipop. Walking uses distance-based planted-foot poses, frame-rate-independent acceleration, and an immediate stop when controls are released. `src/lib/airport-guide.ts` owns chapter progress and cached navigation fields.
+
+Run `npm run test:world` to check that the memory and all airport areas are reachable, diagonal speed is normalized, walls and props hold the player, the plane-to-terminal route is continuous, and the child stays six. It also checks movement across frame rates, stopping without drift, the complete guided walk, and returning to the memory from off-route locations.
 
 ## GitHub activity
 

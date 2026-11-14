@@ -1,10 +1,11 @@
 import { LIFE_STORIES } from "./life-stories";
+import { paintAirportPerson } from "./pixel-person";
 
 export type Point = { x: number; y: number };
 export type Rect = Point & { w: number; h: number };
 export type Direction = "up" | "down" | "left" | "right";
 // Optional legacy growth values are always reset: this chapter stays at age six.
-export type Walker = Point & { direction: Direction; distance: number; moving: boolean; growth?: number };
+export type Walker = Point & { direction: Direction; distance: number; moving: boolean; growth?: number; vx?: number; vy?: number };
 export const WORLD = { width: 1280, height: 800 };
 export const START: Point = { x: 329, y: 560 };
 export const TERMINAL = { x: 50, y: 65, w: 1180, h: 320 };
@@ -47,12 +48,26 @@ export function canWalk(p: Point) {
 export function advanceWalker(player: Walker, input: ReadonlySet<Direction>, seconds: number) {
   const dx = Number(input.has("right")) - Number(input.has("left"));
   const dy = Number(input.has("down")) - Number(input.has("up"));
-  const step = 86 * Math.min(Math.max(seconds, 0), .04) / (Math.hypot(dx, dy) || 1);
+  const dt = Math.min(Math.max(seconds, 0), .04);
+  const length = Math.hypot(dx, dy) || 1;
+  const targetX = dx / length * 86, targetY = dy / length * 86;
+  const decay = Math.exp(-22 * dt);
+  // Integrate acceleration exactly so 30, 60, and 120 Hz travel equally far.
+  // Releasing all keys stops immediately; there is no slippery idle drift.
+  if (!dx && !dy) { player.vx = 0; player.vy = 0; }
+  const vx = player.vx ?? 0, vy = player.vy ?? 0;
+  const stepX = targetX * dt + (vx - targetX) * (1 - decay) / 22;
+  const stepY = targetY * dt + (vy - targetY) * (1 - decay) / 22;
+  player.vx = targetX + (vx - targetX) * decay;
+  player.vy = targetY + (vy - targetY) * decay;
   const oldX = player.x, oldY = player.y;
-  if (dx) player.direction = dx > 0 ? "right" : "left";
-  else if (dy) player.direction = dy > 0 ? "down" : "up";
-  if (canWalk({ x: player.x + dx * step, y: player.y })) player.x += dx * step;
-  if (canWalk({ x: player.x, y: player.y + dy * step })) player.y += dy * step;
+  const keepsFacing = (player.direction === "left" && dx < 0) || (player.direction === "right" && dx > 0) || (player.direction === "up" && dy < 0) || (player.direction === "down" && dy > 0);
+  if (!keepsFacing) {
+    if (dx) player.direction = dx > 0 ? "right" : "left";
+    else if (dy) player.direction = dy > 0 ? "down" : "up";
+  }
+  if (canWalk({ x: player.x + stepX, y: player.y })) player.x += stepX; else player.vx = 0;
+  if (canWalk({ x: player.x, y: player.y + stepY })) player.y += stepY; else player.vy = 0;
   const distance = Math.hypot(player.x - oldX, player.y - oldY);
   player.distance += distance; player.moving = distance > .01; player.growth = 0;
 }
@@ -212,40 +227,12 @@ export function createLifeWorld() {
   // A curbside garden and road continue outside the eastern terminal exit.
   rect(1234,80,46,160,"#749876");rect(1234,330,46,55,"#749876");
   for(let y=89;y<229;y+=25){rect(1243,y,24,16,"#547f60");rect(1247,y-3,17,20,"#6c996b");}
-  // A few travellers and ground crew establish scale around the smaller child.
-  function traveller(x:number,y:number,shirt:string,skin:string,outdoors=false) {
-    ellipse(x,y+2,8,3,outdoors?"#647f8b":"#acbab0");
-    rect(x-4,y-10,3,11,"#405463");rect(x+2,y-10,3,11,"#405463");
-    rect(x-5,y,5,2,"#f0e5ce");rect(x+1,y,5,2,"#f0e5ce");
-    rect(x-5,y-23,11,14,shirt);rect(x-7,y-22,2,12,shirt);rect(x+6,y-22,2,12,shirt);
-    rect(x-7,y-10,2,3,skin);rect(x+6,y-10,2,3,skin);
-    rect(x-4,y-32,9,10,skin);rect(x-5,y-34,10,4,"#43505a");
-    rect(x-3,y-28,1,1,"#31414e");rect(x+3,y-28,1,1,"#31414e");
-  }
-  traveller(550,276,"#a47768","#c48f6d");suitcase(566,265,"#61878b");
-  traveller(1013,308,"#6b8c99","#e1b48c");suitcase(1026,300,"#c59765");
-  traveller(591,560,"#d5c579","#d9a67e",true);rect(587,540,9,2,"#f8edb7");
+  // Travellers and the player share the same small face, limbs, and pixel scale.
+  paintAirportPerson(c,{x:550,y:276,shirt:"#a47768",skin:"#c48f6d"});suitcase(566,265,"#61878b");
+  paintAirportPerson(c,{x:1013,y:308,shirt:"#6b8c99",skin:"#e1b48c"});suitcase(1026,300,"#c59765");
+  paintAirportPerson(c,{x:591,y:560,shirt:"#d5c579",skin:"#d9a67e",outdoors:true,crew:true});
 
-  function paintChild(target: CanvasRenderingContext2D,p: Walker,ox:number,oy:number) {
-    const x=Math.round(ox+p.x),y=Math.round(oy+p.y),step=p.moving?Math.round(Math.sin(p.distance*.34)):0;
-    const r=(xx:number,yy:number,w:number,h:number,color:string)=>{target.fillStyle=color;target.fillRect(x+xx,y+yy,w,h);};
-    r(-3,1,7,1,"#60767d");r(-2,2,5,1,"#70878d");
-    // A tiny 18-pixel child: compact face, black tee, and full-length trousers.
-    r(-2,-6+step,2,6,"#334451");r(1,-6-step,2,6,"#405362");
-    r(-2,step,2,1,"#fff1d5");r(1,-step,2,1,"#fff1d5");
-    r(-2,-7,5,2,"#334451");r(0,-5,1,4,"#202d3d");
-    r(-2,-11,5,5,"#191f29");r(-1,-10,3,3,"#232b35");
-    r(-3,-10-step,1,3,"#161f29");r(3,-10+step,1,3,"#161f29");
-    r(-3,-7-step,1,2,"#e7b28c");r(3,-7+step,1,2,"#e7b28c");
-    r(0,-12,1,1,"#dc9c79");
-    r(-2,-16,5,4,"#edbb91");
-    r(-2,-18,5,2,"#282c36");r(-3,-17,7,2,"#242b35");r(-1,-18,2,1,"#353943");
-    if(p.direction==="up"){r(-2,-16,5,4,"#242b35");r(-1,-13,3,1,"#39404a");}
-    else if(p.direction==="left"){r(-3,-14,1,1,"#efbf96");r(-2,-15,1,1,"#242d38");r(1,-16,2,4,"#282e37");}
-    else if(p.direction==="right"){r(3,-14,1,1,"#efbf96");r(2,-15,1,1,"#242d38");r(-2,-16,2,4,"#282e37");}
-    else {r(-1,-14,1,1,"#28333e");r(1,-14,1,1,"#28333e");}
-  }
-  return { draw(target:CanvasRenderingContext2D,camera:Point,player:Walker,time:number,visited:ReadonlySet<string>,reduced:boolean){
+  return { draw(target:CanvasRenderingContext2D,camera:Point,player:Walker,time:number,visited:ReadonlySet<string>,reduced:boolean,waypoint?:Point|null){
     const ox=Math.round(target.canvas.width/2-camera.x),oy=Math.round(target.canvas.height/2-camera.y);
     target.imageSmoothingEnabled=false;target.fillStyle="#80959e";target.fillRect(0,0,target.canvas.width,target.canvas.height);target.drawImage(layer,ox,oy);
     // Slow-moving luggage, with all motion still on the source pixel grid.
@@ -257,7 +244,11 @@ export function createLifeWorld() {
       target.fillStyle=["#cb8767","#729b91","#b7a477","#8d809c"][n%4];target.fillRect(bx,by,11,8);target.fillStyle="#d0d6bd";target.fillRect(bx+3,by+1,1,6);
     }
     for(const story of LIFE_STORIES){const x=ox+story.x,y=oy+story.y,bob=reduced?0:Math.round(Math.sin(time*.002)*2);target.fillStyle=visited.has(story.id)?"#779a9b":"#fff1af";for(let r=-3;r<=3;r++)target.fillRect(x-(3-Math.abs(r)),y-12+r+bob,(3-Math.abs(r))*2+1,1);target.fillStyle="#485f70";target.fillRect(x-8,y+3,17,1);}
-    paintChild(target,player,ox,oy);
+    if(waypoint && Math.hypot(waypoint.x-player.x,waypoint.y-player.y)>18){
+      const x=Math.round(ox+waypoint.x),y=Math.round(oy+waypoint.y);target.fillStyle="#ffebae";
+      for(const side of [-1,1]){target.fillRect(x+side*5-(side<0?0:2),y-4,3,1);target.fillRect(x+side*5,y-4,1,3);target.fillRect(x+side*5-(side<0?0:2),y+4,3,1);}
+    }
+    paintAirportPerson(target,{...player,x:ox+player.x,y:oy+player.y,child:true,playful:true,outdoors:player.y>387},time);
     // The overhead entrance sign passes in front of the child at the doorway.
     if(player.y<367)target.drawImage(layer,601,330,103,24,ox+601,oy+330,103,24);
   }};

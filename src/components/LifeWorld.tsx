@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import { advanceWalker, closestStory, createLifeWorld, START, type Direction, type Walker } from "@/lib/life-world";
+import { advanceWalker, airportPlace, closestStory, createLifeWorld, START, WORLD, type Direction, type Walker } from "@/lib/life-world";
 
 export type WorldControls = { input: (direction: Direction, held: boolean) => void; focus: () => void };
 export type LifeEra = "childhood" | "growing" | "today";
@@ -14,7 +14,7 @@ type Props = {
   onInteract: (id: string) => void;
   onMap: () => void;
   onMove: () => void;
-  onEra: (era: LifeEra) => void;
+  onEra?: (era: LifeEra) => void;
 };
 const KEY_DIRECTIONS: Record<string, Direction> = { w: "up", a: "left", s: "down", d: "right", ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right" };
 
@@ -39,7 +39,6 @@ export default function LifeWorld(props: Props) {
     const minimap = document.getElementById("world-map-player");
     let frame = 0, previous = 0, ambientTime = 0, lastId = "", lastNear: string | null | undefined, hasMoved = false;
     let disposed = false;
-    let lastEra: LifeEra = "childhood";
 
     function focus() { region.focus({ preventScroll: true }); }
     function clearInput() { held.clear(); player.moving = false; }
@@ -58,22 +57,23 @@ export default function LifeWorld(props: Props) {
       const covered = !!document.documentElement.dataset.roomTransition;
       if (live.current.blocked || covered) clearInput();
       advanceWalker(player, held, dt);
-      const growth = player.growth ?? 0;
-      const era: LifeEra = growth >= 1 ? "today" : growth > .01 ? "growing" : "childhood";
-      if (era !== lastEra) { lastEra = era; live.current.onEra(era); }
       if (player.moving && !hasMoved) { hasMoved = true; live.current.onMove(); }
       const follow = motion.matches ? 1 : 1 - Math.exp(-dt * 8);
-      camera.x += (player.x - camera.x) * follow;
-      camera.y += (player.y - 36 - camera.y) * follow;
+      const targetX = Math.max(field.width / 2, Math.min(WORLD.width - field.width / 2, player.x));
+      const targetY = Math.max(field.height / 2, Math.min(WORLD.height - field.height / 2, player.y - 36));
+      camera.x += (targetX - camera.x) * follow;
+      camera.y += (targetY - camera.y) * follow;
       if (!live.current.paused && !motion.matches && !live.current.blocked) ambientTime += dt * 1000;
       scene.draw(ctx, camera, player, ambientTime, live.current.visited, motion.matches);
       const story = closestStory(player);
+      const place = airportPlace(player);
       const nearby = Math.hypot(story.x - player.x, story.y - player.y) <= 48 ? story.id : null;
-      if (story.id !== lastId || nearby !== lastNear) { lastId = story.id; lastNear = nearby; live.current.onLocation(story.id, nearby); }
+      if (place.id !== lastId || nearby !== lastNear) { lastId = place.id; lastNear = nearby; live.current.onLocation(place.id, nearby); }
       minimap?.setAttribute("x", String(Math.round(player.x - 15)));
       minimap?.setAttribute("y", String(Math.round(player.y - 15)));
       region.dataset.playerX = String(Math.round(player.x)); region.dataset.playerY = String(Math.round(player.y));
-      region.dataset.era = era;
+      region.dataset.era = "childhood";
+      region.dataset.age = "6";
       if (field.dataset.ready !== "true") {
         field.dataset.screenX = String(field.width / 2 - 20); field.dataset.screenY = String(field.height / 2 - 20);
         field.dataset.screenWidth = "40"; field.dataset.screenHeight = "40";

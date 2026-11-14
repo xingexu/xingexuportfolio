@@ -109,3 +109,41 @@
   .world-welcome > span { display: none; }
   .world-location { top: 84px; }
 }
+
+/* Daylight airport palette, independent of the homepage's time-of-day sky. */
+:root:has(.about-page) { --bg: #263f50; --text: #f7efd9; --accent: #f2cf7d; --accent-ink: #233e51; --border: #829fa6; }
+.world-page { background: #80959e; color: #f7efd9; }
+.world-stage:focus-visible { outline-color: #ffe5a7; }
+.world-title { background: #183a50ed; padding: 7px 12px; border-bottom: 2px solid #88a6a8; }
+.world-title p { color: #cfdbcf; }
+.world-exit, .world-index, .world-pause, .world-map-toggle { background: #183a50f2; border-color: #77949c; color: #f4e7c7; }
+.world-index small { color: #d9c795; }
+.world-location { padding: 6px 10px; background: #24465ce8; border-left: 2px solid #efc876; text-shadow: none; }
+.world-location h2, .world-location > span { color: #f0e8d0; }
+.world-location i { color: #a8c3c1; }
+.world-welcome { text-shadow: 2px 2px #284655, -1px -1px #284655; }
+.world-welcome em { color: #ffe4a3; }
+.world-welcome > span { color: #fff3d2; }
+.world-interact button { background: #1c4057f5; color: #fff1d0; border-color: #e4c47c; box-shadow: 3px 3px 0 #385866; }
+.world-interact button > span:last-child { color: #efcc82; }
+.world-walk-hint { background: #24465cf2; color: #f6e9c7; }
+.world-page kbd { background: #315668; color: #fff2d3; border-color: #9aafb0; }
+.world-keyboard-help { color: #fff0ce; text-shadow: 1px 1px #284655; background: #24465ce8; padding: 7px 10px; }
+.world-keyboard-help small { color: #d2dfd3; }
+.world-map-toggle:hover { border-color: #f4d285; }
+.world-direction { background: #23475deb; color: #ffefd1; border-color: #a4b6af; }
+.world-direction:active { background: #4b7685; }
+.world-dialog { color: #234256; background: #eee9d5; border-color: #8fa9aa; box-shadow: 6px 6px 0 #183a50; }
+.world-dialog::backdrop { background: #17374db8; }
+.world-dialog-close { border-color: #9caea8; color: #2d5061; }
+.world-eyebrow, .world-dialog-intro { color: #5d7a80; }
+.world-story-copy { color: #385767; }
+.world-story-list button { color: #25475b; border-color: #b4c3b7; }
+.world-story-list button:hover { color: #a35f39; }
+.world-story-list small, .world-story-list button > span:first-child { color: #617d82; }
+.world-story-link { color: #24516a; border-color: #8fa698; }
+.world-story-end { color: #758a89; }
+.world-airport-plan { display: block; width: 100%; height: auto; margin: 0 0 22px; border: 1px solid #9eb1ab; shape-rendering: crispEdges; }
+.world-airport-plan text { font: 29px var(--font-pixel), monospace; fill: #28495c; }
+.world-page ::-webkit-scrollbar-thumb { background: #71929b; border-color: #d5ddcf; }
+.world-page ::-webkit-scrollbar-track { background: #d5ddcf; }

@@ -3,348 +3,262 @@ import { LIFE_STORIES } from "./life-stories";
 export type Point = { x: number; y: number };
 export type Rect = Point & { w: number; h: number };
 export type Direction = "up" | "down" | "left" | "right";
+// Optional legacy growth values are always reset: this chapter stays at age six.
 export type Walker = Point & { direction: Direction; distance: number; moving: boolean; growth?: number };
-export const WORLD = { width: 1120, height: 760 };
-export const START: Point = { x: 202, y: 541 };
-export const ISLANDS: Rect[] = LIFE_STORIES.map((story) => ({ x: story.x - 135, y: story.y - 135, w: 270, h: 230 }));
-export const BRIDGES: Rect[] = [
-  { x: 299, y: 565, w: 142, h: 40 }, { x: 679, y: 565, w: 142, h: 40 },
-  { x: 920, y: 309, w: 40, h: 142 }, { x: 679, y: 225, w: 142, h: 40 },
-  { x: 299, y: 225, w: 142, h: 40 }, { x: 160, y: 309, w: 40, h: 142 },
-];
-
-const OBSTACLES: Rect[] = [
-  { x: 79, y: 489, w: 204, h: 33 },
-  { x: 135, y: 458, w: 51, h: 76 },
-  { x: 122, y: 524, w: 55, h: 30 },
-  { x: 186, y: 529, w: 3, h: 33 },
-  { x: 218, y: 529, w: 3, h: 33 },
-  { x: 474, y: 480, w: 171, h: 66 },
-  { x: 858, y: 463, w: 164, h: 82 },
-  { x: 864, y: 147, w: 152, h: 30 },
-  { x: 508, y: 140, w: 104, h: 63 },
-  { x: 95, y: 136, w: 171, h: 62 },
-];
-
-const inside = (p: Point, rect: Rect, inset = 0) => p.x >= rect.x + inset && p.x <= rect.x + rect.w - inset && p.y >= rect.y + inset && p.y <= rect.y + rect.h - inset;
-function onIsland(p: Point, island: Rect) {
-  if (!inside(p, island, 6)) return false;
-  const dx = Math.min(p.x - island.x, island.x + island.w - p.x);
-  const dy = Math.min(p.y - island.y, island.y + island.h - p.y);
-  return dx + dy >= 27;
+export const WORLD = { width: 1280, height: 800 };
+export const START: Point = { x: 329, y: 560 };
+export const TERMINAL = { x: 50, y: 65, w: 1180, h: 320 };
+export const AIRPORT_PLACES = [
+  { id: "apron", name: "Off the plane", x: 365, y: 625, hint: "Follow the yellow path to arrivals." },
+  { id: "entrance", name: "Arrivals entrance", x: 650, y: 350, hint: "Baggage claim is to your left." },
+  { id: "baggage", name: "Baggage claim", x: 340, y: 275, hint: "The arrivals hall is through to the right." },
+  { id: "hall", name: "Arrivals hall", x: 855, y: 275, hint: "Explore the terminal at your own pace." },
+  { id: "meeting", name: "Meeting point", x: 1120, y: 290, hint: "Welcome to Canada." },
+] as const;
+export function airportPlace(p: Point) {
+  if (p.y > 395) return AIRPORT_PLACES[0];
+  if (p.y > 310 && p.x > 580 && p.x < 730) return AIRPORT_PLACES[1];
+  if (p.x < 580) return AIRPORT_PLACES[2];
+  if (p.x > 1010) return AIRPORT_PLACES[4];
+  return AIRPORT_PLACES[3];
 }
+export const OBSTACLES: Rect[] = [
+  // Terminal perimeter, with a broad entrance and an eastern exit.
+  { x: 50, y: 65, w: 1180, h: 24 }, { x: 50, y: 65, w: 12, h: 320 },
+  { x: 50, y: 365, w: 555, h: 22 }, { x: 695, y: 365, w: 535, h: 22 },
+  { x: 1218, y: 65, w: 12, h: 185 }, { x: 1218, y: 320, w: 12, h: 65 },
+  // Aircraft and boarding stairs. The stair centre stays walkable.
+  { x: 88, y: 490, w: 338, h: 44 }, { x: 181, y: 429, w: 75, h: 62 },
+  { x: 176, y: 535, w: 89, h: 61 },
+  { x: 305, y: 539, w: 3, h: 54 }, { x: 351, y: 539, w: 3, h: 54 },
+  // Baggage belts, seating, information desk, café and luggage carts.
+  { x: 175, y: 145, w: 320, h: 95 }, { x: 700, y: 130, w: 155, h: 25 },
+  { x: 700, y: 195, w: 155, h: 25 }, { x: 918, y: 102, w: 127, h: 50 },
+  { x: 1050, y: 180, w: 105, h: 35 }, { x: 99, y: 280, w: 38, h: 35 },
+  { x: 1095, y: 98, w: 55, h: 29 }, { x: 480, y: 520, w: 92, h: 38 },
+  { x: 100, y: 650, w: 82, h: 31 }, { x: 1120, y: 590, w: 85, h: 42 },
+];
+const inside = (p: Point, r: Rect, inset = 0) => p.x >= r.x + inset && p.x <= r.x + r.w - inset && p.y >= r.y + inset && p.y <= r.y + r.h - inset;
 export function canWalk(p: Point) {
-  const floor = ISLANDS.some((island) => onIsland(p, island)) || BRIDGES.some((bridge) => inside(p, bridge, 5));
-  return floor && !OBSTACLES.some((rect) => inside(p, { x: rect.x - 5, y: rect.y - 3, w: rect.w + 10, h: rect.h + 8 }));
+  // One connected airport surface, bounded by the perimeter fence and walls.
+  if (!inside(p, { x: 25, y: 88, w: 1230, h: 678 }, 7)) return false;
+  return !OBSTACLES.some(r => inside(p, { x: r.x - 5, y: r.y - 3, w: r.w + 10, h: r.h + 8 }));
 }
 export function advanceWalker(player: Walker, input: ReadonlySet<Direction>, seconds: number) {
   const dx = Number(input.has("right")) - Number(input.has("left"));
   const dy = Number(input.has("down")) - Number(input.has("up"));
-  const length = Math.hypot(dx, dy);
-  const step = 83 * Math.min(seconds, .04) / (length || 1);
-  const beforeX = player.x, beforeY = player.y;
+  const step = 86 * Math.min(Math.max(seconds, 0), .04) / (Math.hypot(dx, dy) || 1);
+  const oldX = player.x, oldY = player.y;
   if (dx) player.direction = dx > 0 ? "right" : "left";
   else if (dy) player.direction = dy > 0 ? "down" : "up";
   if (canWalk({ x: player.x + dx * step, y: player.y })) player.x += dx * step;
   if (canWalk({ x: player.x, y: player.y + dy * step })) player.y += dy * step;
-  const distance = Math.hypot(player.x - beforeX, player.y - beforeY);
-  player.distance += distance;
-  player.moving = distance > .01;
-  // Leaving the first memory grows the sprite toward the present-day avatar.
-  // Growth stays unlocked when revisiting childhood; it does not invent dates.
-  player.growth = Math.max(player.growth ?? 0, Math.min(1, Math.max(0, (player.x - 290) / 145, (435 - player.y) / 125)));
+  const distance = Math.hypot(player.x - oldX, player.y - oldY);
+  player.distance += distance; player.moving = distance > .01; player.growth = 0;
 }
 export function closestStory(p: Point) {
   return LIFE_STORIES.reduce((closest, story) => Math.hypot(p.x - story.x, p.y - story.y) < Math.hypot(p.x - closest.x, p.y - closest.y) ? story : closest);
 }
-
-const hash = (x: number, y: number) => {
-  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return n - Math.floor(n);
+const hash = (x: number, y: number) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
+const FONT: Record<string, string[]> = {
+  A:["01110","10001","10001","11111","10001","10001","10001"], B:["11110","10001","10001","11110","10001","10001","11110"],
+  C:["01111","10000","10000","10000","10000","10000","01111"], D:["11110","10001","10001","10001","10001","10001","11110"],
+  E:["11111","10000","10000","11110","10000","10000","11111"], F:["11111","10000","10000","11110","10000","10000","10000"],
+  G:["01111","10000","10000","10111","10001","10001","01111"], H:["10001","10001","10001","11111","10001","10001","10001"],
+  I:["11111","00100","00100","00100","00100","00100","11111"], J:["00111","00010","00010","00010","10010","10010","01100"],
+  K:["10001","10010","10100","11000","10100","10010","10001"], L:["10000","10000","10000","10000","10000","10000","11111"],
+  M:["10001","11011","10101","10101","10001","10001","10001"], N:["10001","11001","11001","10101","10011","10011","10001"],
+  O:["01110","10001","10001","10001","10001","10001","01110"], P:["11110","10001","10001","11110","10000","10000","10000"],
+  Q:["01110","10001","10001","10001","10101","10010","01101"], R:["11110","10001","10001","11110","10100","10010","10001"],
+  S:["01111","10000","10000","01110","00001","00001","11110"], T:["11111","00100","00100","00100","00100","00100","00100"],
+  U:["10001","10001","10001","10001","10001","10001","01110"], V:["10001","10001","10001","10001","10001","01010","00100"],
+  W:["10001","10001","10001","10101","10101","11011","10001"], X:["10001","10001","01010","00100","01010","10001","10001"],
+  Y:["10001","10001","01010","00100","00100","00100","00100"], Z:["11111","00001","00010","00100","01000","10000","11111"],
+  "0":["01110","10001","10011","10101","11001","10001","01110"], "1":["00100","01100","00100","00100","00100","00100","01110"], "2":["01110","10001","00001","00010","00100","01000","11111"],
 };
-const grey = (shade: number) => `rgb(${shade} ${shade} ${shade})`;
-const GLYPHS = [
-  ["1111111", "0000011", "0000110", "0001100", "0011000", "0110000", "1111111"],
-  ["1111111", "0011100", "0011100", "0011100", "0011100", "0011100", "1111111"],
-  ["1100011", "1110011", "1111011", "1101111", "1100111", "1100011", "1100011"],
-  ["0111110", "1100011", "1100000", "1101111", "1100011", "1100011", "0111110"],
-  ["1111111", "1100000", "1100000", "1111110", "1100000", "1100000", "1111111"],
-  ["1111110", "1100011", "1100011", "1111110", "1101100", "1100110", "1100011"],
-];
 
-/** All artwork is drawn to a small integer grid, then scaled without smoothing. */
+/** Cached, hand-drawn pixel airport. Every edge and reflection uses integer cells. */
 export function createLifeWorld() {
-  const layer = document.createElement("canvas");
-  layer.width = WORLD.width; layer.height = WORLD.height;
-  const context = layer.getContext("2d", { alpha: false });
-  if (!context) return null;
-  const c = context;
-  function rect(x: number, y: number, w: number, h: number, shade: number | string) {
-    c.fillStyle = typeof shade === "number" ? grey(shade) : shade;
-    c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  const layer = document.createElement("canvas"); layer.width = WORLD.width; layer.height = WORLD.height;
+  const ctx = layer.getContext("2d", { alpha: false }); if (!ctx) return null;
+  const c = ctx;
+  function rect(x: number, y: number, w: number, h: number, color: string) { c.fillStyle = color; c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+  function line(x: number, y: number, xx: number, yy: number, color: string) {
+    const length = Math.max(Math.abs(xx - x), Math.abs(yy - y));
+    for (let i = 0; i <= length; i++) rect(x + (xx - x) * i / Math.max(1, length), y + (yy - y) * i / Math.max(1, length), 1, 1, color);
   }
-  function line(x1: number, y1: number, x2: number, y2: number, shade: number) {
-    const length = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
-    for (let n = 0; n <= length; n++) rect(x1 + (x2 - x1) * n / Math.max(1, length), y1 + (y2 - y1) * n / Math.max(1, length), 1, 1, shade);
-  }
-  function outline(x: number, y: number, w: number, h: number, shade: number) {
-    rect(x, y, w, 1, shade); rect(x, y + h - 1, w, 1, shade); rect(x, y, 1, h, shade); rect(x + w - 1, y, 1, h, shade);
-  }
-  function polygon(points: [number, number][], shade: number) {
-    const top = Math.min(...points.map((point) => point[1])), bottom = Math.max(...points.map((point) => point[1]));
+  function outline(x: number, y: number, w: number, h: number, color: string) { rect(x,y,w,1,color); rect(x,y+h-1,w,1,color); rect(x,y,1,h,color); rect(x+w-1,y,1,h,color); }
+  function poly(points: [number,number][], color: string) {
+    const top = Math.min(...points.map(p=>p[1])), bottom = Math.max(...points.map(p=>p[1]));
     for (let y = top; y <= bottom; y++) {
-      const intersections: number[] = [];
-      points.forEach(([x1, y1], i) => {
-        const [x2, y2] = points[(i + 1) % points.length];
-        if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) intersections.push(x1 + (y - y1) / (y2 - y1) * (x2 - x1));
-      });
-      intersections.sort((a, b) => a - b);
-      for (let i = 0; i + 1 < intersections.length; i += 2) rect(Math.ceil(intersections[i]), y, Math.floor(intersections[i + 1]) - Math.ceil(intersections[i]) + 1, 1, shade);
+      const xs: number[] = [];
+      points.forEach(([x1,y1],i) => { const [x2,y2] = points[(i+1)%points.length]; if ((y1<=y && y2>y)||(y2<=y && y1>y)) xs.push(x1+(y-y1)/(y2-y1)*(x2-x1)); });
+      xs.sort((a,b)=>a-b); for(let i=0;i+1<xs.length;i+=2) rect(Math.ceil(xs[i]), y, Math.floor(xs[i+1])-Math.ceil(xs[i])+1, 1, color);
     }
   }
-  function ellipse(x: number, y: number, rx: number, ry: number, shade: number) {
-    for (let row = -ry; row <= ry; row++) {
-      const span = Math.floor(rx * Math.sqrt(Math.max(0, 1 - row * row / (ry * ry))));
-      rect(x - span, y + row, span * 2 + 1, 1, shade);
+  function ellipse(x: number,y: number,rx: number,ry: number,color: string) {
+    for(let row=-ry;row<=ry;row++){const span=Math.floor(rx*Math.sqrt(Math.max(0,1-row*row/(ry*ry))));rect(x-span,y+row,span*2+1,1,color);}
+  }
+  function text(label: string,x: number,y: number,color: string,size=1) {
+    [...label].forEach((letter,i)=>FONT[letter]?.forEach((row,yy)=>[...row].forEach((v,xx)=>{if(v==="1")rect(x+i*6*size+xx*size,y+yy*size,size,size,color);}))); }
+  function box(x:number,y:number,w:number,h:number,depth:number,top:string,front:string) {
+    rect(x+3,y+depth+3,w,h,"#657a80");rect(x,y,w,h,top);rect(x,y+h,w,depth,front);rect(x,y,w,1,"#e6ece2"); }
+  function plant(x:number,y:number) {
+    ellipse(x,y+3,11,4,"#a3b2aa");box(x-7,y-7,14,9,5,"#c39e78","#967458");
+    rect(x-1,y-34,2,28,"#425e43");
+    for(let i=0;i<4;i++){const side=i%2?1:-1,yy=y-12-i*6;poly([[x,yy],[x+side*14,yy-8],[x+side*10,yy+1]],i%2?"#4d8060":"#729866");}
+  }
+  function seats(x:number,y:number,count:number) {
+    rect(x+3,y+22,count*25-8,4,"#617783");
+    for(let i=0;i<count;i++){const xx=x+i*25;rect(xx+3,y+18,2,14,"#52636f");rect(xx+17,y+18,2,14,"#52636f");box(xx,y,21,13,8,"#487b8e","#33576c");rect(xx+2,y+2,17,2,"#689cad");rect(xx-2,y+11,3,8,"#b8c7c6");rect(xx+20,y+11,3,8,"#b8c7c6");}
+  }
+  function suitcase(x:number,y:number,color:string) { rect(x+3,y-3,7,3,"#364653");box(x,y,14,11,4,color,"#354957");rect(x+3,y+4,1,7,"#a7b8bc");rect(x+10,y+4,1,7,"#a7b8bc");rect(x+2,y+15,3,2,"#293746");rect(x+10,y+15,3,2,"#293746"); }
+  function cone(x:number,y:number) { rect(x-5,y+5,11,2,"#536c73");poly([[x,y-8],[x-4,y+5],[x+4,y+5]],"#d77c43");rect(x-2,y,5,2,"#fff1d5"); }
+  function sign(x:number,y:number,w:number,label:string) {box(x,y,w,18,3,"#1b4057","#102d41");text(label,x+7,y+5,"#f3d078");}
+  function canadianFlag(x:number,y:number) {
+    rect(x,y,2,59,"#d9e2df");rect(x+2,y,34,21,"#f6f1e3");rect(x+2,y,7,21,"#ce5c56");rect(x+29,y,7,21,"#ce5c56");
+    const mx=x+19,my=y+3;poly([[mx,my],[mx+2,my+5],[mx+5,my+3],[mx+4,my+7],[mx+8,my+6],[mx+5,my+11],[mx+1,my+11],[mx+1,my+16],[mx-1,my+16],[mx-1,my+11],[mx-5,my+11],[mx-8,my+6],[mx-4,my+7],[mx-5,my+3],[mx-2,my+5]],"#c84e4d"); }
+
+  // The full canvas is airport ground. There is no void or separate platform.
+  rect(0,0,WORLD.width,WORLD.height,"#80959e");
+  for(let y=0;y<WORLD.height;y++) for(let x=0;x<WORLD.width;x++) {
+    const n=hash(x,y); if(n>.87)rect(x,y,1,1,n>.96?"#8fa2a7":"#758c97");
+    if(y%56===0 || x%88===0)rect(x,y,1,1,"#748a94");
+  }
+  // Perimeter, service road, runway stripes, grass and taxiway lights.
+  rect(0,0,WORLD.width,49,"#658965");rect(0,760,WORLD.width,40,"#526d78");
+  for(let x=0;x<WORLD.width;x+=45){rect(x,776,24,2,"#ddd4ad");rect(x,755,5,3,"#edc56a");}
+  rect(0,42,WORLD.width,2,"#acc0b1");for(let x=10;x<WORLD.width;x+=22){rect(x,30,2,20,"#a6bab4");line(x,32,x+22,43,"#89a09b");}
+  // A yellow pedestrian route connects the aircraft stairs to the arrival doors.
+  rect(340,628,312,3,"#efd27c");rect(649,401,3,230,"#efd27c");
+  for(let x=360;x<625;x+=46){poly([[x,617],[x+9,622],[x,627],[x+3,622]],"#ffe7a0");}
+  for(let y=446;y<610;y+=50){poly([[640,y],[646,y-10],[652,y],[646,y-4]],"#ffe7a0");}
+  for(let x=613;x<690;x+=11)rect(x,392,6,23,"#ede8ca");
+  for(let y=470;y<720;y+=32)rect(800,y,2,17,"#d8c589");
+  for(let x=77;x<1190;x+=42)rect(x,720,21,2,"#e2c76f");
+  outline(62,440,510,260,"#a6b4b4");text("02",80,688,"#e7d8ad",2);
+
+  // Roofless terminal cutaway: cream tiles, glass front and continuous walkable doors.
+  rect(50,65,1180,320,"#d5d8c9");
+  for(let y=89;y<366;y++) for(let x=63;x<1218;x++) {
+    if((x-63)%24===0 || (y-89)%24===0)rect(x,y,1,1,"#bcc8c1");
+    else if(hash(x,y)>.95)rect(x,y,1,1,"#e0e0d0");
+  }
+  // Reflections from the blue windows fall onto the floor, on the pixel grid.
+  for(let x=82;x<1190;x+=70) poly([[x,337],[x+39,337],[x+62,280],[x+23,280]],"#c4d6d0");
+  box(50,65,1180,17,15,"#658795","#496779");rect(57,66,1166,3,"#b9d3d6");
+  rect(50,89,12,277,"#4d6e7e");rect(53,89,2,275,"#9db8bf");
+  // Blue glass and mullions stop at the actual door opening.
+  for(const [start,end] of [[62,605],[695,1218]]) {
+    rect(start,344,end-start,37,"#5a8c9c");rect(start,346,end-start,7,"#a1c9ce");rect(start,378,end-start,8,"#456575");
+    for(let x=start+3;x<end-20;x+=44){rect(x,354,36,21,"#75a6b0");line(x+3,371,x+19,354,"#a6d0d0");rect(x+38,344,3,38,"#34566a");}
+    rect(start,383,end-start,3,"#d2ded6");
+  }
+  rect(605,363,90,24,"#a6bcb9");rect(606,363,3,20,"#284c60");rect(692,363,3,20,"#284c60");
+  rect(610,382,80,4,"#f3e7c0");sign(601,330,99,"ARRIVALS");
+  rect(617,389,65,1,"#f8e9b3");
+  rect(1218,89,12,161,"#577784");rect(1218,320,12,65,"#577784");
+  sign(1188,221,42,"EXIT");rect(1221,251,8,67,"#e5dcb7");
+  // Overhead beams and warm pendant light strips.
+  for(let x=90;x<1180;x+=170){rect(x,95,72,4,"#f6e7ba");rect(x,99,72,1,"#bcab88");}
+  sign(199,107,126,"BAGGAGE CLAIM"); sign(704,96,113,"ARRIVALS");
+
+  // A broad, rounded baggage carousel; the bags animate around its belt below.
+  for(let row=0;row<96;row++){const cut=Math.max(0,14-Math.min(row,95-row));rect(175+cut,148+row,320-cut*2,1,"#8c9d9c");rect(175+cut,145+row,320-cut*2,1,"#3b535e");}
+  for(let x=190;x<480;x+=8){rect(x,150,1,13,"#71858a");rect(x,221,1,13,"#71858a");}
+  for(let y=163;y<222;y+=7){rect(180,y,14,1,"#71858a");rect(476,y,14,1,"#71858a");}
+  box(199,167,273,47,7,"#c0c8ba","#859996");rect(209,174,250,1,"#e1e0c9");
+  text("01",326,181,"#5c747a",2);rect(316,159,3,9,"#83999a");
+  // Information kiosk and small café, with no invented personal events.
+  box(918,102,127,40,10,"#d3af7e","#947458");rect(924,108,115,2,"#ead3a9");
+  sign(924,88,115,"INFORMATION");box(972,112,24,15,3,"#25465d","#18394c");rect(975,114,18,10,"#7db5b8");
+  box(1095,98,55,22,7,"#a4b7af","#69878a");text("CAFE",1104,103,"#274c5f");
+  for(let i=0;i<3;i++){rect(1103+i*13,115,7,4,"#ebd6ac");rect(1105+i*13,112,3,3,"#f5e8c7");}
+  seats(700,130,6);seats(700,195,6);seats(1050,180,4);
+  plant(665,129);plant(883,209);plant(1168,126);plant(87,113);plant(1154,337);
+  canadianFlag(1088,267);sign(971,248,97,"MEETING POINT");
+  // Front desk queue posts and inset floor route.
+  for(let x=920;x<1030;x+=30){ellipse(x,193,4,2,"#a9b6aa");rect(x-1,181,2,11,"#597b84");}
+  rect(920,180,90,2,"#b58c5d");
+  for(let x=500;x<1180;x+=42)rect(x,299,19,1,"#b2c0b6");
+  // Nesting luggage carts.
+  for(let i=0;i<3;i++){const x=100+i*10;rect(x,282,2,24,"#738d95");rect(x,283,15,2,"#36596c");box(x+2,291,18,12,3,"#a9bec1","#7b969e");rect(x+3,307,3,3,"#395768");rect(x+15,307,3,3,"#395768");}
+
+  // Large unbranded aircraft parked beside the terminal, with red tail and blue windows.
+  ellipse(260,548,178,27,"#637b88");
+  poly([[214,495],[176,424],[205,422],[289,496]],"#c2d2d7");poly([[220,493],[186,430],[202,428],[273,494]],"#edf0e7");
+  poly([[230,524],[166,593],[202,601],[296,528]],"#b0c2ca");poly([[238,530],[179,588],[199,589],[276,529]],"#e2e8e4");
+  box(211,558,35,13,7,"#dbe3e2","#90a8b6");ellipse(244,568,5,7,"#547587");rect(212,558,30,2,"#f5f3df");
+  box(228,467,32,11,4,"#c0d1d9","#7b9aaa");rect(256,469,5,9,"#36596c");
+  poly([[89,505],[114,488],[372,488],[400,496],[426,514],[418,527],[396,535],[119,535],[92,521]],"#b5c6d0");
+  poly([[93,504],[117,491],[372,491],[398,500],[423,512],[399,522],[121,521]],"#edf1e7");
+  rect(123,491,249,3,"#fff9e6");rect(126,527,263,3,"#7999a9");
+  poly([[107,505],[78,453],[108,452],[151,507]],"#b95655");poly([[106,501],[84,459],[104,458],[138,502]],"#d87863");
+  poly([[104,515],[70,548],[96,548],[153,523]],"#9db7c3");
+  poly([[388,497],[402,504],[398,508],[386,503]],"#3c697e");rect(379,496,6,7,"#436e81");
+  for(let i=0;i<20;i++){rect(137+i*11,503,6,6,"#4f7c91");rect(138+i*11,503,4,1,"#89b2bd");}
+  rect(320,514,17,21,"#3d5c6b");rect(323,516,11,17,"#243e52");
+  // Stairs join directly to the apron; collision rails leave the centre open.
+  box(311,536,38,65,5,"#8da1ac","#526d80");
+  for(let i=0;i<11;i++){rect(313,538+i*6,34,2,"#d2dfda");rect(313,542+i*6,34,1,"#617f91");}
+  rect(307,536,3,62,"#e7e6d5");rect(351,536,3,62,"#e7e6d5");
+  for(let i=0;i<4;i++){rect(305,544+i*15,2,11,"#657e8e");rect(354,544+i*15,2,11,"#657e8e");}
+  rect(309,602,45,3,"#e8d9a8");
+  cone(75,562);cone(456,569);cone(430,451);cone(80,465);
+  // Baggage train, ground crew equipment and a shuttle give the apron scale.
+  for(let i=0;i<3;i++){box(480+i*29,530,26,19,7,"#c0ba9e","#7a8990");rect(483+i*29,556,5,3,"#345362");rect(498+i*29,556,5,3,"#345362");suitcase(485+i*29,518,["#c3875a","#6d9b94","#917f9d"][i]);}
+  box(100,650,80,21,10,"#c2a467","#8e805f");rect(106,638,25,16,"#cad8d5");rect(110,640,17,9,"#436a80");rect(110,678,10,5,"#354d60");rect(162,678,10,5,"#354d60");
+  box(1120,590,85,33,9,"#e1d2ab","#aa9c7e");rect(1125,595,72,12,"#426c84");for(let i=0;i<5;i++)rect(1137+i*12,595,2,13,"#9fb9c0");rect(1129,630,10,5,"#345163");rect(1187,630,10,5,"#345163");
+  // A curbside garden and road continue outside the eastern terminal exit.
+  rect(1234,80,46,160,"#749876");rect(1234,330,46,55,"#749876");
+  for(let y=89;y<229;y+=25){rect(1243,y,24,16,"#547f60");rect(1247,y-3,17,20,"#6c996b");}
+  // A few travellers and ground crew establish scale around the smaller child.
+  function traveller(x:number,y:number,shirt:string,skin:string,outdoors=false) {
+    ellipse(x,y+2,8,3,outdoors?"#647f8b":"#acbab0");
+    rect(x-4,y-10,3,11,"#405463");rect(x+2,y-10,3,11,"#405463");
+    rect(x-5,y,5,2,"#f0e5ce");rect(x+1,y,5,2,"#f0e5ce");
+    rect(x-5,y-23,11,14,shirt);rect(x-7,y-22,2,12,shirt);rect(x+6,y-22,2,12,shirt);
+    rect(x-7,y-10,2,3,skin);rect(x+6,y-10,2,3,skin);
+    rect(x-4,y-32,9,10,skin);rect(x-5,y-34,10,4,"#43505a");
+    rect(x-3,y-28,1,1,"#31414e");rect(x+3,y-28,1,1,"#31414e");
+  }
+  traveller(550,276,"#a47768","#c48f6d");suitcase(566,265,"#61878b");
+  traveller(1013,308,"#6b8c99","#e1b48c");suitcase(1026,300,"#c59765");
+  traveller(591,560,"#d5c579","#d9a67e",true);rect(587,540,9,2,"#f8edb7");
+
+  function paintChild(target: CanvasRenderingContext2D,p: Walker,ox:number,oy:number) {
+    const x=Math.round(ox+p.x),y=Math.round(oy+p.y),step=p.moving?Math.round(Math.sin(p.distance*.34)):0;
+    const r=(xx:number,yy:number,w:number,h:number,color:string)=>{target.fillStyle=color;target.fillRect(x+xx,y+yy,w,h);};
+    r(-6,0,13,2,"#60767d");r(-4,2,9,1,"#70878d");
+    // Short bare legs, shorts, a black tee, and a large rounded head.
+    r(-4,-6+step,3,5,"#e7b28c");r(2,-6-step,3,5,"#e7b28c");
+    r(-5,-1+step,5,2,"#fff1d5");r(1,-1-step,5,2,"#fff1d5");
+    r(-5,-9,11,4,"#334451");r(0,-7,1,3,"#202d3d");
+    r(-5,-15,11,7,"#191f29");r(-3,-14,7,5,"#232b35");
+    r(-7,-14-step,2,4,"#161f29");r(6,-14+step,2,4,"#161f29");
+    r(-7,-10-step,2,3,"#e7b28c");r(6,-10+step,2,3,"#e7b28c");
+    r(-1,-16,3,2,"#dc9c79");
+    r(-5,-24,11,8,"#edbb91");r(-6,-22,13,5,"#edbb91");
+    r(-5,-26,11,4,"#282c36");r(-6,-24,13,3,"#242b35");r(-3,-27,7,2,"#353943");
+    if(p.direction==="up"){r(-5,-23,11,7,"#242b35");r(-4,-17,9,1,"#39404a");}
+    else if(p.direction==="left"){r(-6,-22,2,5,"#efbf96");r(-5,-22,2,2,"#242d38");r(3,-23,3,7,"#282e37");r(-5,-19,2,1,"#dc927f");}
+    else if(p.direction==="right"){r(5,-22,2,5,"#efbf96");r(4,-22,2,2,"#242d38");r(-5,-23,3,7,"#282e37");r(5,-19,2,1,"#dc927f");}
+    else {r(-4,-22,2,2,"#28333e");r(3,-22,2,2,"#28333e");r(-4,-22,1,1,"#fff4da");r(3,-22,1,1,"#fff4da");r(-5,-19,2,1,"#df9580");r(4,-19,2,1,"#df9580");r(0,-18,2,1,"#b97063");}
+  }
+  return { draw(target:CanvasRenderingContext2D,camera:Point,player:Walker,time:number,visited:ReadonlySet<string>,reduced:boolean){
+    const ox=Math.round(target.canvas.width/2-camera.x),oy=Math.round(target.canvas.height/2-camera.y);
+    target.imageSmoothingEnabled=false;target.fillStyle="#80959e";target.fillRect(0,0,target.canvas.width,target.canvas.height);target.drawImage(layer,ox,oy);
+    // Slow-moving luggage, with all motion still on the source pixel grid.
+    const perimeter=2*(284+64);
+    for(let n=0;n<7;n++){
+      let d=(n*97+(reduced?0:time*.014))%perimeter,x=191,y=158;
+      if(d<284)x+=d;else if((d-=284)<64){x+=284;y+=d;}else if((d-=64)<284){x+=284-d;y+=64;}else{d-=284;y+=64-d;}
+      const bx=Math.round(x+ox),by=Math.round(y+oy);target.fillStyle="#263e4d";target.fillRect(bx+2,by-2,6,2);
+      target.fillStyle=["#cb8767","#729b91","#b7a477","#8d809c"][n%4];target.fillRect(bx,by,11,8);target.fillStyle="#d0d6bd";target.fillRect(bx+3,by+1,1,6);
     }
-  }
-  function glow(x: number, y: number, rx: number, ry: number, strength: number) {
-    for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) {
-      const v = Math.max(0, 1 - Math.hypot(dx / rx, dy / ry));
-      if (hash(x + dx, y + dy) < v * .7) rect(x + dx, y + dy, 1, 1, 26 + Math.floor(v * strength));
-    }
-  }
-  function block(x: number, y: number, w: number, h: number, depth: number, shade: number) {
-    rect(x + 3, y + depth + 3, w, h, 9);
-    rect(x, y + depth, w, h, shade - 12);
-    rect(x, y, w, h, shade);
-    rect(x, y, w, 1, shade + 24);
-    rect(x, y + h, w, depth, shade - 16);
-    rect(x + w - 2, y, 2, h + depth, shade - 10);
-  }
-  function plant(x: number, y: number) {
-    ellipse(x, y + 5, 10, 4, 10); block(x - 6, y - 5, 12, 9, 5, 48);
-    rect(x - 1, y - 25, 2, 21, 58);
-    for (let i = 0; i < 4; i++) {
-      const s = i % 2 ? 1 : -1, yy = y - 8 - i * 5;
-      rect(x + (s < 0 ? -10 : 1), yy - 5, 9, 5, 38 + i * 8);
-      rect(x + (s < 0 ? -8 : 3), yy - 8, 5, 4, 52 + i * 5);
-    }
-  }
-  function bench(x: number, y: number) {
-    block(x, y, 42, 9, 6, 49); rect(x + 4, y + 15, 3, 6, 24); rect(x + 35, y + 15, 3, 6, 24);
-    for (let n = 0; n < 3; n++) rect(x, y + 2 + n * 3, 40, 1, 30);
-  }
-  function lamp(x: number, y: number) {
-    glow(x, y + 7, 24, 11, 23); ellipse(x, y + 3, 5, 2, 11);
-    rect(x - 1, y - 25, 2, 28, 49); rect(x - 4, y - 27, 8, 5, 141); rect(x - 2, y - 26, 4, 3, 221);
-  }
-  function monitor(x: number, y: number, w: number, h: number, chart: boolean) {
-    glow(x + w / 2, y + h + 18, w * .8, 35, 37);
-    rect(x + w / 2 - 1, y + h, 3, 12, 62); rect(x + w / 2 - 9, y + h + 10, 20, 3, 52);
-    block(x, y, w, h, 3, 51); rect(x + 3, y + 3, w - 6, h - 6, 13);
-    rect(x + 4, y + 4, w - 8, 1, 82);
-    if (chart) {
-      for (let n = 0; n < 15; n++) {
-        const xx = x + 7 + n * (w - 14) / 15, yy = y + h * .65 - Math.sin(n * .8) * 5 - n * .5;
-        rect(xx, yy - 4, 1, 11, n % 3 ? 166 : 65); rect(xx - 1, yy, 3, 4, n % 3 ? 135 : 54);
-      }
-    } else for (let n = 0; n < 7; n++) {
-      rect(x + 6 + (n % 3) * 3, y + 7 + n * 4, (w - 15) * (.3 + hash(n, x) * .5), 1, 65 + n % 3 * 28);
-    }
-  }
-
-  rect(0, 0, WORLD.width, WORLD.height, 8);
-  for (let y = 0; y < WORLD.height; y += 2) for (let x = 0; x < WORLD.width; x += 2) {
-    const n = hash(x, y);
-    if (n > .65) rect(x, y, 1, 1, n > .998 ? 56 : 10 + Math.floor(n * 4));
-    if (x % 24 === 0 && y % 24 === 0) rect(x, y, 1, 1, 23);
-  }
-  // Bridges form a walkable loop, including a return route to the start.
-  for (const b of BRIDGES) {
-    rect(b.x + 3, b.y + 9, b.w, b.h, 4); rect(b.x, b.y, b.w, b.h, 29);
-    outline(b.x, b.y, b.w, b.h, 61);
-    const horizontal = b.w > b.h;
-    for (let i = 8; i < (horizontal ? b.w : b.h); i += 9) {
-      if (horizontal) { rect(b.x + i, b.y + 2, 1, b.h - 4, 19); rect(b.x + i, b.y, 3, 1, 126); }
-      else { rect(b.x + 2, b.y + i, b.w - 4, 1, 19); rect(b.x, b.y + i, 1, 3, 126); }
-    }
-  }
-  for (const island of ISLANDS) {
-    const { x, y, w, h } = island;
-    for (let row = 0; row < h; row++) {
-      const cut = Math.max(0, 22 - Math.min(row, h - 1 - row));
-      rect(x + cut + 5, y + row + 15, w - 2 * cut, 1, 4);
-      rect(x + cut, y + row + 8, w - 2 * cut, 1, 22);
-      rect(x + cut, y + row, w - 2 * cut, 1, row < 2 || row > h - 3 ? 69 : 31);
-      for (let col = cut + 2; col < w - cut - 2; col++) {
-        const n = hash(x + col, y + row);
-        if (n > .6) rect(x + col, y + row, 1, 1, 28 + Math.floor(n * 11));
-        if (row % 16 === 0 || col % 24 === 0) rect(x + col, y + row, 1, 1, 24);
-      }
-    }
-    line(x + 23, y + 3, x + w - 24, y + 3, 83);
-    for (let i = 36; i < w - 30; i += 40) { rect(x + i, y + h - 2, 8, 2, 89); }
-    // Low back wall and architectural ribs.
-    block(x + 25, y + 12, w - 50, 11, 17, 50);
-    for (let i = 30; i < w - 30; i += 24) rect(x + i, y + 17, 2, 20, 63);
-    if (island !== ISLANDS[0]) { plant(x + 27, y + h - 38); plant(x + w - 27, y + h - 38); }
-    lamp(x + 25, y + 82); lamp(x + w - 25, y + 82);
-    bench(x + w - 75, y + h - 35);
-  }
-
-  // Age six: an aircraft on a Canadian apron, with a walkable boarding stair.
-  // The plane is intentionally unbranded; no airline or airport was supplied.
-  for (let n = 0; n < 8; n++) rect(64 + n * 29, 621, 15, 2, 99);
-  rect(65, 593, 84, 1, 72); rect(65, 573, 1, 21, 72);
-  ellipse(177, 522, 108, 17, 15);
-  polygon([[148, 496], [131, 453], [148, 451], [191, 495]], 114);
-  polygon([[145, 496], [135, 457], [146, 455], [179, 496]], 153);
-  polygon([[151, 508], [119, 555], [144, 558], [194, 511]], 133);
-  polygon([[155, 512], [126, 552], [139, 551], [179, 513]], 174);
-  block(151, 530, 21, 8, 4, 101); rect(168, 531, 5, 7, 38); rect(151, 530, 18, 1, 203);
-  block(156, 479, 20, 7, 2, 126); rect(173, 480, 4, 6, 44);
-  polygon([[76, 499], [90, 487], [245, 487], [263, 492], [279, 503], [275, 511], [260, 517], [100, 517], [78, 510]], 111);
-  polygon([[80, 498], [94, 489], [245, 489], [262, 494], [277, 502], [263, 509], [101, 508]], 193);
-  rect(101, 489, 142, 2, 228); rect(104, 511, 153, 2, 145);
-  // Tailplane and vertical fin, cockpit and a row of distinct dark windows.
-  polygon([[84, 500], [72, 470], [88, 470], [111, 501]], 157);
-  polygon([[83, 504], [62, 523], [77, 524], [113, 510]], 123);
-  polygon([[253, 492], [263, 497], [259, 500], [251, 496]], 35);
-  rect(247, 492, 3, 5, 39);
-  for (let n = 0; n < 14; n++) { rect(114 + n * 9, 496, 4, 4, 46); rect(114 + n * 9, 495, 3, 1, 105); }
-  // Open doorway; the child starts on the upper steps and walks toward camera.
-  rect(197, 502, 13, 15, 23); rect(199, 503, 9, 11, 12);
-  block(191, 518, 26, 50, 5, 50);
-  for (let n = 0; n < 10; n++) { rect(192, 520 + n * 5, 24, 2, 106 - n * 3); rect(192, 523 + n * 5, 24, 1, 31); }
-  rect(188, 518, 2, 46, 163); rect(218, 518, 2, 46, 163);
-  for (let n = 0; n < 4; n++) { rect(186, 527 + n * 11, 2, 8, 89); rect(220, 527 + n * 11, 2, 8, 89); }
-  rect(189, 569, 31, 3, 88);
-  // Canadian flag beside the arrival path, entirely in the grayscale palette.
-  rect(268, 550, 2, 55, 110); rect(270, 551, 31, 18, 181);
-  rect(270, 551, 6, 18, 58); rect(295, 551, 6, 18, 58);
-  polygon([[285, 553], [287, 557], [290, 555], [289, 559], [293, 559], [289, 563], [286, 563], [286, 567], [284, 567], [284, 563], [281, 563], [277, 559], [281, 559], [280, 555], [283, 557]], 53);
-  block(73, 597, 35, 15, 4, 54); rect(77, 593, 3, 4, 79); rect(100, 593, 3, 4, 79);
-  block(78, 582, 13, 13, 2, 88); rect(81, 579, 7, 3, 121); block(94, 586, 9, 10, 2, 65);
-
-  // Workshop: three luminous displays, keyboard, PC and a silver Monster can.
-  block(476, 507, 168, 34, 8, 60);
-  monitor(476, 477, 47, 34, false); monitor(529, 462, 63, 44, true); monitor(598, 477, 44, 34, false);
-  block(530, 524, 58, 9, 2, 39);
-  for (let x = 533; x < 585; x += 4) for (let y = 526; y < 532; y += 3) rect(x, y, 2, 1, 89);
-  block(615, 517, 9, 17, 1, 27); rect(615, 516, 9, 2, 157);
-  for (let i = 0; i < 3; i++) line(617 + i * 2, 521, 618 + i * 2, 529, 154);
-  block(645, 502, 16, 37, 6, 37); outline(648, 506, 10, 10, 88); outline(648, 521, 10, 10, 88);
-
-  // Campus: an architectural miniature, not a claimed replica of a building.
-  block(860, 481, 160, 56, 9, 54); block(883, 466, 114, 16, 4, 68);
-  block(918, 448, 45, 19, 8, 73); rect(936, 436, 3, 12, 85); rect(939, 437, 11, 6, 106);
-  for (let i = 0; i < 8; i++) { block(868 + i * 18, 488, 8, 39, 5, 87); rect(879 + i * 18, 491, 4, 24, 20); }
-  rect(930, 494, 22, 43, 16); rect(933, 497, 16, 35, 33); rect(941, 497, 1, 35, 79);
-  for (let i = 0; i < 4; i++) rect(920 - i * 3, 537 + i * 3, 42 + i * 6, 2, 83 - i * 10);
-
-  // Volleyball court, net, bleachers, and one blue/yellow panelled ball.
-  rect(848, 145, 184, 111, 40); outline(857, 154, 166, 93, 139);
-  rect(940, 154, 1, 93, 108); rect(892, 154, 1, 93, 89); rect(988, 154, 1, 93, 89);
-  rect(859, 160, 2, 36, 154); rect(1020, 160, 2, 36, 154);
-  rect(860, 153, 161, 2, 183);
-  for (let x = 861; x < 1020; x += 5) rect(x, 155, 1, 22, 80);
-  for (let y = 157; y < 177; y += 5) rect(861, y, 160, 1, 85);
-  for (let i = 0; i < 3; i++) block(862, 124 - i * 6, 153, 4, 3, 48 + i * 9);
-  ellipse(983, 218, 8, 3, 20);
-  for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) {
-    if (dx * dx + dy * dy > 49) continue;
-    const panel = Math.sin(Math.atan2(dy, dx) * 3 + Math.hypot(dx, dy) * .34) > .1;
-    rect(982 + dx, 210 + dy, 1, 1, panel ? "#c9b245" : "#363f75");
-  }
-
-  // Chess terrace, a single sculpted knight on the giant board.
-  block(508, 141, 104, 60, 6, 44);
-  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) rect(512 + x * 12, 144 + y * 7, 12, 7, (x + y) % 2 ? 43 : 118);
-  const knight = ["0000111000", "0001111100", "0011111110", "0111011110", "1111111110", "1110011110", "0000111100", "0001111000", "0011111000", "0011111000", "0111111100", "1111111110"];
-  ellipse(560, 183, 14, 4, 25);
-  knight.forEach((row, y) => [...row].forEach((p, x) => {
-    if (p === "1") { rect(550 + x * 2, 155 + y * 2, 2, 2, 191); rect(551 + x * 2, 156 + y * 2, 1, 1, 146); }
-  }));
-  rect(558, 162, 2, 2, 28);
-
-  // Food stop: a tiny open-front counter and stools, awaiting real memories.
-  block(99, 145, 162, 43, 8, 42); block(95, 126, 170, 15, 5, 67);
-  for (let i = 0; i < 17; i++) rect(97 + i * 10, 129, 6, 17, i % 2 ? 54 : 97);
-  rect(103, 149, 154, 24, 15); rect(107, 151, 146, 2, 147);
-  block(95, 180, 171, 10, 5, 83);
-  for (let i = 0; i < 4; i++) {
-    const x = 116 + i * 39;
-    ellipse(x, 184, 10, 3, 154); ellipse(x, 182, 8, 2, 48);
-    rect(x - 4, 178, 8, 3, 133); line(x - 4, 180, x + 7, 176, 187);
-    block(x - 7, 208, 14, 9, 9, 74);
-  }
-  glow(179, 200, 85, 35, 23);
-
-  function paintPlayer(target: CanvasRenderingContext2D, player: Walker, offsetX: number, offsetY: number) {
-    const x = Math.round(player.x + offsetX), y = Math.round(player.y + offsetY);
-    const step = player.moving ? Math.sin(player.distance * .35) : 0;
-    // The body grows from 19 to 27 source pixels while keeping every edge on-grid.
-    const growth = player.growth ?? 0;
-    const scaleY = .70 + growth * .30, scaleX = .82 + growth * .18;
-    const p = (xx: number, yy: number, w: number, h: number, color: number) => {
-      const left = Math.round(xx * scaleX), top = Math.round(yy * scaleY);
-      target.fillStyle = grey(color);
-      target.fillRect(x + left, y + top, Math.max(1, Math.round((xx + w) * scaleX) - left), Math.max(1, Math.round((yy + h) * scaleY) - top));
-    };
-    p(-7, -1, 14, 3, 12); p(-5, 2, 10, 1, 17);
-    // Shoes and independently alternating legs.
-    p(-4, -7 + Math.round(step), 3, 7, 57); p(1, -7 - Math.round(step), 3, 7, 57);
-    p(-5, -1 + Math.round(step), 4, 2, 218); p(1, -1 - Math.round(step), 4, 2, 218);
-    p(-5, -17, 10, 11, 202); p(-3, -16, 6, 9, 229); p(-1, -10, 3, 1, 155);
-    p(-7, -16 - Math.round(step), 2, 8, 161); p(5, -16 + Math.round(step), 2, 8, 161);
-    p(-7, -8 - Math.round(step), 2, 2, 196); p(5, -8 + Math.round(step), 2, 2, 196);
-    p(-4, -24, 8, 8, 180); p(-5, -26, 10, 5, 28); p(-4, -27, 8, 2, 38);
-    if (player.direction === "up") { p(-4, -22, 8, 5, 26); p(-3, -17, 6, 2, 143); }
-    else if (player.direction === "left") { p(-5, -21, 3, 4, 196); p(-4, -21, 1, 1, 29); p(2, -23, 3, 6, 28); }
-    else if (player.direction === "right") { p(2, -21, 3, 4, 196); p(3, -21, 1, 1, 29); p(-5, -23, 3, 6, 28); }
-    else { p(-3, -21, 1, 1, 26); p(2, -21, 1, 1, 26); p(-1, -18, 2, 1, 125); }
-    if (growth < .45) {
-      // A small travel backpack remains visible from behind and from the side.
-      if (player.direction === "up") { p(-3, -15, 6, 7, 75); p(-2, -14, 4, 4, 110); }
-      else if (player.direction === "right") p(-7, -15, 3, 7, 74);
-      else if (player.direction === "left") p(4, -15, 3, 7, 74);
-      else { p(-4, -15, 1, 7, 78); p(3, -15, 1, 7, 78); }
-    }
-  }
-
-  return {
-    draw(target: CanvasRenderingContext2D, camera: Point, player: Walker, time: number, visited: ReadonlySet<string>, reduced: boolean) {
-      const ox = Math.round(target.canvas.width / 2 - camera.x), oy = Math.round(target.canvas.height / 2 - camera.y);
-      target.imageSmoothingEnabled = false;
-      target.fillStyle = "#080808"; target.fillRect(0, 0, target.canvas.width, target.canvas.height);
-      target.drawImage(layer, ox, oy);
-      // Floating name belongs to the origin, so the camera leaves it behind.
-      GLYPHS.forEach((rows, index) => {
-        const bob = reduced ? 0 : Math.round(Math.sin(time * .0008 + index * .8) * 3);
-        rows.forEach((row, y) => [...row].forEach((value, x) => {
-          if (value !== "1") return;
-          target.fillStyle = "#484848"; target.fillRect(ox + 94 + index * 29 + x * 3 + 2, oy + 412 + y * 3 + bob + 2, 3, 3);
-          target.fillStyle = y === 0 ? "#ededed" : "#aaaaaa"; target.fillRect(ox + 94 + index * 29 + x * 3, oy + 412 + y * 3 + bob, 3, 3);
-        }));
-      });
-      for (const story of LIFE_STORIES) {
-        const x = ox + story.x, y = oy + story.y;
-        const close = Math.hypot(player.x - story.x, player.y - story.y) < 48;
-        target.fillStyle = visited.has(story.id) ? "#777" : close ? "#eee" : "#aaa";
-        const bob = reduced ? 0 : Math.round(Math.sin(time * .002 + Number(story.number)) * 2);
-        // A small diamond marks a memory, well in front of collision geometry.
-        for (let row = -3; row <= 3; row++) target.fillRect(x - (3 - Math.abs(row)), y - 14 + row + bob, (3 - Math.abs(row)) * 2 + 1, 1);
-        target.fillStyle = close ? "#777" : "#444";
-        target.fillRect(x - 8, y + 3, 17, 1); target.fillRect(x - 8, y + 1, 1, 2); target.fillRect(x + 8, y + 1, 1, 2);
-      }
-      if (!reduced) for (let n = 0; n < 26; n++) {
-        const x = (hash(n, 9) * WORLD.width + time * .002 * (n % 2 ? 1 : -1) + WORLD.width) % WORLD.width;
-        const y = hash(n, 27) * WORLD.height + Math.sin(time * .0005 + n) * 5;
-        target.fillStyle = n % 4 ? "#363636" : "#686868";
-        target.fillRect(Math.round(ox + x), Math.round(oy + y), 1, 1);
-      }
-      paintPlayer(target, player, ox, oy);
-    },
-  };
+    for(const story of LIFE_STORIES){const x=ox+story.x,y=oy+story.y,bob=reduced?0:Math.round(Math.sin(time*.002)*2);target.fillStyle=visited.has(story.id)?"#779a9b":"#fff1af";for(let r=-3;r<=3;r++)target.fillRect(x-(3-Math.abs(r)),y-12+r+bob,(3-Math.abs(r))*2+1,1);target.fillStyle="#485f70";target.fillRect(x-8,y+3,17,1);}
+    paintChild(target,player,ox,oy);
+    // The overhead entrance sign passes in front of the child at the doorway.
+    if(player.y<367)target.drawImage(layer,601,330,103,24,ox+601,oy+330,103,24);
+  }};
 }

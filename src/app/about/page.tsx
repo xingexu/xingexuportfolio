@@ -4,7 +4,7 @@ import "./about.css";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "Walk through Xinge Xu’s pixel world with WASD. Explore coding, Western CS + Ivey, chess, volleyball, and new food spots through a playable About page.",
+  description: "Explore a colorful pixel airport as six-year-old Xinge arrives in Canada. Walk off the plane, through arrivals, and into the first chapter with WASD.",
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About · Xinge Xu",

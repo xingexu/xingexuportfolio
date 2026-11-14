@@ -13,14 +13,17 @@ export type LifeStory = {
   link?: { href: string; label: string };
 };
 
-// The first memory is the supplied age-six arrival in Canada. The remaining
-// areas are present-day interests; no events or dates are invented in between.
+// Only the supplied childhood arrival is playable. Later interests are kept
+// separately until the owner adds the memories that connect the chapters.
 export const LIFE_STORIES: LifeStory[] = [
   {
     id: "arrival", number: "01", place: "Arriving in Canada", title: "Six years old. A new country.",
     description: "I came to Canada when I was six. This is where the walk begins: getting off the plane, with the rest of my life still ahead of me.",
-    x: 180, y: 570, photos: [],
+    x: 365, y: 625, photos: [],
   },
+];
+
+export const LATER_STORIES: LifeStory[] = [
   {
     id: "building", number: "02", place: "The workshop", title: "An idea. Then a project.",
     description: "I love to code and turn ideas into things you can actually use. PhotoGit brings version control to Photoshop files. Drift is my first macOS app, built to help students understand their online time.",

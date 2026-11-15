@@ -6,7 +6,8 @@ import { LIFE_STORIES, type LifeChapter, type LifeStory } from "@/lib/life-stori
 import { AIRPORT_PLACES, START, type Direction } from "@/lib/life-world";
 import { emptyAirportProgress, getAirportGuide, type AirportGuide } from "@/lib/airport-guide";
 import { HOME_START } from "@/lib/home-world";
-import { chessPieceAt, chessPiecePath } from "@/lib/pixel-chess";
+import { ROOM_OBJECTS, roomObjectById } from "@/lib/room-objects";
+import RoomObjectView from "./RoomObjectView";
 import LifeWorld, { type WorldControls } from "./LifeWorld";
 import { TransitionLink } from "./PageTransitions";
 
@@ -25,6 +26,8 @@ export default function About() {
   const [chapter, setChapter] = useState<LifeChapter>("airport");
   const [travelling, setTravelling] = useState<LifeChapter | null>(null);
   const [guide, setGuide] = useState<AirportGuide>(() => getAirportGuide(START, emptyAirportProgress(), false));
+  const viewedObjects = ROOM_OBJECTS.filter(object => visited.has(object.id)).length;
+  const objectIndex = ROOM_OBJECTS.findIndex(object => object.id === opened);
   const controls = useRef<WorldControls | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -48,6 +51,7 @@ export default function About() {
     if (!element) return;
     if (opened) {
       if (!element.open) element.showModal();
+      element.scrollTop = 0;
       closeButton.current?.focus();
     } else if (element.open) {
       element.close();
@@ -85,10 +89,10 @@ export default function About() {
       <div className="world-interact">
         <div className="world-guide" id="world-next-step" role="status" aria-live="polite" aria-atomic="true">
           <span className="world-guide-arrow" aria-hidden="true">{guide.arrow}</span>
-          <div><small>{guide.id.endsWith("complete") ? "MEMORY FOUND" : `NEXT · ${guide.step} / ${guide.total ?? 5}`}</small><strong>{guide.title}</strong>
+          <div><small>{atHome ? `ROOM · ${viewedObjects} / ${ROOM_OBJECTS.length} VIEWED` : `NEXT · ${guide.step} / ${guide.total ?? 5}`}</small><strong>{guide.title}</strong>
             <p className="world-guide-desktop">{guide.hint}</p><p className="world-guide-touch">{guide.touchHint}</p></div>
         </div>
-        {near && <button type="button" className="world-read-memory" onClick={() => readStory(near.id)}><kbd>E</kbd><span>{near.id === "first-home" ? "Look at chessboard" : visited.has(near.id) ? "Revisit memory" : "Read memory"}</span><span aria-hidden="true">↗</span></button>}
+        {near && <button type="button" className="world-read-memory" onClick={() => readStory(near.id)}><kbd>E</kbd><span>{near.viewLabel ? `View ${near.viewLabel}` : visited.has(near.id) ? "Revisit memory" : "Read memory"}</span><span aria-hidden="true">↗</span></button>}
         {guide.id.endsWith("complete") && !near && <TransitionLink href="/" className="world-guide-home">Return to portfolio <span aria-hidden="true">↖</span></TransitionLink>}
       </div>
       <div className="world-bottomline">
@@ -102,17 +106,23 @@ export default function About() {
           <span>{atHome ? "Room map" : "Airport map"} <span aria-hidden="true">↗</span></span>
         </button>
       </div>
-      <dialog ref={dialog} className="world-dialog" aria-labelledby="world-dialog-title" onCancel={(event) => { event.preventDefault(); close(); }} onClick={(event) => { if (event.target === event.currentTarget) { const r = event.currentTarget.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); } }}>
+      <dialog ref={dialog} className="world-dialog" data-object={objectIndex >= 0} aria-labelledby="world-dialog-title" onCancel={(event) => { event.preventDefault(); close(); }} onClick={(event) => { if (event.target === event.currentTarget) { const r = event.currentTarget.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); } }}>
         <button ref={closeButton} type="button" className="world-dialog-close" onClick={close} aria-label="Back to walking">×</button>
         {opened === "map" ? <>
           <p className="world-eyebrow">Chapter {chapterNumber} · Age six · {atHome ? "Markham, Ontario" : "Canada"}</p><h2 id="world-dialog-title">{atHome ? "18 Holsworthy." : "A whole new place."}</h2>
           {atHome ? <HomeMap guide={guide} /> : <AirportMap guide={guide} />}
           <p className="world-map-legend"><span>■ You are here</span><span>□ Next stop</span></p>
           <p className="world-map-next"><strong>{guide.title}</strong> {guide.hint}</p>
-          <p className="world-dialog-intro">{atHome ? "You’re inside my room at 18 Holsworthy. The chessboard and LEGO are on the left; agar.io, candy, and badminton rackets are on the right. Walk down through the doorway to revisit the airport." : "Walk down the plane stairs, follow the yellow path right, then head up to the nearby terminal doors. They take you straight into my childhood room — no airport detour."}</p>
-          <div className="world-story-list">{LIFE_STORIES.filter(item => (item.chapter ?? "airport") === chapter).map((item) => <button type="button" key={item.id} onClick={() => readStory(item.id)}><span>{item.number}</span><span><strong>{item.place}</strong><small>{item.title}</small></span><span aria-label={visited.has(item.id) ? "Discovered" : "Unread"}>{visited.has(item.id) ? "◆" : "◇"}</span></button>)}</div>
-        </> : story ? <StoryContent story={story} /> : <h2 id="world-dialog-title" className="sr-only">Stories</h2>}
-        {story && <p className="world-memory-next">{guide.id.endsWith("complete") ? "Keep exploring my room, or return to the airport through the doorway." : `Next: ${guide.title}`}</p>}
+          <p className="world-dialog-intro">{atHome ? "You’re inside my room at 18 Holsworthy. Click or tap any object for a closer look, or walk up and press E. You can also choose any of the 8 objects below. The doorway leads back to the airport." : "Walk down the plane stairs, follow the yellow path right, then head up to the nearby terminal doors. They take you straight into my childhood room — no airport detour."}</p>
+          <div className={`world-story-list ${atHome ? "room-object-list" : ""}`}>{LIFE_STORIES.filter(item => (item.chapter ?? "airport") === chapter).map((item,index) => <button type="button" key={item.id} onClick={() => readStory(item.id)} aria-label={item.viewLabel ? `View ${item.viewLabel}` : undefined}><span>{atHome ? String(index+1).padStart(2,"0") : item.number}</span><span><strong>{item.viewLabel ?? item.place}</strong><small>{item.viewLabel ? (visited.has(item.id) ? "Viewed · view again" : "View object ↗") : item.title}</small></span><span aria-label={visited.has(item.id) ? "Viewed" : "Not viewed"}>{visited.has(item.id) ? "◆" : "◇"}</span></button>)}</div>
+        </> : story ? <StoryContent story={story} paused={paused} /> : <h2 id="world-dialog-title" className="sr-only">Stories</h2>}
+        {objectIndex >= 0 && <nav className="room-object-nav" aria-label="Room object browser">
+          <button type="button" onClick={() => readStory(ROOM_OBJECTS[(objectIndex+ROOM_OBJECTS.length-1)%ROOM_OBJECTS.length].id)} aria-label={`View previous object: ${ROOM_OBJECTS[(objectIndex+ROOM_OBJECTS.length-1)%ROOM_OBJECTS.length].label}`}>← Previous</button>
+          <span>{String(objectIndex+1).padStart(2,"0")} / {String(ROOM_OBJECTS.length).padStart(2,"0")}</span>
+          <button type="button" onClick={() => readStory(ROOM_OBJECTS[(objectIndex+1)%ROOM_OBJECTS.length].id)} aria-label={`View next object: ${ROOM_OBJECTS[(objectIndex+1)%ROOM_OBJECTS.length].label}`}>Next →</button>
+        </nav>}
+
+        {story && !story.objectId && <p className="world-memory-next">{guide.id.endsWith("complete") ? "Keep exploring my room, or return to the airport through the doorway." : `Next: ${guide.title}`}</p>}
         {opened && <button type="button" className="world-continue" onClick={close}>Keep walking <span aria-hidden="true">→</span></button>}
       </dialog>
       {travelling && <div className="world-chapter-transition" key={travelling} role="status"><small>CHAPTER {travelling === "holsworthy" ? "02" : "01"}</small><strong>{travelling === "holsworthy" ? "18 HOLSWORTHY" : "ARRIVING IN CANADA"}</strong><span>{travelling === "holsworthy" ? "My room · Markham, Ontario" : "Back where the walk began"}</span></div>}
@@ -138,18 +148,6 @@ function HomeMap({ live = false, guide }: { live?: boolean; guide: AirportGuide 
   </svg>;
 }
 
-function MemoryChessboard() {
-  return <figure className="world-chess-memory"><svg viewBox="0 0 96 96" role="img" aria-label="Chessboard with all 32 pieces in the starting position" shapeRendering="crispEdges">
-    {Array.from({length:64},(_,i)=>{
-      const row=Math.floor(i/8),col=i%8,piece=chessPieceAt(row,col);
-      return <g key={i}><rect x={col*12} y={row*12} width="12" height="12" fill={(row+col)%2 ? "#687b65" : "#e5d5ad"} />{piece && <g transform={`translate(${col*12+2} ${row*12+1})`}>
-        {[[-1,0],[1,0],[0,-1],[0,1]].map(([x,y])=><path key={`${x},${y}`} transform={`translate(${x} ${y})`} d={chessPiecePath(piece.piece)} fill={piece.white?"#86765a":"#b8b396"} />)}
-        <path d={chessPiecePath(piece.piece)} fill={piece.white?"#fff2cf":"#25333b"} />
-      </g>}</g>;
-    })}
-  </svg><figcaption>Where I learned to play.</figcaption></figure>;
-}
-
 function AirportMap({ live = false, guide }: { live?: boolean; guide: AirportGuide }) {
   return <svg viewBox="0 0 1280 800" aria-hidden="true" className={live ? "world-minimap" : "world-airport-plan"}>
     <rect width="1280" height="800" fill="#6d8995" />
@@ -168,14 +166,15 @@ function AirportMap({ live = false, guide }: { live?: boolean; guide: AirportGui
   </svg>;
 }
 
-function StoryContent({ story }: { story: LifeStory }) {
+function StoryContent({ story, paused }: { story: LifeStory; paused: boolean }) {
+  const object = story.objectId ? roomObjectById(story.objectId) : null;
   return <>
-    <p className="world-eyebrow">{story.number} / {story.place}</p>
+    <p className="world-eyebrow">{object ? "OBJECT VIEW" : story.number} / {story.place}</p>
     <h2 id="world-dialog-title">{story.title}</h2>
+    {object && <RoomObjectView object={object} paused={paused} />}
     <p className="world-story-copy">{story.description}</p>
-    {story.id === "first-home" && <MemoryChessboard />}
     {story.photos.length > 0 && <div className="world-memory-photos">{story.photos.map((photo) => <figure key={photo.src}><Image src={photo.src} alt={photo.alt} width={900} height={600} sizes="(max-width: 640px) 85vw, 540px" /><figcaption>{photo.caption}</figcaption></figure>)}</div>}
     {story.link && (story.link.href.startsWith("/") ? <TransitionLink href={story.link.href} className="world-story-link">{story.link.label}<span aria-hidden="true">↗</span></TransitionLink> : <a href={story.link.href} target="_blank" rel="noopener noreferrer" className="world-story-link">{story.link.label}<span aria-hidden="true">↗</span><span className="sr-only"> (opens in a new tab)</span></a>)}
-    <p className="world-story-end">A little piece of my world.</p>
+    {!object && <p className="world-story-end">A little piece of my world.</p>}
   </>;
 }

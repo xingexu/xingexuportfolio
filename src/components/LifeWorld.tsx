@@ -3,7 +3,8 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { advanceWalker, airportPlace, atAirportExit, canWalk, closestStory, createLifeWorld, AIRPORT_RETURN, START, WORLD, type Direction, type Walker } from "@/lib/life-world";
 import { emptyAirportProgress, getAirportGuide, recordAirportProgress, type AirportGuide } from "@/lib/airport-guide";
-import { atHomeReturn, canWalkHome, createHomeWorld, getHomeGuide, homePlace, HOME_START, HOME_WORLD, CHESS_TABLE } from "@/lib/home-world";
+import { atHomeReturn, canWalkHome, createHomeWorld, getHomeGuide, homePlace, HOME_START, HOME_WORLD } from "@/lib/home-world";
+import { roomObjectAt, nearbyRoomObject } from "@/lib/room-objects";
 import type { LifeChapter } from "@/lib/life-stories";
 
 export type WorldControls = { input: (direction: Direction, held: boolean) => void; focus: () => void; travel?: (chapter: LifeChapter) => void };
@@ -48,19 +49,19 @@ export default function LifeWorld(props: Props) {
     const progress = emptyAirportProgress();
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0, previous = 0, ambientTime = 0, lastId = "", lastNear: string | null | undefined, hasMoved = false;
-    let lastGuide = "";
+    let lastGuide = "", hoveredObject: string | null = null;
     let disposed = false;
 
     function focus() { region.focus({ preventScroll: true }); }
     function clearInput() { sources.clear(); held.clear(); player.moving = false; player.vx = 0; player.vy = 0; }
     function input(direction: Direction, down: boolean, source = `touch-${direction}`) {
-      if (down && !live.current.blocked && !transition) sources.set(source, direction);
+      if (down && !live.current.blocked && !transition) { sources.set(source, direction); hoveredObject = null; region.title = ""; }
       else sources.delete(source);
       held.clear(); for (const value of sources.values()) held.add(value);
     }
     function travel(to: LifeChapter) {
       if (transition || to === chapter) return;
-      clearInput(); transition = { to, elapsed: 0, switched: false };
+      clearInput(); hoveredObject = null; region.title = ""; transition = { to, elapsed: 0, switched: false };
       live.current.onTransition?.(to);
     }
     function worldSize() { return chapter === "airport" ? WORLD : HOME_WORLD; }
@@ -108,11 +109,11 @@ export default function LifeWorld(props: Props) {
       if (!live.current.paused && !motion.matches && !live.current.blocked) ambientTime += dt * 1000;
       if (chapter === "airport") recordAirportProgress(progress, player);
       else if (player.y < 525) enteredHome = true;
-      const guide = chapter === "airport" ? getAirportGuide(player, progress, live.current.visited.has("arrival")) : getHomeGuide(player, enteredHome, live.current.visited.has("first-home"));
-      const guideKey = `${guide.id}|${guide.hint}|${guide.arrow}`;
+      const guide = chapter === "airport" ? getAirportGuide(player, progress, live.current.visited.has("arrival")) : getHomeGuide(player, enteredHome, live.current.visited.has("first-home"), live.current.visited, hoveredObject);
+      const guideKey = `${guide.id}|${guide.title}|${guide.hint}|${guide.arrow}|${guide.step}`;
       if (guideKey !== lastGuide) { lastGuide = guideKey; live.current.onGuide?.(guide); }
-      const scene = chapter === "airport" ? airportScene : homeScene;
-      scene.draw(ctx, camera, player, ambientTime, live.current.visited, motion.matches, guide.waypoint);
+      if (chapter === "airport") airportScene.draw(ctx, camera, player, ambientTime, live.current.visited, motion.matches, guide.waypoint);
+      else homeScene.draw(ctx, camera, player, ambientTime, live.current.visited, motion.matches, guide.waypoint, hoveredObject);
       if (transition) {
         const t = transition.elapsed;
         const coverage = motion.matches ? (t < 120 ? 1 : 0) : t < 600 ? t / 600 : t < 900 ? 1 : 1 - (t - 900) / 700;
@@ -125,7 +126,7 @@ export default function LifeWorld(props: Props) {
       }
       const story = closestStory(player, chapter);
       const place = chapter === "airport" ? airportPlace(player) : homePlace(player);
-      const nearby = Math.hypot(story.x - player.x, story.y - player.y) <= 48 ? story.id : null;
+      const nearby = chapter === "holsworthy" ? hoveredObject ?? nearbyRoomObject(player)?.id ?? null : Math.hypot(story.x - player.x, story.y - player.y) <= 48 ? story.id : null;
       if (place.id !== lastId || nearby !== lastNear) { lastId = place.id; lastNear = nearby; live.current.onLocation(place.id, nearby); }
       document.querySelectorAll("[data-world-map-player]").forEach(marker => {
         marker.setAttribute("x", String(Math.round(player.x - 15)));
@@ -167,12 +168,24 @@ export default function LifeWorld(props: Props) {
       clearInput(); cancelAnimationFrame(frame); previous = 0;
       if (!document.hidden) frame = requestAnimationFrame(draw);
     }
-    function inspectBoard(event: PointerEvent) {
-      if (chapter !== "holsworthy" || transition || live.current.blocked || lastNear !== "first-home") return;
+    function objectUnderPointer(event: PointerEvent) {
       const bounds = field.getBoundingClientRect();
-      const x = (event.clientX - bounds.left) / bounds.width * field.width + camera.x - field.width / 2;
-      const y = (event.clientY - bounds.top) / bounds.height * field.height + camera.y - field.height / 2;
-      if (x >= CHESS_TABLE.x && x <= CHESS_TABLE.x + CHESS_TABLE.w && y >= CHESS_TABLE.y && y <= CHESS_TABLE.y + CHESS_TABLE.h) { clearInput(); live.current.onInteract("first-home"); }
+      return roomObjectAt({
+        x: (event.clientX-bounds.left)/bounds.width*field.width+camera.x-field.width/2,
+        y: (event.clientY-bounds.top)/bounds.height*field.height+camera.y-field.height/2,
+      });
+    }
+    function inspectObject(event: PointerEvent) {
+      if (chapter !== "holsworthy" || transition || live.current.blocked) return;
+      const object = objectUnderPointer(event);
+      if (object) { clearInput(); hoveredObject = object.id; live.current.onInteract(object.id); }
+    }
+    function hoverObject(event: PointerEvent) {
+      if (chapter !== "holsworthy" || transition || live.current.blocked || event.pointerType === "touch") return;
+      const object = objectUnderPointer(event);
+      hoveredObject = object?.id ?? null;
+      region.style.cursor = object ? "pointer" : "default";
+      region.title = object ? `View ${object.label}` : "";
     }
     function resize() {
       const scale = Math.max(2, Math.floor(Math.min(region.clientWidth / 440, region.clientHeight / 270)));
@@ -186,14 +199,16 @@ export default function LifeWorld(props: Props) {
     window.addEventListener("keydown", keydown); window.addEventListener("keyup", keyup);
     window.addEventListener("blur", clearInput); document.addEventListener("visibilitychange", visibility);
     region.addEventListener("blur", clearInput);
-    region.addEventListener("pointerup", inspectBoard);
+    region.addEventListener("pointerup", inspectObject);
+    region.addEventListener("pointermove", hoverObject);
     visibility();
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); held.clear();
       window.removeEventListener("keydown", keydown); window.removeEventListener("keyup", keyup);
       window.removeEventListener("blur", clearInput); document.removeEventListener("visibilitychange", visibility);
       region.removeEventListener("blur", clearInput);
-      region.removeEventListener("pointerup", inspectBoard);
+      region.removeEventListener("pointerup", inspectObject);
+      region.removeEventListener("pointermove", hoverObject);
       if (handle.current === control) handle.current = null;
     };
   }, []);

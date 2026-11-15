@@ -1,9 +1,12 @@
+import { ROOM_OBJECTS } from "./room-objects";
 import { LINKS } from "@/app/data";
 
 export type MemoryPhoto = { src: string; alt: string; caption?: string };
 export type LifeChapter = "airport" | "holsworthy";
 export type LifeStory = {
   chapter?: LifeChapter;
+  objectId?: string;
+  viewLabel?: string;
   id: string;
   number: string;
   place: string;
@@ -23,12 +26,12 @@ export const LIFE_STORIES: LifeStory[] = [
     description: "I came to Canada when I was six. This is where the walk begins: getting off the plane, with the rest of my life still ahead of me.",
     x: 365, y: 625, photos: [],
   },
-  {
-    id: "first-home", chapter: "holsworthy", number: "02", place: "18 Holsworthy · Markham, Ontario", title: "My first home. My first moves.",
-    description: "18 Holsworthy was my first house in Markham, Ontario. This is where I learned to play chess. My room had LEGO sets, Star Wars posters, badminton rackets, candy, and a computer playing agar.io.",
-    x: 370, y: 488, photos: [],
-    link: { href: LINKS.lichess, label: "Play me on Lichess" },
-  },
+  ...ROOM_OBJECTS.map((object): LifeStory => ({
+    id: object.id, objectId: object.id, viewLabel: object.label, chapter: "holsworthy", number: "02",
+    place: "My room · 18 Holsworthy", title: object.title, description: object.description,
+    x: object.position.x, y: object.position.y, photos: [],
+    ...(object.id === "first-home" ? { link: { href: LINKS.lichess, label: "Play me on Lichess" } } : {}),
+  })),
 ];
 
 export const LATER_STORIES: LifeStory[] = [

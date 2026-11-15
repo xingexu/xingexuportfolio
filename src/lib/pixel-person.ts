@@ -3,29 +3,32 @@ import type { Direction } from "./life-world";
 type Person = {
   x: number; y: number; direction?: Direction; distance?: number; moving?: boolean;
   child?: boolean; shirt?: string; skin?: string; pants?: string;
-  outdoors?: boolean; playful?: boolean; crew?: boolean;
+  outdoors?: boolean; playful?: boolean; crew?: boolean; scale?: number;
 };
 
 /** One pixel vocabulary for every traveller; only clothes and body height vary. */
 export function paintAirportPerson(ctx: CanvasRenderingContext2D, person: Person, time = 0) {
   const x = Math.round(person.x), y = Math.round(person.y);
+  const scale = Math.max(1, Math.round(person.scale ?? 2));
   const r = (xx: number, yy: number, w: number, h: number, color: string) => {
-    ctx.fillStyle = color; ctx.fillRect(x + xx, y + yy, w, h);
+    ctx.fillStyle = color; ctx.fillRect(x + xx * scale, y + yy * scale, w * scale, h * scale);
   };
   const direction = person.direction ?? "down";
   const skin = person.skin ?? "#edbb91", shirt = person.shirt ?? "#191f29", pants = person.pants ?? "#334451";
   // Distance-driven, planted-foot poses. No head bobbing or idle leg jitter.
   const step = person.moving ? [0, 1, 1, 0, 0, -1, -1, 0][Math.floor((person.distance ?? 0) / 5) % 8] : 0;
-  const legs = person.child ? 7 : 9, torso = person.child ? 6 : 8;
+  const legs = person.child ? 8 : 10, torso = person.child ? 7 : 9;
   const top = -legs - torso, neck = top - 1, face = neck - 5;
-  const arm = person.child ? 4 : 5;
+  const arm = person.child ? 5 : 6;
   const smile = "#d47993";
-  r(-3, 1, 7, 1, person.outdoors ? "#60767d" : "#a3b5ac");
-  r(-2, 2, 5, 1, person.outdoors ? "#70878d" : "#b4c1b5");
+  r(-4, 1, 9, 1, person.outdoors ? "#526d76" : "#7f7966");
+  r(-3, 2, 7, 1, person.outdoors ? "#607984" : "#918875");
   r(-2, -legs + step, 2, legs, pants); r(1, -legs - step, 2, legs, pants);
   r(-2, step, 2, 1, "#fff1d5"); r(1, -step, 2, 1, "#fff1d5");
   r(-2, -legs - 1, 5, 2, pants); r(0, -legs + 1, 1, legs - 2, "#202d3d");
   r(-2, top, 5, torso, shirt); r(-1, top + 1, 3, torso - 2, person.shirt ?? "#232b35");
+  r(-2, top, 1, 3, person.shirt ?? "#434c54");
+  r(2, -legs + 1, 1, legs - 2, person.pants ?? "#4e6170");
   const leftStep = person.playful && direction === "left" ? 0 : step;
   r(-3, top + 1 - leftStep, 1, arm, shirt); r(-3, top + 1 + arm - leftStep, 1, 2, skin);
   const rightStep = person.playful && direction !== "left" ? 0 : step;

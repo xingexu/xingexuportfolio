@@ -23,6 +23,7 @@ const { LIFE_STORIES } = load('src/lib/life-stories.ts');
 const { emptyAirportProgress, recordAirportProgress, getAirportGuide, nextAirportWaypoint } = load('src/lib/airport-guide.ts');
 const airportStories = LIFE_STORIES.filter(s => (s.chapter ?? 'airport') === 'airport');
 const { HOME_START, HOME_CHESS, HOME_OBSTACLES, canWalkHome, atHomeReturn, getHomeGuide, nextHomeWaypoint } = load('src/lib/home-world.ts');
+const { ROOM_OBJECTS, roomObjectAt, nearbyRoomObject } = load('src/lib/room-objects.ts');
 const { chessPieceAt } = load('src/lib/pixel-chess.ts');
 const walker = () => ({ ...START, direction: 'down', distance: 0, moving: false, growth: 0 });
 
@@ -78,7 +79,7 @@ test('the child stays six everywhere, including after a legacy growth value', ()
     advanceWalker(p, new Set(), .02);
     assert.equal(p.growth, 0);
   }
-  assert.deepEqual(LIFE_STORIES.map(s => s.id), ['arrival', 'first-home']);
+  assert.deepEqual(LIFE_STORIES.map(s => s.id), ['arrival', ...ROOM_OBJECTS.map(object => object.id)]);
 });
 
 test('acceleration is frame-rate independent and releasing input stops without drift', () => {
@@ -141,7 +142,7 @@ test('arrival starts inside the bedroom and guides the child to the nearby chess
     assert.ok(canWalkHome(p)); assert.equal(p.growth, 0);
   }
   assert.equal(complete, true, `Stopped at ${p.x}, ${p.y}`);
-  assert.deepEqual([...stages], ['home-chess', 'home-complete']);
+  assert.deepEqual([...stages], ['home-explore', 'home-complete']);
 });
 
 test('home furniture is solid and both chapter gates have reachable thresholds', () => {
@@ -183,4 +184,41 @@ test('the bedroom objects and return doorway remain reachable around the furnitu
     }
     assert.equal(arrived, true, `Cannot reach ${JSON.stringify(destination)}; stopped at ${p.x}, ${p.y}`);
   }
+});
+
+test('every room object has its own reachable interaction and a precise pointer target', () => {
+  const ids = new Set();
+  for (const object of ROOM_OBJECTS) {
+    ids.add(object.id);
+    assert.ok(canWalkHome(object.position), `${object.label} has a blocked interaction spot`);
+    assert.equal(nearbyRoomObject(object.position).id, object.id);
+    const area = object.areas[0];
+    assert.equal(roomObjectAt({ x: area.x + area.w/2, y: area.y + area.h/2 }).id, object.id);
+    const p = { ...walker(), ...HOME_START };
+    let arrived = false;
+    for (let frame=0; frame<1800; frame++) {
+      if (Math.hypot(p.x-object.position.x,p.y-object.position.y)<8) { arrived=true; break; }
+      const waypoint = nextHomeWaypoint(p,object.position), dx=waypoint.x-p.x, dy=waypoint.y-p.y;
+      const direction = Math.abs(dx)>Math.abs(dy) ? (dx>0?'right':'left') : (dy>0?'down':'up');
+      advanceWalker(p,new Set([direction]),1/60,canWalkHome);
+    }
+    assert.ok(arrived, `${object.label} unreachable: ${p.x}, ${p.y}`);
+  }
+  assert.equal(ids.size, 8);
+  assert.equal(roomObjectAt(HOME_START), null);
+  assert.equal(nearbyRoomObject({ x: 466, y: 541 }), null);
+});
+
+test('viewing chess alone does not complete the room and guidance advances to unseen objects', () => {
+  const seen = new Set(['first-home']);
+  const guide = getHomeGuide(HOME_CHESS,true,true,seen);
+  assert.equal(guide.id,'home-explore');
+  assert.equal(guide.step,1);
+  assert.equal(guide.total,8);
+  assert.notDeepEqual(guide.target,HOME_CHESS);
+  const complete = getHomeGuide(HOME_START,true,true,new Set(ROOM_OBJECTS.map(object=>object.id)));
+  assert.equal(complete.id,'home-complete');
+  assert.equal(complete.target,null);
+  const hover = getHomeGuide(HOME_START,true,false,new Set(),'room-candy');
+  assert.equal(hover.title,'View Candy');
 });

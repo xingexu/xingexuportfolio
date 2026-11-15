@@ -2,6 +2,7 @@ import { type Point, type Rect, type Walker } from "./life-world";
 import { paintAirportPerson } from "./pixel-person";
 import { paintChessboard } from "./pixel-chess";
 import { createWorldNavigator } from "./world-navigation";
+import { ROOM_OBJECTS, nearbyRoomObject, roomObjectById, type RoomObject } from "./room-objects";
 import type { AirportGuide } from "./airport-guide";
 
 export const HOME_WORLD = { width: 840, height: 720 };
@@ -30,17 +31,20 @@ export function homePlace(p: Point) {
   if (p.x < 290) return { id: "home-lego", name: "LEGO sets & Star Wars" };
   return { id: "home-chess", name: "Where I learned chess" };
 }
-export function getHomeGuide(player: Point, _entered: boolean, read: boolean): AirportGuide {
-  const near = Math.hypot(player.x - HOME_CHESS.x, player.y - HOME_CHESS.y) <= 48;
-  const id = read ? "home-complete" : "home-chess";
-  const title = read ? "Welcome to my room." : "This is where I learned chess.";
-  const target = read ? null : HOME_CHESS;
-  const hint = read ? "Wander around: LEGO, Star Wars, badminton, candy, and agar.io. The doorway leads back to the airport." : near ? "Press E or select Look at chessboard below." : "Walk left to the chessboard, or explore the rest of my room.";
-  const touchHint = read ? "Explore my room. Walk down through the doorway to revisit the airport." : near ? "Tap Look at chessboard below to open this memory." : hint;
-  const waypoint = target ? (player.y >= 480 && player.x >= 280 ? target : nextHomeWaypoint(player, target)) : null;
-  const dx = waypoint ? waypoint.x - player.x : 0, dy = waypoint ? waypoint.y - player.y : 0;
-  const arrow = !waypoint ? "✓" : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "→" : "←") : (dy > 0 ? "↓" : "↑");
-  return { id, step: 1, total: 1, title, hint, touchHint, target, waypoint, arrow };
+export function getHomeGuide(player: Point, _entered: boolean, read: boolean, visited?: ReadonlySet<string>, hovered?: string | null): AirportGuide {
+  const seen = visited ?? new Set(read ? ROOM_OBJECTS.map(object => object.id) : []);
+  const remaining = ROOM_OBJECTS.filter(object => !seen.has(object.id));
+  const near = (hovered && roomObjectById(hovered)) || nearbyRoomObject(player);
+  const next = remaining.reduce<RoomObject | null>((best, object) => !best || Math.hypot(player.x-object.position.x, player.y-object.position.y) < Math.hypot(player.x-best.position.x, player.y-best.position.y) ? object : best, null);
+  const id = next ? "home-explore" : "home-complete";
+  const title = near ? `View ${near.label}` : next ? "Take a closer look." : "Every little piece of my room.";
+  const hint = near ? "Press E or choose View below. You can also click the object." : next ? "Click any object, or walk up and press E. The arrow points to something you haven’t viewed." : "You’ve explored all 8 objects. The doorway leads back to the airport.";
+  const touchHint = near ? "Tap View below, or tap the object itself." : next ? "Tap an object to view it. The room map lists all 8." : "All 8 objects viewed. Walk through the doorway to revisit the airport.";
+  const target = next?.position ?? null;
+  const waypoint = target ? (next?.id === "first-home" && player.y >= 480 && player.x >= 280 ? target : nextHomeWaypoint(player, target)) : null;
+  const dx = waypoint ? waypoint.x-player.x : 0, dy = waypoint ? waypoint.y-player.y : 0;
+  const arrow = !waypoint ? "✓" : Math.abs(dx)>Math.abs(dy) ? (dx>0 ? "→" : "←") : (dy>0 ? "↓" : "↑");
+  return { id, step: ROOM_OBJECTS.length-remaining.length, total: ROOM_OBJECTS.length, title, hint, touchHint, target, waypoint, arrow };
 }
 
 // Tiny lettering stays on the same integer-pixel grid as the room.
@@ -125,6 +129,7 @@ export function createHomeWorld() {
   box(344,450,30,13,5,"#be9a6c","#886443");r(348,468,3,5,"#614b3e");r(367,468,3,5,"#614b3e");
   // Desk, tower, keyboard, mouse, swivel chair, and a candy bowl.
   box(526,310,171,64,10,"#c1a477","#876d50");r(534,384,5,21,"#745a47");r(687,384,5,21,"#745a47");
+  r(545,274,132,74,"#8fb6aa");r(550,271,122,81,"#a7c4b4");
   r(553,279,116,65,"#263944");r(557,283,108,54,"#d5dfcf");r(558,338,106,3,"#587581");r(605,344,10,9,"#506873");r(588,351,46,4,"#334d59");
   r(550,360,91,15,"#46606e");r(553,362,85,10,"#97aba9");for(let y=363;y<371;y+=3)for(let x=555;x<638;x+=5)r(x,y,3,2,"#d2d2b7");r(574,371,34,2,"#d2d2b7");
   r(649,359,17,18,"#6f8688");r(654,361,8,12,"#d0cfb7");r(657,362,1,4,"#4a6672");
@@ -145,7 +150,7 @@ export function createHomeWorld() {
   r(440,516,4,28,"#d6c6a0");r(488,516,4,28,"#d6c6a0");r(444,520,44,24,"#b99367");r(444,536,44,2,"#ddc69c");
   r(445,496,42,15,"#758b86");r(448,499,36,9,"#9eaf9a");
 
-  return { draw(target:CanvasRenderingContext2D,camera:Point,player:Walker,time:number,visited:ReadonlySet<string>,reduced:boolean,waypoint?:Point|null){
+  function drawScene(target: CanvasRenderingContext2D, camera: Point, time: number, reduced: boolean) {
     const ox=Math.round(target.canvas.width/2-camera.x),oy=Math.round(target.canvas.height/2-camera.y);
     target.imageSmoothingEnabled=false;target.fillStyle="#29383e";target.fillRect(0,0,target.canvas.width,target.canvas.height);target.drawImage(layer,ox,oy);
     // A tiny, continuously looping agar.io match, rendered at native pixels.
@@ -156,11 +161,34 @@ export function createHomeWorld() {
     const phase=reduced?0:time/8000*Math.PI*2;
     for(const [i,cx,cy,size] of [[0,27,29,9],[1,67,35,6],[2,89,20,4],[3,48,19,4]])cell(target,sx+cx+Math.sin(phase+i*2)*5,sy+cy+Math.cos(phase+i)*4,size,colors[i]);
     label(target,"agar.io",sx+3,sy+3,"#4d6771");
-    if(!visited.has("first-home")){
-      const x=ox+HOME_CHESS.x,y=oy+HOME_CHESS.y-8+(reduced?0:Math.round(Math.sin(time*.002)));
-      target.fillStyle="#ffe1a1";target.fillRect(x-2,y,5,1);target.fillRect(x,y-2,1,5);
+    // Hard-edged pools of screen light stay on the room’s pixel grid.
+    target.fillStyle="#c5e6c0"; target.globalAlpha=reduced ? .09 : .07+Math.sin(time*.0006)*.02;
+    target.fillRect(ox+540,oy+386,132,8);target.fillRect(ox+548,oy+394,116,7);target.globalAlpha=1;
+  }
+  return {
+    drawDetail(target: CanvasRenderingContext2D, object: RoomObject, time: number, reduced: boolean) {
+      drawScene(target,{x:object.detail.x+object.detail.w/2,y:object.detail.y+object.detail.h/2},time,reduced);
+    },
+    draw(target:CanvasRenderingContext2D,camera:Point,player:Walker,time:number,visited:ReadonlySet<string>,reduced:boolean,waypoint?:Point|null,hovered?:string|null){
+      drawScene(target,camera,time,reduced);
+      const ox=Math.round(target.canvas.width/2-camera.x),oy=Math.round(target.canvas.height/2-camera.y);
+      const selected=hovered ?? nearbyRoomObject(player)?.id;
+      for(const object of ROOM_OBJECTS){
+        const area=object.areas[0], x=ox+area.x+area.w-4, y=oy+area.y-4;
+        target.fillStyle=visited.has(object.id)?"#a3b9a2":"#fbe5ad";
+        target.fillRect(x-2,y,5,1);target.fillRect(x,y-2,1,5);
+        if(object.id===selected){
+          target.fillStyle=object.accent;
+          for(const bounds of object.areas){
+            const left=ox+bounds.x-3,top=oy+bounds.y-3,right=left+bounds.w+5,bottom=top+bounds.h+5;
+            for(const [xx,yy,sx,sy] of [[left,top,1,1],[right,top,-1,1],[left,bottom,1,-1],[right,bottom,-1,-1]]){
+              target.fillRect(xx+(sx<0?-7:0),yy,8,2);target.fillRect(xx,yy+(sy<0?-7:0),2,8);
+            }
+          }
+        }
+      }
+      if(waypoint&&Math.hypot(waypoint.x-player.x,waypoint.y-player.y)>18){const x=Math.round(ox+waypoint.x),y=Math.round(oy+waypoint.y);target.fillStyle="#fbe4ad";target.fillRect(x-4,y-4,3,1);target.fillRect(x+2,y-4,3,1);target.fillRect(x-4,y+4,3,1);target.fillRect(x+2,y+4,3,1);}
+      paintAirportPerson(target,{...player,x:ox+player.x,y:oy+player.y,child:true,playful:true,outdoors:false},time);
     }
-    if(waypoint&&Math.hypot(waypoint.x-player.x,waypoint.y-player.y)>18){const x=Math.round(ox+waypoint.x),y=Math.round(oy+waypoint.y);target.fillStyle="#fbe4ad";target.fillRect(x-4,y-4,3,1);target.fillRect(x+2,y-4,3,1);target.fillRect(x-4,y+4,3,1);target.fillRect(x+2,y+4,3,1);}
-    paintAirportPerson(target,{...player,x:ox+player.x,y:oy+player.y,child:true,playful:true,outdoors:false},time);
-  }};
+  };
 }

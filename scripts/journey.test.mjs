@@ -130,6 +130,46 @@ test('scene artwork has solid relief with recessed art and raised details', () =
   });
 });
 
+test('the plane tail marks and welcome lettering stay attached to their backing', () => {
+  const plane = buildModel('plane');
+  let tailInk = 0;
+  plane.forEach((x, y, z, color) => {
+    if (Math.abs(x) !== 1 || y < 16 || color !== 0xf2f0ea) return;
+    assert.equal(plane.get(0, y, z), 0xc8102e);
+    assert.equal(plane.get(-x, y, z), color);
+    tailInk++;
+  });
+  assert.ok(tailInk > 60);
+  const sign = buildModel('welcome-sign');
+  sign.forEach((x, y, z) => { if (z === 1) assert.equal(sign.get(x, y, 0), 0xf2f0ea); });
+  const brawl = buildModel('brawl-stand');
+  assert.equal(brawl.get(6, 12, 1), 0xf2f0ea, 'El Primo’s mask eye');
+  assert.equal(brawl.get(5, 1, 1), 0x163f94, 'boots rest on the plinth');
+  assert.ok(brawl.has(5, 0, 1));
+});
+
+test('only designated props react and their motion settles inside the room', () => {
+  const reactions = CHAPTERS.flatMap(chapter => [...chapter.items, ...chapter.decor].filter(p => p.bump));
+  assert.deepEqual(reactions.map(p => p.model), ['cone', 'cone', 'cone', 'basketball']);
+  const makeProp = kind => ({ kind, x: 0, z: 0, radius: 1.75, vx: 0, vz: 0, fall: null, tilt: 0 });
+  const cone = makeProp('tip');
+  W.bumpProp(cone, { x: -2, z: 0 }, { x: -0.3, z: 0 }, 2, 0.016);
+  assert.equal(cone.fall, null, 'walking away does not tip it');
+  W.bumpProp(cone, { x: -2, z: 0 }, { x: 0.3, z: 0 }, 2, 0.016);
+  assert.deepEqual(cone.fall, { x: 1, z: 0 });
+  W.settleBump(0, cone, 0.016, true);
+  assert.equal(cone.tilt, Math.PI / 2);
+  const ball = makeProp('roll');
+  ball.z = W.interior(CHAPTERS[3]).minZ + 2;
+  W.bumpProp(ball, { x: 0, z: ball.z + 2 }, { x: 0, z: -0.4 }, 2, 0.016);
+  assert.ok(ball.vz < 0);
+  W.settleBump(3, ball, 0.05, false);
+  assert.ok(ball.vz > 0, 'bounces inside the wall rather than going through a doorway');
+  for (let i = 0; i < 150; i++) W.settleBump(3, ball, 0.016, false);
+  assert.equal(ball.vz, 0);
+  assert.ok(ball.z >= W.interior(CHAPTERS[3]).minZ + ball.radius);
+});
+
 test('every model uses an aligned voxel grid and fits its world footprint', () => {
   for (const id of MODEL_IDS) {
     const grid = buildModel(id);

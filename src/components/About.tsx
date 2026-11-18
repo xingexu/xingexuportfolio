@@ -162,7 +162,7 @@ export default function About() {
           <span><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> Turn</span>
           <span><kbd>E</kbd> Inspect</span>
         </aside>
-        {!moved && !near && <p className="journey-touch-note">Drag or use the joystick · tap to inspect</p>}
+        {!moved && !near && <p className="journey-touch-note">Drag anywhere in the scene or use the joystick. Tap an object to inspect it.</p>}
       </>}
 
       {near && !opened && !transition && (

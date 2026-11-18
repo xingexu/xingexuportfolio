@@ -3,7 +3,7 @@ import { LINKS } from "@/app/data";
 export type JourneyLink = { href: string; label: string };
 export type Rot = 0 | 1 | 2 | 3;
 /** A model placed in a room. `x`/`z` is the footprint centre; rot turns the model's +z front by quarter turns. */
-export type Placement = { model: string; x: number; z: number; y?: number; rot?: Rot; solid?: boolean };
+export type Placement = { model: string; x: number; z: number; y?: number; rot?: Rot; solid?: boolean; bump?: "tip" | "roll" };
 export type JourneyItem = Placement & {
   id: string;
   label: string;
@@ -69,7 +69,7 @@ const ROOMS: Chapter[] = [
         description: "A new country, a new language, and a lot of firsts waiting just past the arrivals doors." },
     ],
     decor: [
-      { model: "cone", x: 10, z: 26 }, { model: "cone", x: 12, z: -26 }, { model: "cone", x: -10, z: -28 },
+      { model: "cone", x: 10, z: 26, bump: "tip" }, { model: "cone", x: 12, z: -26, bump: "tip" }, { model: "cone", x: -10, z: -28, bump: "tip" },
       { model: "runway-light", x: 40, z: 30 }, { model: "runway-light", x: 40, z: 10 }, { model: "runway-light", x: 40, z: -10 },
       { model: "runway-light", x: -44, z: 34 }, { model: "bench", x: 20, z: -34, solid: true },
       { model: "service-cart", x: 49, z: 22, rot: 3 },
@@ -146,7 +146,7 @@ const ROOMS: Chapter[] = [
       { id: "elm-poster", model: "poster-starwars-big", x: -29, z: 9, y: 12, rot: 1, solid: false, label: "Star Wars poster", title: "Still a Star Wars kid.",
         description: "Still a Star Wars kid. The hoodie proves it." },
     ],
-    decor: [{ model: "rug-square", x: 0, z: 6, solid: false }, { model: "basketball", x: 8, z: 24 }, { model: "beanbag", x: -14, z: 28 }, { model: "dresser", x: -26, z: 14, rot: 1 }],
+    decor: [{ model: "rug-square", x: 0, z: 6, solid: false }, { model: "basketball", x: 8, z: 24, bump: "roll" }, { model: "beanbag", x: -14, z: 28 }, { model: "dresser", x: -26, z: 14, rot: 1 }],
   },
   {
     id: "bayview", stop: "Secondary school", number: "05", place: "Bayview Secondary School", location: "Richmond Hill, Ontario", heading: "High school.",
@@ -177,7 +177,7 @@ const ROOMS: Chapter[] = [
           { href: "https://cemc.uwaterloo.ca/sites/default/files/documents/2025/2025FGHResults.pdf", label: "2025 FGH results" },
         ] },
       { id: "brawlstars", model: "brawl-stand", x: 24, z: -12, label: "Brawl Stars", title: "One more match.",
-        description: "Brawl Stars became my go-to game in high school.",
+        description: "Brawl Stars became my go-to game in high school. That’s El Primo in the blue mask beside the display.",
         links: [{ href: "https://supercell.com/en/games/brawlstars/", label: "Brawl Stars" }] },
       { id: "projects", model: "projects-board", x: 35, z: 4, y: 19, rot: 3, solid: false, label: "Projects board", title: "Making things.",
         description: "This is when I started making my own projects. See everything I’ve built, from high school until now.",

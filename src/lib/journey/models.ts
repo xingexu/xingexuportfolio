@@ -172,10 +172,14 @@ function plane(g: Grid) {
     }
   }
   for (let y = 14; y <= 27; y++) {
-    const start = 18 + Math.round((y - 14) * 0.7);
-    g.box(0, y, start, 1, 1, 30 - start + 1, 0xc8102e);
+    const start = 17 + Math.round((y - 14) * 0.52);
+    g.box(-1, y, start, 3, 1, 32 - start, 0xc8102e);
   }
-  maple(g, 1, 16, 24, WHITE);
+  const tailMark = new Grid();
+  maple(tailMark, 22, 16, 0, WHITE);
+  tailMark.forEach((z, y, _z, color) => {
+    for (const x of [-1, 1]) if (g.has(x, y, z)) g.set(x, y, z, color);
+  });
   for (let s = 0; s <= 10; s++) g.box(s, 12, 24 + Math.round(s * 0.3), 1, 1, 6 - Math.round(s * 0.3), 0xdde2e8).box(-s, 12, 24 + Math.round(s * 0.3), 1, 1, 6 - Math.round(s * 0.3), 0xdde2e8);
   for (const [x, z] of [[0, -24], [-4, 4], [4, 4]]) g.box(x, 2, z, 1, 3, 1, METAL_DARK).box(x, 0, z - 1, 1, 2, 3, 0x1a1a1a);
 }
@@ -375,11 +379,11 @@ const MODELS: Record<string, (g: Grid) => void> = {
   },
   "welcome-sign": g => {
     g.box(-20, 0, -1, 2, 12, 2, METAL_DARK).box(18, 0, -1, 2, 12, 2, METAL_DARK);
-    g.box(-22, 12, -1, 44, 20, 1, 0xc8102e);
-    panel(g, -21, 13, 0, 42, 18, () => WHITE);
-    maple(g, -19, 18, 1, 0xc8102e);
-    g.text("WELCOME", -8, 23, 1, 0x1e1e1e);
-    g.text("TO CANADA", -8, 15, 1, 0xc8102e);
+    g.box(-27, 12, -1, 54, 20, 1, 0xc8102e);
+    panel(g, -26, 13, 0, 52, 18, () => WHITE);
+    maple(g, -24, 18, 1, 0xc8102e);
+    centeredText(g, "WELCOME", 23, 1, 0x1e1e1e, 5);
+    centeredText(g, "TO CANADA", 15, 1, 0xc8102e, 5);
   },
   cone: g => { g.box(-2, 0, -2, 4, 1, 4, 0xe8612c).box(-1, 1, -1, 2, 2, 2, 0xe8612c).box(-1, 3, -1, 2, 1, 2, WHITE).box(-1, 4, -1, 2, 1, 2, 0xe8612c); },
   "runway-light": g => { g.box(0, 0, 0, 1, 3, 1, METAL_DARK).box(-1, 3, -1, 3, 1, 3, 0x3c3c3c).set(0, 4, 0, 0x5aa9ff); },
@@ -582,7 +586,7 @@ const MODELS: Record<string, (g: Grid) => void> = {
   "brawl-stand": g => {
     const gold = 0xffce1f, red = 0xff5470, blue = 0x41b9ff;
     const skull = ["..######..", ".########.", "##..##..##", "##..##..##", "##########", ".###..###.", "..#.##.#.."];
-    g.box(-2, 0, -3, 4, 10, 2, 0x29242f).box(-5, 0, -4, 10, 1, 6, BLACK);
+    g.box(-2, 0, -3, 4, 10, 2, 0x29242f).box(-5, 0, -4, 17, 1, 6, BLACK);
     g.box(-8, 10, -3, 16, 26, 2, 0x111111);
     reliefPanel(g, -7, 11, -1, 14, 24, (i, j) => {
       if (j >= 3 && j < 10 && i >= 2 && i < 12) return skull[j - 3][i - 2] === "#" ? gold : 0x2a0f45;
@@ -591,6 +595,17 @@ const MODELS: Record<string, (g: Grid) => void> = {
     }, color => color === gold ? 2 : color === red || color === blue ? 1 : 0);
     printEdge(g, -8, 10, 16, 26, 0x492b64);
     g.box(-5, 35, 0, 10, 1, 1, 0xa157d1);
+    const mask = 0x2876dc, shadow = 0x163f94, skin = 0xe69a6a;
+    for (const x of [5, 9]) {
+      g.box(x, 1, -2, 2, 2, 4, shadow);
+      g.box(x, 3, -2, 2, 2, 3, skin);
+    }
+    g.box(5, 5, -2, 6, 2, 3, 0xc92f59).box(7, 6, 1, 2, 1, 1, gold);
+    g.box(5, 7, -2, 6, 3, 4, skin).box(4, 8, -2, 1, 2, 3, skin).box(11, 8, -2, 1, 2, 3, skin);
+    g.box(3, 9, -2, 2, 2, 3, mask).box(11, 9, -2, 2, 2, 3, mask);
+    g.box(6, 10, -2, 4, 4, 4, mask).box(7, 14, -2, 2, 1, 3, 0x52aaff);
+    g.set(6, 12, 1, WHITE).set(9, 12, 1, WHITE).box(7, 10, 1, 2, 1, 1, skin);
+    g.set(7, 13, 1, gold).set(8, 13, 1, gold);
   },
   "projects-board": g => {
     frame(g, 35, 20, WOOD_DARK, (i, j) => hash3(i, j, 2) > 0.7 ? 0xb88a55 : 0xc89a64);

@@ -91,7 +91,7 @@ const CUSTOM_BLOCKS: Record<string, Box[]> = {
 export function chapterObstacles(index: number): Box[] {
   const chapter = CHAPTERS[index];
   return [...chapter.items, ...chapter.decor].flatMap(p => {
-    if (p.solid === false) return [];
+    if (p.solid === false || p.bump) return [];
     if ("id" in p && CUSTOM_BLOCKS[(p as JourneyItem).id]) return CUSTOM_BLOCKS[(p as JourneyItem).id];
     return [placementBox(p)];
   });
@@ -116,6 +116,41 @@ export function blocked(index: number, x: number, z: number, r: number) {
   const inBackDoor = index > 0 && Math.abs(x) <= DOOR_HALF - r;
   if (!inBackDoor && z > room.maxZ - r) return true;
   return obstacles(index).some(box => hits(box, x, z, r));
+}
+
+export type BumpProp = Vec & { kind: NonNullable<Placement["bump"]>; radius: number; vx: number; vz: number; fall: Vec | null; tilt: number };
+
+export function bumpProp(prop: BumpProp, player: Vec, movement: Vec, playerRadius: number, dt: number) {
+  const x = prop.x - player.x, z = prop.z - player.z, distance = Math.hypot(x, z);
+  const approach = distance > 0.01 ? (x * movement.x + z * movement.z) / distance : Math.hypot(movement.x, movement.z);
+  if (distance > prop.radius + playerRadius || approach < 0.025) return;
+  const heading = distance > 0.01 ? { x: x / distance, z: z / distance } : { x: movement.x / approach, z: movement.z / approach };
+  if (prop.kind === "tip") prop.fall ??= heading;
+  else {
+    const speed = Math.min(26, approach / Math.max(dt, 0.001) * 1.25);
+    const boost = Math.max(0, speed - (prop.vx * heading.x + prop.vz * heading.z));
+    prop.vx += heading.x * boost;
+    prop.vz += heading.z * boost;
+  }
+}
+
+export function settleBump(index: number, prop: BumpProp, dt: number, reducedMotion: boolean) {
+  if (prop.kind === "tip") {
+    if (prop.fall) {
+      const target = Math.PI / 2;
+      prop.tilt = reducedMotion || target - prop.tilt < 0.007 ? target : prop.tilt + (target - prop.tilt) * (1 - Math.exp(-12 * dt));
+    }
+    return;
+  }
+  const room = interior(CHAPTERS[index]), r = prop.radius;
+  const free = (x: number, z: number) => x >= room.minX + r && x <= room.maxX - r &&
+    z >= room.minZ + r && z <= room.maxZ - r && !obstacles(index).some(box => hits(box, x, z, r));
+  const x = prop.x + prop.vx * dt, z = prop.z + prop.vz * dt;
+  if (free(x, prop.z)) prop.x = x; else prop.vx *= -0.35;
+  if (free(prop.x, z)) prop.z = z; else prop.vz *= -0.35;
+  const drag = Math.exp(-3.5 * dt);
+  prop.vx *= drag; prop.vz *= drag;
+  if (Math.hypot(prop.vx, prop.vz) < 0.12) prop.vx = prop.vz = 0;
 }
 
 export type StepResult = Vec & { exit: "next" | "prev" | null };

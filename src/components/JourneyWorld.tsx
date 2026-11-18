@@ -382,7 +382,10 @@ export default function JourneyWorld(props: Props) {
         // A/D turn, W/S walk along the way you face.
         let turn = (held.has("right") ? 1 : 0) - (held.has("left") ? 1 : 0) + stick.x;
         let move = (held.has("up") ? 1 : 0) - (held.has("down") ? 1 : 0) - stick.y;
-        if (transition || blockedNow) { turn = 0; move = 0; }
+        if (transition || blockedNow) {
+          turn = 0; move = 0;
+          player.vx = 0; player.vz = 0; player.spin = 0;
+        }
         turn = Math.max(-1, Math.min(1, turn)); move = Math.max(-1, Math.min(1, move));
         player.spin += (turn * TURN_SPEED - player.spin) * (1 - Math.exp(-dt * 10));
         player.yaw -= player.spin * dt;

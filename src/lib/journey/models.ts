@@ -132,6 +132,51 @@ function shelfUnit(g: Grid, w: number, h: number, d: number, shelves: number[], 
   for (const y of shelves) g.box(x, y, z, w, 1, d, color);
 }
 
+function standingDesk(g: Grid, wood: Color, frame: Color) {
+  g.box(-17, 16, -7, 34, 1, 14, shade(wood, 0.76));
+  g.box(-17, 17, -7, 34, 1, 14, (x, _y, z) =>
+    shade(wood, 0.95 + 0.1 * hash3(Math.floor(x / 5), 17, z)));
+  for (const x of [-14, 12]) {
+    g.box(x, 0, -1, 2, 11, 2, frame).box(x, 11, -1, 2, 5, 2, shade(frame, 1.36));
+    g.box(x - 1, 0, -5, 4, 1, 11, frame);
+  }
+  g.box(-14, 13, -3, 28, 2, 2, frame).box(11, 15, 6, 4, 1, 1, frame);
+  g.set(14, 15, 6, 0x83b9bd);
+  g.box(-6, 18, 1, 11, 1, 4, 0x2b2d33).box(6, 18, 1, 5, 1, 5, 0x49434e);
+  for (const z of [2, 3]) for (let x = -5; x < 4; x += 2) g.set(x, 18, z, 0x60606a);
+  g.box(8, 19, 2, 2, 1, 2, 0xd8d8d8);
+}
+
+function dormCloset(g: Grid) {
+  const frame = 0x61534f, edge = 0x9a8472;
+  shelfUnit(g, 46, 32, 14, [0, 28], frame);
+  g.box(4, 1, -6, 1, 28, 13, frame).box(4, 1, 7, 1, 28, 1, shade(edge, 0.85));
+  for (const x of [-23, 22]) g.box(x, 0, 7, 1, 32, 1, edge);
+  g.box(-23, 31, 7, 46, 1, 1, edge);
+  g.box(-22, 5, -6, 26, 1, 13, frame).box(-22, 24, -1, 26, 1, 1, METAL);
+  for (let i = 0; i < 12; i++) {
+    const x = -21 + i * 2, y = 8 + i % 5, c = [0x21212a, 0x31313b, 0x272b34, 0x191b24][i % 4];
+    g.box(x, y, -4, 2, 23 - y, 9 - i % 3, c).box(x, y + 2, 5 - i % 3, 1, 18 - y, 1, shade(c, 1.27));
+    g.set(x, 23, -1, METAL).set(x, 21, 4 - i % 3, 0x45424d);
+  }
+  for (const x of [-21, -14, -7]) {
+    for (let y = 1; y < 5; y++) g.box(x, y, -4, 6, 1, 9, y % 2 ? 0x33343f : 0x23242d);
+    g.box(x, 29, -4, 6, 2, 8, 0x342f3d).box(x + 1, 29, 4, 4, 1, 1, 0x626072);
+  }
+  for (const y of [0, 8, 15, 22, 28]) g.box(5, y, -6, 17, 1, 13, frame).box(5, y, 7, 17, 1, 1, edge);
+  for (const [x, y, h, color, label] of [
+    [6, 1, 5, 0xc44b33, 0xffdea3], [11, 1, 6, 0xe3ab32, 0xb7382c], [16, 1, 5, 0x397a53, 0xf1e5b3],
+    [6, 9, 5, 0x644689, 0xffdc88], [16, 9, 4, 0xcc553d, 0xf2cc7f],
+    [6, 16, 5, 0x3b6fa5, 0xe1e8f3], [11, 16, 4, 0xbf6c32, 0xf8dc91], [17, 16, 5, 0xcf4f5e, 0xf6e1a9],
+  ]) {
+    g.box(x, y, 1, 4, h, 4, color).box(x, y + 1, 5, 4, 2, 1, label).box(x + 1, y + h - 1, 1, 2, 1, 4, shade(color, 1.16));
+  }
+  for (const [x, y, color] of [[13, 9, 0x6ba778], [7, 23, 0xcf5260], [11, 23, 0x70a3c8], [15, 23, 0xde983e], [19, 23, 0x8d72ad]]) {
+    for (let layer = 0; layer < 4; layer++) disc(g, x, y + layer, 4, 1.45, () => layer === 2 ? shade(color, 1.28) : color);
+    disc(g, x, y + 4, 4, 1.45, () => METAL);
+  }
+}
+
 function books(g: Grid, x0: number, y: number, z: number, count: number, seed: number) {
   const colors = [0xc0392b, 0x2e6da4, 0x27ae60, 0xf1c40f, 0x8e44ad, 0xe67e22, 0x34495e, 0xecf0f1];
   for (let i = 0; i < count; i++) {
@@ -710,12 +755,14 @@ const MODELS: Record<string, (g: Grid) => void> = {
     const panel = ((Math.atan2(z, x) / Math.PI * 3 + y * 0.17 + 12) % 3 + 3) % 3;
     return shade(panel % 1 < 0.12 ? 0xa8aab4 : [0xf5efe4, 0x277d59, 0xb8394f][Math.floor(panel)], 0.96 + hash3(x, y, z) * 0.08);
   }),
-  "standing-desk": g => {
-    g.box(-11, 17, -5, 22, 1, 10, 0xd9c7a7);
-    for (const x of [-9, 8]) g.box(x, 0, -1, 1, 17, 2, 0x2a2a2e).box(x - 1, 0, -4, 3, 1, 8, 0x2a2a2e);
-    g.box(-9, 9, 0, 18, 1, 1, 0x2a2a2e);
-    g.box(-4, 18, 1, 9, 1, 3, 0x2b2d33).box(6, 18, 2, 2, 1, 2, 0xd8d8d8);
-    g.box(-10, 18, 1, 3, 1, 3, 0xf2f2f2);
+  "standing-desk": g => standingDesk(g, 0xd9c7a7, 0x33333a),
+  "standing-desk-roommate": g => standingDesk(g, 0x9b7d64, 0x44444d),
+  "desk-divider": g => {
+    g.box(-18, 0, -1, 36, 19, 2, (x, y, z) => {
+      if (y <= 1 || y === 7 || (y < 7 && (x + 18) % 6 === 0)) return 0x4c3c5a;
+      return shade(y < 7 ? 0x60516a : 0x776982, 0.97 + 0.07 * hash3(x, y, z));
+    });
+    g.box(-19, 19, -2, 38, 1, 4, 0xb19b8c);
   },
   monitor: g => monitor(g, -7, 3, 0, 14, 10, code(17)),
   "desk-lamp": g => { g.box(-1, 0, -1, 3, 1, 3, BLACK).box(0, 1, 0, 1, 7, 1, BLACK).box(0, 8, 0, 1, 1, 4, BLACK).box(-1, 6, 3, 3, 2, 2, BLACK).box(-1, 6, 3, 3, 1, 2, 0xffe9a8); },
@@ -736,17 +783,7 @@ const MODELS: Record<string, (g: Grid) => void> = {
     }
     g.box(-1, 8, 2, 3, 3, 1, 0x565d68);
   },
-  closet: g => {
-    shelfUnit(g, 24, 30, 9, [0, 6, 25, 29], 0x514740);
-    g.box(-11, 23, -1, 22, 1, 1, METAL);
-    for (let i = 0; i < 10; i++) {
-      const x = -10 + i * 2, y = 9 + i % 4, c = [0x21212a, 0x31313b, 0x272b34, 0x191b24][i % 4];
-      g.box(x, y, -3, 2, 22 - y, 7 - i % 3, c).box(x, y + 3, 3 - i % 3, 1, 17 - y, 1, shade(c, 1.27));
-      g.set(x, 22, -1, METAL).set(x, 20, 3 - i % 3, 0x45424d);
-    }
-    for (const x of [-9, -3, 3]) for (let y = 1; y < 5; y++) g.box(x, y, -3, 5, 1, 6, y % 2 ? 0x33343f : 0x23242d);
-    for (const x of [-8, 0]) g.box(x, 26, -3, 7, 3, 6, 0x342f3d).box(x + 1, 27, 3, 4, 1, 1, 0x626072);
-  },
+  closet: dormCloset,
   "nightstand": g => {
     shelfUnit(g, 9, 9, 7, [0, 8], 0x574b42);
     g.box(-3, 4, -2, 6, 3, 6, 0x6c5b4d).box(-1, 5, 4, 2, 1, 1, METAL);

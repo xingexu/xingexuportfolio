@@ -318,9 +318,11 @@ test('volleyballs bounce off the floor and walls, then settle', () => {
 });
 
 test('lifting a Molten beside a tall closet does not pull it inside', () => {
-  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'western'));
-  const closet = field.blocks.find(p => p.minX < -27 && p.maxX > -27 && p.minZ < -39 && p.maxZ > -39);
-  const ball = V.makeBall(-31, 0, closet.maxZ + 2, 1.875);
+  const index = CHAPTERS.findIndex(c => c.id === 'western');
+  const room = CHAPTERS[index], field = W.buildBallField(index);
+  const { x, z } = room.items.find(item => item.id === 'closet');
+  const closet = field.blocks.find(p => p.minX < x && p.maxX > x && p.minZ < z && p.maxZ > z);
+  const ball = V.makeBall(room.items.find(item => item.id === 'molten').x, 0, closet.maxZ + 2, 1.875);
   V.liftBall(ball, { x: ball.x, y: 23, z: closet.maxZ - 1 }, field);
   assert.ok(Math.abs(ball.y - 23) < 1e-6);
   assert.ok(ball.z >= closet.maxZ + ball.radius);
@@ -521,6 +523,54 @@ test('the Western dorm keeps small props and signs proportional to the furniture
   assert.ok(footprint('molten').height < 4);
   assert.ok(footprint('degree').height < footprint('mustangs').height);
   for (const id of ['csa', 'wds', 'wfn', 'mustangs']) assert.ok(footprint(id).height < W.AVATAR_SCALE * avatarHeight(18));
+});
+
+test('the larger Western dorm fits two beds in a T without overlapping', () => {
+  const room = CHAPTERS.at(-1);
+  assert.ok(room.width >= 120 && room.depth >= 120);
+  const [bar, stem] = ['ohall-bed', 'richards-bed'].map(id => room.items.find(item => item.id === id));
+  assert.equal(Math.abs(bar.rot - stem.rot) % 2, 1, 'the beds are a quarter turn apart');
+  const a = W.placementBox(bar), b = W.placementBox(stem);
+  assert.equal((a.minX + a.maxX) / 2, (b.minX + b.maxX) / 2);
+  assert.ok(a.minX < b.minX && a.maxX > b.maxX, 'the crossbar extends past both sides of the stem');
+  assert.ok(a.minZ >= b.maxZ && a.minZ - b.maxZ <= 2, 'the foot of the stem sits against the crossbar');
+});
+
+test('the two wide standing desks face out from the half wall and have clear approaches', () => {
+  const index = CHAPTERS.length - 1, room = CHAPTERS[index];
+  const [mine, richards] = room.items.filter(item => item.model.startsWith('standing-desk'));
+  const divider = room.decor.find(prop => prop.model === 'desk-divider');
+  const wall = W.placementBox(divider), wallHeight = modelFootprint(divider.model).height;
+  assert.equal(mine.x, divider.x);
+  assert.equal(richards.x, divider.x);
+  assert.equal(mine.z - divider.z, divider.z - richards.z);
+  assert.equal(mine.rot ?? 0, 0);
+  assert.equal(richards.rot, 2);
+  assert.ok(wallHeight >= W.WALL_HEIGHT / 2 && wallHeight <= W.WALL_HEIGHT / 2 + 1);
+  assert.ok(W.blocked(index, divider.x, divider.z, 3.5));
+  const cells = reachable(index, W.spawn(index, 'forward'));
+  for (const desk of [mine, richards]) {
+    const footprint = modelFootprint(desk.model), rect = W.placementBox(desk);
+    assert.ok(footprint.maxX - footprint.minX >= 30 && footprint.maxZ - footprint.minZ >= 12);
+    assert.ok(wall.minX <= rect.minX && wall.maxX >= rect.maxX);
+    const south = desk.z > divider.z, gap = south ? rect.minZ - wall.maxZ : wall.minZ - rect.maxZ;
+    assert.ok(gap >= 0 && gap <= 2, 'the desk backs sit against the divider');
+    assert.ok(cells.some(p => p.x === desk.x && p.z === (south ? rect.maxZ + 5 : rect.minZ - 5)), 'the front of the desk is walkable');
+  }
+  for (const x of [wall.minX - 4, wall.maxX + 4]) {
+    assert.ok(!W.blocked(index, x, divider.z, 3.5), 'the divider leaves passage at both ends');
+  }
+});
+
+test('the tall Western closet has hanging clothes and four stocked pantry tiers', () => {
+  const closet = buildModel('closet'), size = modelFootprint('closet');
+  assert.ok(size.maxX - size.minX >= 44 && size.height >= 30);
+  for (const y of [2, 10, 17, 25]) {
+    let stocked = 0;
+    for (let x = 5; x < 22; x++) for (let z = 1; z <= 5; z++) if (closet.has(x, y, z)) stocked++;
+    assert.ok(stocked >= 12, `snack tier at ${y}`);
+  }
+  assert.ok(closet.has(-20, 20, 2) && !closet.has(-20, 20, 6), 'the hanging bay is open');
 });
 
 test('the story runs from age 7 to 18 with the requested outfits', () => {

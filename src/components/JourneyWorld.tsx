@@ -491,7 +491,19 @@ export default function JourneyWorld(props: Props) {
       <canvas ref={canvasRef} className="journey-canvas" aria-hidden="true" />
       <canvas ref={coverRef} className="journey-cover" aria-hidden="true" />
       <div ref={tipRef} className="journey-tip" hidden aria-hidden="true" />
-      <p className="journey-fallback">This part of the page needs WebGL. Use the journey index to read every chapter.</p>
+      <div className="journey-fallback">
+        <p>The 3D walk needs WebGL, so here is every stop as a list.</p>
+        {CHAPTERS.map(entry => (
+          <section key={entry.id}>
+            <h2>{entry.stop}{entry.stopNote ? ` · ${entry.stopNote}` : ""}</h2>
+            <ul>{entry.items.map(item => (
+              <li key={item.id}><strong>{item.label}:</strong> {item.description}{item.links?.map(link => (
+                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer"> {link.label} ↗</a>
+              ))}</li>
+            ))}</ul>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

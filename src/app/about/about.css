@@ -15,7 +15,10 @@
 .journey-canvas, .journey-cover { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
 .journey-cover { visibility: hidden; pointer-events: none; }
 .journey-fallback { display: none; }
-.journey-stage[data-failed] .journey-fallback { display: block; position: absolute; top: 45%; left: 50%; transform: translateX(-50%); width: min(90%, 420px); text-align: center; color: #bbb; font-size: 13px; line-height: 1.7; }
+.journey-stage[data-failed] .journey-fallback { display: block; position: absolute; inset: 0; z-index: 6; overflow-y: auto; padding: 32px max(20px, calc(50% - 320px)) 90px; background: #0b0b0e; color: #bbb; font-size: 13px; line-height: 1.7; }
+.journey-fallback h2 { margin: 24px 0 6px; color: #eee; font-family: var(--font-pixel), monospace; font-size: 18px; font-weight: 400; }
+.journey-fallback li { margin-bottom: 6px; }
+.journey-fallback a { color: #f2d24b; }
 .journey-tip { position: absolute; left: 0; top: 0; pointer-events: none; padding: 5px 8px; background: #0d0d10f2; border: 1px solid #6b6b6b; box-shadow: 2px 2px 0 #000; font-size: 11px; color: #f2f2f2; white-space: nowrap; z-index: 2; }
 .journey-page kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 4px; border: 1px solid #666; border-bottom-width: 3px; background: #19191c; color: #ddd; font-family: var(--font-mono), monospace; font-size: 11px; }
 

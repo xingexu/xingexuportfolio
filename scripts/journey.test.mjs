@@ -81,7 +81,7 @@ function reachable(index, start, r = 3.5) {
     const p = queue.shift(); cells.push(p);
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const n = { x: p.x + dx, z: p.z + dz };
-      if (n.z < room.minZ || seen.has(key(n)) || W.blocked(index, n.x, n.z, r)) continue;
+      if (n.z < room.minZ || n.z > room.maxZ || seen.has(key(n)) || W.blocked(index, n.x, n.z, r)) continue;
       seen.add(key(n)); queue.push(n);
     }
   }

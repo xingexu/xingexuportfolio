@@ -6,7 +6,7 @@ import { CHAPTERS, type Placement } from "@/lib/journey/data";
 import { buildModel, modelFootprint } from "@/lib/journey/models";
 import { buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { ageAt, buildRoomShell, interior, nearbyItems, placementBox, spawn, step, walkSpeed, INTRO_END } from "@/lib/journey/world";
+import { ageAt, blocked as blockedAt, buildRoomShell, interior, nearbyItems, placementBox, spawn, step, walkSpeed, INTRO_END, WALL_HEIGHT } from "@/lib/journey/world";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -33,7 +33,7 @@ type Props = {
 const KEYS: Record<string, "up" | "down" | "left" | "right"> = {
   w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right",
 };
-const COVER = 0.45, HOLD = 1.6, REVEAL = 0.5, INTRO = 6;
+const COVER = 0.6, HOLD = 1.9, REVEAL = 0.6, INTRO = 6, TURN_SPEED = 2.6;
 const smooth = (t: number) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
 const stairHeight = (x: number) => x < -22 ? 8 : x < -6 ? 8 - Math.floor((x + 22) / 2) : 0;
 
@@ -61,7 +61,7 @@ export default function JourneyWorld(props: Props) {
     renderer.outputColorSpace = LinearSRGBColorSpace;
     renderer.setPixelRatio(1);
     const scene = new Scene();
-    const camera = new PerspectiveCamera(40, 1, 1, 700);
+    const camera = new PerspectiveCamera(55, 1, 0.5, 900);
     const baseMaterial = new MeshBasicMaterial({ vertexColors: true });
     const geometries = new Map<string, BufferGeometry>();
     const owned: BufferGeometry[] = [];
@@ -150,7 +150,7 @@ export default function JourneyWorld(props: Props) {
 
     // State
     let chapter = 0, transition: (TransitionInfo & { t: number; switched: boolean }) | null = null;
-    const player = { x: INTRO_END.x, z: INTRO_END.z, y: 0, yaw: Math.PI, vx: 0, vz: 0, phase: 0, moving: 0, age: 7 };
+    const player = { x: INTRO_END.x, z: INTRO_END.z, y: 0, yaw: Math.PI, vx: 0, vz: 0, spin: 0, phase: 0, moving: 0, age: 7 };
     let intro: { t: number } | null = motion.matches ? null : { t: 0 };
     const held = new Set<string>();
     const stick = { x: 0, y: 0 };
@@ -178,10 +178,32 @@ export default function JourneyWorld(props: Props) {
     }
 
     function cameraGoal(pos: Vector3, look: Vector3) {
+      // Over-the-shoulder: the camera turns with the character, so the room turns with you.
       const H = parts?.height ?? 20, aspect = camera.aspect, portrait = aspect < 1 ? 1 - aspect : 0;
-      const dist = (62 + H * 1.1) * (1 + portrait * 2), height = (50 + H * 1.25) * (1 + portrait * 1.6);
-      pos.set(player.x, player.y + height, player.z + dist);
-      look.set(player.x, player.y + H * 0.5, player.z - 20);
+      const fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+      let dist = (24 + H * 0.9) * (1 + portrait * 0.6);
+      const height = 10 + H * 0.95;
+      // Pull the camera in rather than letting it pass through walls or big props.
+      const full = dist;
+      for (let t = 6; t <= dist; t += 1.5) if (blockedAt(chapter, player.x - fx * t, player.z - fz * t, 1.5)) { dist = Math.max(6, t - 1.5); break; }
+      let cx = player.x - fx * dist, cz = player.z - fz * dist;
+      const chapterNow = CHAPTERS[chapter];
+      if (!chapterNow.outdoor) {
+        const room = interior(chapterNow);
+        cx = Math.max(room.minX + 1.5, Math.min(room.maxX - 1.5, cx));
+        cz = Math.max(room.minZ + 1.5, Math.min(room.maxZ - 1.5, cz));
+      }
+      // Too tight for a shoulder view (backed against a wall): see through the character's own eyes.
+      const back = Math.hypot(cx - player.x, cz - player.z);
+      const firstPerson = back < Math.min(28, full * 0.7);
+      avatar.visible = !firstPerson;
+      if (firstPerson) {
+        pos.set(player.x + fx * 1.5, player.y + H * 0.9, player.z + fz * 1.5);
+        look.set(player.x + fx * 40, player.y + H * 0.75, player.z + fz * 40);
+      } else {
+        pos.set(cx, Math.min(chapterNow.outdoor ? Infinity : WALL_HEIGHT - 2, player.y + height + (1 - back / full) * H * 0.6), cz);
+        look.set(player.x + fx * 26, player.y + H * 0.5, player.z + fz * 26);
+      }
     }
     function snapCamera() { cameraGoal(camPos, camLook); camera.position.copy(camPos); camera.lookAt(camLook); }
 
@@ -192,21 +214,23 @@ export default function JourneyWorld(props: Props) {
       renderer.setSize(iw, ih, false);
       view.style.width = `${iw * scale}px`; view.style.height = `${ih * scale}px`;
       camera.aspect = iw / ih; camera.updateProjectionMatrix();
-      const block = scale * 6;
+      const block = scale * 3;
       cover.width = Math.ceil(w / block); cover.height = Math.ceil(h / block);
       cover.style.width = `${cover.width * block}px`; cover.style.height = `${cover.height * block}px`;
     }
 
-    function drawCover(amount: number) {
+    /** Pixels sweep in from the bottom-left corner to the top-right, then clear in the same direction. */
+    function drawCover(amount: number, revealing = false) {
       const ctx = cover.getContext("2d");
       if (!ctx) return;
       cover.style.visibility = amount <= 0 ? "hidden" : "visible";
       if (amount <= 0) return;
       const image = ctx.createImageData(cover.width, cover.height);
       for (let j = 0; j < cover.height; j++) for (let i = 0; i < cover.width; i++) {
-        const threshold = hash3(i, j, 41) * 0.55 + (1 - j / cover.height) * 0.45;
+        const threshold = hash3(i, j, 41) * 0.18 + ((i / cover.width) + ((cover.height - 1 - j) / cover.height)) / 2 * 0.82;
         const k = (j * cover.width + i) * 4;
-        if (threshold < amount * 1.0001) { image.data[k] = 11; image.data[k + 1] = 11; image.data[k + 2] = 14; image.data[k + 3] = 255; }
+        const covered = revealing ? threshold >= 1 - amount : threshold < amount * 1.0001;
+        if (covered) { image.data[k] = 11; image.data[k + 1] = 11; image.data[k + 2] = 14; image.data[k + 3] = 255; }
       }
       ctx.putImageData(image, 0, 0);
     }
@@ -355,27 +379,29 @@ export default function JourneyWorld(props: Props) {
         camPos.copy(camera.position);
         if (t >= INTRO) finishIntro();
       } else {
-        let ix = (held.has("right") ? 1 : 0) - (held.has("left") ? 1 : 0) + stick.x;
-        let iz = (held.has("down") ? 1 : 0) - (held.has("up") ? 1 : 0) + stick.y;
-        if (transition || blockedNow) { ix = 0; iz = 0; }
-        const length = Math.hypot(ix, iz);
-        if (length > 1) { ix /= length; iz /= length; }
-        const height = parts?.height ?? 20, speed = walkSpeed(height);
-        if (length > 0.05) {
-          const blend = 1 - Math.exp(-dt * 14);
-          player.vx += (ix * speed - player.vx) * blend; player.vz += (iz * speed - player.vz) * blend;
-          if (!moved) { moved = true; live.current.onMove(); }
-        } else { player.vx = 0; player.vz = 0; }
-        speedNow = Math.hypot(player.vx, player.vz) / speed;
-        if (speedNow > 0.02) {
+        // A/D turn, W/S walk along the way you face.
+        let turn = (held.has("right") ? 1 : 0) - (held.has("left") ? 1 : 0) + stick.x;
+        let move = (held.has("up") ? 1 : 0) - (held.has("down") ? 1 : 0) - stick.y;
+        if (transition || blockedNow) {
+          turn = 0; move = 0;
+          player.vx = 0; player.vz = 0; player.spin = 0;
+        }
+        turn = Math.max(-1, Math.min(1, turn)); move = Math.max(-1, Math.min(1, move));
+        player.spin += (turn * TURN_SPEED - player.spin) * (1 - Math.exp(-dt * 10));
+        player.yaw -= player.spin * dt;
+        const height = parts?.height ?? 20, speed = walkSpeed(height) * (move < 0 ? 0.65 : 1);
+        if (Math.abs(move) > 0.05 || Math.abs(turn) > 0.05) { if (!moved) { moved = true; live.current.onMove(); } }
+        if (Math.abs(move) > 0.05) {
+          const blend = 1 - Math.exp(-dt * 14), fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+          player.vx += (fx * move * speed - player.vx) * blend; player.vz += (fz * move * speed - player.vz) * blend;
+        } else { const stop = Math.exp(-dt * 18); player.vx *= stop; player.vz *= stop; }
+        speedNow = Math.max(Math.hypot(player.vx, player.vz) / speed, Math.abs(turn) * 0.35);
+        if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
+        if (Math.hypot(player.vx, player.vz) > 0.02) {
           const result = step(chapter, player, player.vx * dt, player.vz * dt, height >= 29 ? 3.5 : 3);
           const travelled = Math.hypot(result.x - player.x, result.z - player.z);
           player.x = result.x; player.z = result.z;
           player.phase += travelled * 0.45;
-          const target = Math.atan2(player.vx, player.vz);
-          let delta = target - player.yaw;
-          delta = Math.atan2(Math.sin(delta), Math.cos(delta));
-          player.yaw += delta * (1 - Math.exp(-dt * 16));
           if (result.exit === "next") {
             if (chapter < CHAPTERS.length - 1) startTransition(chapter + 1, "forward");
             else { player.z = interior(current).minZ + 5; player.vx = 0; player.vz = 0; held.clear(); live.current.onFinale(); }
@@ -384,8 +410,7 @@ export default function JourneyWorld(props: Props) {
           if (age !== player.age) { player.age = age; setAvatar(age, current.outfit); }
         }
         cameraGoal(goalPos, goalLook);
-        const follow = 1 - Math.exp(-dt * 6);
-        camPos.lerp(goalPos, follow); camLook.lerp(goalLook, follow);
+        camPos.lerp(goalPos, 1 - Math.exp(-dt * 7)); camLook.lerp(goalLook, 1 - Math.exp(-dt * 11));
         camera.position.copy(camPos); camera.lookAt(camLook);
       }
 
@@ -398,7 +423,7 @@ export default function JourneyWorld(props: Props) {
         }
         const t = transition.t;
         const total = COVER + HOLD + REVEAL;
-        drawCover(reduced ? 0 : t < COVER ? t / COVER : t < COVER + HOLD ? 1 : 1 - (t - COVER - HOLD) / REVEAL);
+        drawCover(reduced ? 0 : t < COVER ? smooth(t / COVER) : t < COVER + HOLD ? 1 : 1 - smooth((t - COVER - HOLD) / REVEAL), t >= COVER + HOLD);
         if (t >= total) finishTransition();
       }
 
@@ -469,7 +494,19 @@ export default function JourneyWorld(props: Props) {
       <canvas ref={canvasRef} className="journey-canvas" aria-hidden="true" />
       <canvas ref={coverRef} className="journey-cover" aria-hidden="true" />
       <div ref={tipRef} className="journey-tip" hidden aria-hidden="true" />
-      <p className="journey-fallback">This part of the page needs WebGL. Use the journey index to read every chapter.</p>
+      <div className="journey-fallback">
+        <p>The 3D walk needs WebGL, so here is every stop as a list.</p>
+        {CHAPTERS.map(entry => (
+          <section key={entry.id}>
+            <h2>{entry.stop}{entry.stopNote ? ` · ${entry.stopNote}` : ""}</h2>
+            <ul>{entry.items.map(item => (
+              <li key={item.id}><strong>{item.label}:</strong> {item.description}{item.links?.map(link => (
+                <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer"> {link.label} ↗</a>
+              ))}</li>
+            ))}</ul>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

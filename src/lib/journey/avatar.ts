@@ -13,7 +13,7 @@ export type AvatarParts = {
   propellerY?: number;
 };
 
-const SKIN = 0xf1c7a1, SKIN_DARK = 0xdcae86, HAIR = 0x1d1714, EYE = 0x15161a;
+const SKIN = 0xf8e1d0, SKIN_DARK = 0xecc9b4, HAIR = 0x1d1714, EYE = 0x15161a;
 const HEIGHTS: Record<number, number> = { 7: 20, 8: 21, 9: 22, 10: 23, 11: 24, 12: 26, 13: 27, 14: 29, 15: 30, 16: 31, 17: 32, 18: 34 };
 export const avatarHeight = (age: number) => HEIGHTS[Math.max(7, Math.min(18, Math.round(age)))];
 

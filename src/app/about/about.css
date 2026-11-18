@@ -15,67 +15,30 @@
 .journey-canvas, .journey-cover { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
 .journey-cover { visibility: hidden; pointer-events: none; }
 .journey-fallback { display: none; }
-.journey-stage[data-failed] .journey-fallback { display: block; position: absolute; top: 45%; left: 50%; transform: translateX(-50%); width: min(90%, 420px); text-align: center; color: #bbb; font-size: 13px; line-height: 1.7; }
+.journey-stage[data-failed] .journey-fallback { display: block; position: absolute; inset: 0; z-index: 6; overflow-y: auto; padding: 32px max(20px, calc(50% - 320px)) 90px; background: #0b0b0e; color: #bbb; font-size: 13px; line-height: 1.7; }
+.journey-fallback h2 { margin: 24px 0 6px; color: #eee; font-family: var(--font-pixel), monospace; font-size: 18px; font-weight: 400; }
+.journey-fallback li { margin-bottom: 6px; }
+.journey-fallback a { color: #f2d24b; }
 .journey-tip { position: absolute; left: 0; top: 0; pointer-events: none; padding: 5px 8px; background: #0d0d10f2; border: 1px solid #6b6b6b; box-shadow: 2px 2px 0 #000; font-size: 11px; color: #f2f2f2; white-space: nowrap; z-index: 2; }
 .journey-page kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 4px; border: 1px solid #666; border-bottom-width: 3px; background: #19191c; color: #ddd; font-family: var(--font-mono), monospace; font-size: 11px; }
 
-.journey-top { position: absolute; z-index: 3; top: max(18px, env(safe-area-inset-top)); left: 20px; right: 20px; display: flex; align-items: center; gap: 14px; pointer-events: none; }
-.journey-top > * { pointer-events: auto; }
-.journey-exit { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border: 1px solid #3a3a3a; background: #0b0b0ee8; color: #ddd; text-decoration: none; font-size: 22px; }
-.journey-exit:hover { border-color: #aaa; }
-.journey-title { pointer-events: none; text-shadow: 2px 2px 0 #000; }
-.journey-title > span { font-family: var(--font-pixel), monospace; font-size: 18px; letter-spacing: .13em; }
-.journey-title p { color: #d6d6d6; font-size: 11px; margin-top: 3px; }
-.journey-chapters { display: flex; gap: 4px; margin: 0 auto; padding: 4px; background: #0b0b0ed9; border: 1px solid #2c2c2c; }
-.journey-chapters button { width: 34px; height: 28px; border: 1px solid #333; background: #141417; color: #9a9a9a; font-family: var(--font-pixel), monospace; font-size: 11px; cursor: pointer; }
-.journey-chapters button:hover { color: #fff; border-color: #888; }
-.journey-chapters button[aria-current] { background: #f2d24b; color: #111; border-color: #f2d24b; }
-.journey-actions { display: flex; gap: 8px; }
-.journey-skip { height: 40px; padding: 0 14px; border: 1px solid #6b6b6b; background: #0b0b0ee8; color: #eee; font-size: 12px; cursor: pointer; box-shadow: 3px 3px 0 #000; }
-.journey-skip:hover { border-color: #fff; }
-
-.journey-chapter { position: absolute; z-index: 2; top: calc(max(18px, env(safe-area-inset-top)) + 58px); left: 20px; pointer-events: none; text-shadow: 2px 2px 0 #000; max-width: min(60vw, 420px); }
-.journey-chapter small { font-size: 10px; color: #d9d9d9; letter-spacing: .08em; }
-.journey-chapter i { color: #888; font-style: normal; }
-.journey-chapter h2 { font-family: var(--font-pixel), monospace; font-weight: 400; font-size: clamp(15px, 2.2vw, 22px); margin: 4px 0; line-height: 1.4; }
-.journey-chapter p { font-size: 10px; color: #c8c8c8; line-height: 1.6; }
-
-.journey-intro { position: absolute; z-index: 3; left: 50%; top: 28%; transform: translateX(-50%); text-align: center; pointer-events: none; text-shadow: 3px 3px 0 #000; width: min(90%, 520px); animation: journey-fade 600ms steps(6) both; }
-.journey-intro small { font-size: 11px; letter-spacing: .14em; color: #f2f2f2; }
-.journey-intro strong { display: block; font-family: var(--font-pixel), monospace; font-weight: 400; font-size: clamp(22px, 5vw, 40px); margin: 10px 0; line-height: 1.3; }
-.journey-intro span { font-size: 12px; color: #eee; }
-
-.journey-card { position: absolute; z-index: 4; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: transparent; border: none; color: #eee; text-align: center; cursor: pointer; animation: journey-card 2.55s steps(1) both; }
-.journey-card small { font-size: 11px; letter-spacing: .18em; color: #bbb; }
-.journey-card strong { font-family: var(--font-pixel), monospace; font-weight: 400; font-size: clamp(24px, 6vw, 48px); line-height: 1.25; }
-.journey-card > span { font-size: 14px; color: #ddd; }
-.journey-card em { font-style: normal; font-size: 11px; color: #f2d24b; max-width: 520px; line-height: 1.6; }
-.journey-card .journey-card-skip { margin-top: 18px; font-size: 10px; color: #888; }
-@keyframes journey-card { 0% { opacity: 0; } 17% { opacity: 1; } 80% { opacity: 1; } 81% { opacity: 0; } 100% { opacity: 0; } }
-@keyframes journey-fade { from { opacity: 0; } to { opacity: 1; } }
-
-.journey-prompt { position: absolute; z-index: 3; left: 50%; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 70px); transform: translateX(-50%); max-width: calc(100% - 32px); display: flex; justify-content: center; }
-.journey-prompt button { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 14px 8px 9px; border: 1px solid #f2d24b; background: #111114f5; color: #eee; box-shadow: 3px 3px 0 #000; font-size: 13px; cursor: pointer; text-align: left; }
-.journey-prompt-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.journey-prompt .journey-prompt-more { border-color: #555; font-size: 12px; padding: 8px 12px; }
-.journey-prompt button strong { color: #f2d24b; font-weight: 500; }
-.journey-prompt button > span:last-child { color: #999; }
-.journey-hint { padding: 8px 12px; background: #0b0b0ecc; color: #e2e2e2; font-size: 11px; text-align: center; line-height: 1.6; }
-.journey-hint strong { color: #f2d24b; font-weight: 500; }
-
-.journey-bottom { position: absolute; z-index: 3; left: 20px; right: 20px; bottom: max(18px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; pointer-events: none; }
-.journey-bottom > * { pointer-events: auto; }
-.journey-keys { display: flex; align-items: center; gap: 12px; font-size: 11px; color: #ddd; text-shadow: 1px 1px 0 #000; pointer-events: none !important; }
-.journey-keys small { font-size: 9px; color: #aaa; }
-.journey-keycaps { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.journey-keycaps > span { display: flex; gap: 3px; }
-.journey-key-action { display: flex; align-items: center; gap: 6px; margin-left: 8px; font-size: 10px; }
-.journey-key-action kbd:not(:first-child) { margin-left: 8px; }
+.journey-typed i { font-style: normal; animation: journey-caret 900ms steps(1) infinite; margin-left: 2px; }
+@keyframes journey-caret { 50% { opacity: 0; } }
+.journey-intro { position: absolute; z-index: 3; left: 50%; top: 26%; transform: translateX(-50%); pointer-events: none; text-shadow: 3px 3px 0 #000; font-family: var(--font-pixel), monospace; font-size: clamp(22px, 5vw, 40px); white-space: nowrap; }
+.journey-card { position: absolute; z-index: 4; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; background: transparent; border: none; color: #eee; cursor: pointer; }
+.journey-card strong { font-family: var(--font-pixel), monospace; font-weight: 400; font-size: clamp(26px, 6vw, 52px); line-height: 1.2; }
+.journey-card > span { font-size: 14px; color: #bbb; }
+.journey-tutorial { position: absolute; z-index: 3; left: 50%; bottom: calc(max(24px, env(safe-area-inset-bottom)) + 40px); justify-items: center; transform: translateX(-50%); display: grid; grid-template-columns: auto auto; align-items: end; gap: 8px 14px; padding: 14px 18px; background: #0b0b0ed9; border: 1px solid #3a3a3a; box-shadow: 4px 4px 0 #000; pointer-events: none; }
+.journey-wasd { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.journey-wasd > span { display: flex; gap: 4px; }
+.journey-tutorial p { grid-column: 1 / -1; text-align: center; font-size: 11px; color: #ccc; letter-spacing: .06em; min-height: 1.4em; }
+.journey-tutorial-touch { display: none; }
+.journey-page kbd { min-width: 30px; height: 30px; font-size: 12px; }
+.journey-prompt { position: absolute; z-index: 3; left: 50%; bottom: calc(max(24px, env(safe-area-inset-bottom)) + 40px); transform: translateX(-50%); display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 16px 8px 9px; border: 1px solid #f2d24b; background: #111114f0; color: #f2d24b; box-shadow: 3px 3px 0 #000; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.journey-skip { position: absolute; z-index: 5; top: max(18px, env(safe-area-inset-top)); right: 20px; height: 36px; padding: 0 14px; border: 1px solid #6b6b6b; background: #0b0b0ee8; color: #eee; font-size: 12px; cursor: pointer; box-shadow: 3px 3px 0 #000; }
+.journey-back { position: absolute; z-index: 7; right: 20px; bottom: max(20px, env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 1px solid #4a4a4a; background: #0b0b0ee8; color: #ddd; text-decoration: none; font-size: 12px; box-shadow: 3px 3px 0 #000; }
+.journey-back:hover, .journey-skip:hover { border-color: #fff; color: #fff; }
 .journey-joystick { display: none; }
-.journey-found { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; padding: 8px 11px; background: #0b0b0ee8; border: 1px solid #3a3a3a; color: #bbb; font-size: 10px; cursor: pointer; }
-.journey-found strong { font-family: var(--font-pixel), monospace; font-size: 15px; font-weight: 400; color: #f2d24b; }
-.journey-found:hover { border-color: #aaa; }
-
 .journey-dialog { margin: auto; width: min(640px, calc(100vw - 24px)); max-height: min(88svh, 900px); overflow-y: auto; padding: 46px 38px 28px; color: #eee; background: #111114; border: 1px solid #555; box-shadow: 6px 6px 0 #000; overscroll-behavior: contain; user-select: text; -webkit-user-select: text; }
 .journey-dialog::backdrop { background: #000c; }
 .journey-dialog-close { position: absolute; right: 12px; top: 10px; width: 36px; height: 36px; color: #bbb; background: none; border: 1px solid #373737; font-size: 22px; cursor: pointer; }
@@ -110,26 +73,15 @@
 .journey-nojs { position: absolute; z-index: 10; inset: 0; overflow: auto; background: #111; padding: 40px max(24px, 8vw); line-height: 1.7; font-size: 14px; }
 .journey-nojs h3 { margin: 24px 0 8px; font-weight: 500; }
 
-@media (max-width: 900px) {
-  .journey-key-action { display: none; }
-  .journey-chapters button { width: 28px; }
-}
 @media (pointer: coarse), (max-width: 640px) {
-  .journey-keys { display: none; }
-  .journey-joystick { display: block; position: relative; width: 116px; height: 116px; border-radius: 50%; border: 2px solid #ffffff55; background: #0b0b0e88; touch-action: none; }
+  .journey-joystick { display: block; position: absolute; z-index: 3; left: 18px; bottom: max(18px, env(safe-area-inset-bottom)); width: 116px; height: 116px; border-radius: 50%; border: 2px solid #ffffff55; background: #0b0b0e88; touch-action: none; }
   .journey-joystick span { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #f2f2f2dd; border: 2px solid #111; box-shadow: 0 3px 0 #000; }
-  .journey-prompt { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 130px); }
-}
-@media (max-width: 640px) {
-  .journey-top { flex-wrap: wrap; row-gap: 8px; left: 12px; right: 12px; }
-  .journey-chapters { order: 3; width: 100%; justify-content: center; }
-  .journey-actions { margin-left: auto; }
-  .journey-skip { height: 36px; padding: 0 10px; font-size: 11px; }
-  .journey-chapter { top: calc(max(18px, env(safe-area-inset-top)) + 96px); left: 12px; }
-  .journey-bottom { left: 12px; right: 12px; }
+  .journey-tutorial { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 140px); }
+  .journey-tutorial .journey-wasd, .journey-tutorial > kbd, .journey-tutorial p:not(.journey-tutorial-touch) { display: none; }
+  .journey-tutorial-touch { display: block; }
+  .journey-prompt { bottom: calc(max(18px, env(safe-area-inset-bottom)) + 140px); }
   .journey-dialog { padding: 44px 20px 22px; }
-  .journey-index > li > p, .journey-index ul { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .journey-intro, .journey-card { animation: none; }
+  .journey-typed i { animation: none; }
 }

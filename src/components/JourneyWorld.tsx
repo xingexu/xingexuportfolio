@@ -6,7 +6,8 @@ import { CHAPTERS, chapterAccent, type Placement } from "@/lib/journey/data";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, bumpProp, cameraOffsets, cutawaySides, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type BumpProp, type RoomSide } from "@/lib/journey/world";
+import { buildRoommate, ROOMMATE_SEAT, ROOMMATE_VOXEL_SIZE, SIP_DURATION, sipPose, stepRoommate, type RoommateState } from "@/lib/journey/roommate";
+import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type BumpProp, type RoomSide } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
@@ -20,7 +21,7 @@ export type JourneyControls = {
   toggleCamera: (mode: keyof CameraMode) => void;
 };
 export type CameraMode = { front: boolean; tilt: boolean };
-export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction };
+export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; roommate?: string };
 export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" };
 type Props = {
   controls: RefObject<JourneyControls | null>;
@@ -102,56 +103,91 @@ export default function JourneyWorld(props: Props) {
     owned.push(markerGeometry);
 
     type ItemView = { material: MeshBasicMaterial; marker: Mesh; markerMaterial: MeshBasicMaterial; markerY: number };
-    type PropView = { holder: Group; bounds: Box3; material: MeshBasicMaterial; glass?: MeshBasicMaterial };
+    type PropView = { holder: Group; bounds: Box3; material: MeshBasicMaterial; glass?: MeshBasicMaterial; wall?: RoomSide; visibility: number };
     type ReactiveView = { prop: PropView; state: BumpProp; pivot: number };
     type BallView = { prop: PropView; state: Ball; kind: BallKind };
     type Volley = { ball: BallView; sequence: VolleySequence };
     type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; ballPositions: Map<string, Ball>; field?: BallField; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, Group> };
+    type WallView = { group: Group; material: MeshBasicMaterial };
+    type RoommateView = { holder: Group; name: string; arm: Mesh; carton: Mesh; head: Mesh; state: RoommateState };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; ballPositions: Map<string, Ball>; field?: BallField; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView };
     const rooms = new Map<number, RoomView>();
+    function setOpacity(material: MeshBasicMaterial, opacity: number) {
+      material.opacity = opacity;
+      const transparent = opacity < 1;
+      if (material.transparent !== transparent) {
+        material.transparent = transparent;
+        material.depthWrite = !transparent;
+        material.needsUpdate = true;
+      }
+    }
+
     function room(index: number): RoomView {
       const cached = rooms.get(index);
       if (cached) return cached;
       const chapter = CHAPTERS[index], group = new Group(), items = new Map<string, ItemView>(), pickables: Object3D[] = [];
-      const walls = { left: new Group(), right: new Group(), front: new Group(), back: new Group() };
+      const wall = (): WallView => ({ group: new Group(), material: baseMaterial.clone() });
+      const walls = { left: wall(), right: wall(), front: wall(), back: wall() };
       const shell = buildCutawayShell(index), bounds = interior(chapter);
-      const addShell = (target: Group, grid: Grid) => {
+      const addShell = (target: Group, grid: Grid, material = baseMaterial) => {
         if (!grid.size) return;
         const geometry = gridGeometry(grid);
         owned.push(geometry);
-        target.add(new Mesh(geometry, baseMaterial));
+        target.add(new Mesh(geometry, material));
       };
       addShell(group, shell.fixed);
       for (const side of Object.keys(walls) as RoomSide[]) {
-        group.add(walls[side]);
-        addShell(walls[side], shell.walls[side]);
+        group.add(walls[side].group);
+        addShell(walls[side].group, shell.walls[side], walls[side].material);
       }
       const leafGeometry = gridGeometry(buildDoorLeaf(chapter), [0, 0, 0], 0.02, DOOR_VOXEL_SIZE);
       owned.push(leafGeometry);
       const sides: DoorView["side"][] = chapter.outdoor ? ["front"] : ["front", "back"];
       const doors = sides.map((side): DoorView => {
         const z = side === "front" ? bounds.minZ - 0.5 : bounds.maxZ + 0.5;
-        const left = new Mesh(leafGeometry, baseMaterial), right = new Mesh(leafGeometry, baseMaterial);
+        const left = new Mesh(leafGeometry, walls[side].material), right = new Mesh(leafGeometry, walls[side].material);
         left.position.set(-DOOR_HALF, 0, z);
         right.position.set(DOOR_HALF, 0, z);
         right.scale.x = -1;
-        walls[side].add(left, right);
+        walls[side].group.add(left, right);
         return { z, side, leaves: [left, right], open: 0 };
       });
-      const parentFor = (p: Placement) => {
-        const side = !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) : null;
-        return side ? walls[side] : group;
-      };
+      const wallFor = (p: Placement) =>
+        !p.ball && !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) ?? undefined : undefined;
       const props: PropView[] = [], reactive: ReactiveView[] = [], balls: BallView[] = [], ballPositions = new Map<string, Ball>();
+      let roommate: RoommateView | undefined;
+      if (chapter.roommate) {
+        const { x, z, name } = chapter.roommate;
+        const holder = new Group(), material = baseMaterial.clone();
+        const parts = buildRoommate();
+        const model = (grid: Grid) => {
+          const geometry = gridGeometry(grid, [0, 0, 0], 0.015, ROOMMATE_VOXEL_SIZE);
+          owned.push(geometry);
+          return new Mesh(geometry, material);
+        };
+        const head = model(parts.head), arm = model(parts.forearm), carton = model(parts.carton);
+        head.position.set(0, 8.5, 0);
+        arm.position.set(3.25, 4.7, 1);
+        carton.scale.setScalar(0.9);
+        carton.position.set(-2.5, -0.1, 3.7);
+        arm.add(carton);
+        holder.add(model(parts.seated), head, arm);
+        holder.position.set(x, ROOMMATE_SEAT, z);
+        holder.rotation.y = Math.PI / 2;
+        group.add(holder);
+        props.push({ holder, bounds: new Box3().setFromObject(holder), material, visibility: 1 });
+        roommate = { holder, name, arm, carton, head, state: { near: false, elapsed: SIP_DURATION } };
+      }
       const addProp = (p: Placement) => {
         const material = baseMaterial.clone(), holder = place(p, material);
         const glass = modelHasGlass(p.model) ? glassMaterial.clone() : undefined;
         if (glass) (holder.children[1] as Mesh).material = glass;
         const bounds = new Box3().setFromObject(holder);
         if (!bounds.isEmpty()) bounds.expandByScalar(1);
-        const prop = { holder, bounds, material, glass };
+        const wall = wallFor(p);
+        const prop = { holder, bounds, material, glass, wall, visibility: 1 };
         props.push(prop);
-        (p.ball ? group : parentFor(p)).add(holder);
+        (wall ? walls[wall].group : group).add(holder);
         if (p.bump) {
           const size = modelFootprint(p.model), pivot = p.bump === "roll" ? size.height / 2 : 0;
           holder.position.y += pivot;
@@ -167,14 +203,14 @@ export default function JourneyWorld(props: Props) {
           balls.push({ prop, state, kind: p.ball });
           bounds.setFromObject(holder).expandByScalar(1);
         }
-        return { holder, material };
+        return prop;
       };
       for (const p of chapter.decor) addProp(p);
       for (const item of chapter.items) {
-        const { holder, material } = addProp(item);
+        const { holder, material, wall } = addProp(item);
         holder.traverse(object => { object.userData.itemId = item.id; if (object instanceof Mesh) pickables.push(object); });
         if (item.ball) ballPositions.set(item.id, balls[balls.length - 1].state);
-        const parent = item.ball ? group : parentFor(item);
+        const parent = wall ? walls[wall].group : group;
         const box = placementBox(item), markerMaterial = new MeshBasicMaterial({ vertexColors: true });
         const marker = new Mesh(markerGeometry, markerMaterial);
         const markerY = Math.min(40, (item.y ?? 0) + modelFootprint(item.model).height + 5);
@@ -182,7 +218,7 @@ export default function JourneyWorld(props: Props) {
         parent.add(marker);
         items.set(item.id, { material, marker, markerMaterial, markerY });
       }
-      const view = { group, items, props, reactive, balls, ballPositions, field: balls.length ? buildBallField(index) : undefined, doors, pickables, walls };
+      const view = { group, items, props, reactive, balls, ballPositions, field: balls.length ? buildBallField(index) : undefined, doors, pickables, walls, roommate };
       rooms.set(index, view);
       return view;
     }
@@ -277,7 +313,9 @@ export default function JourneyWorld(props: Props) {
       const view = cameraOffsets(height, camera.aspect, frontBlend, tiltBlend);
       const fx = Math.sin(yaw + view.orbit), fz = Math.cos(yaw + view.orbit);
       pos.set(x - fx * view.distance, y + view.rise, z - fz * view.distance);
-      look.set(x + fx * view.lead, y + view.lookHeight, z + fz * view.lead);
+      const current = CHAPTERS[chapter];
+      const lead = current.outdoor ? view.lead : cameraLookAhead(interior(current), { x, z }, { x: fx, z: fz }, view.lead);
+      look.set(x + fx * lead, y + view.lookHeight, z + fz * lead);
     }
     function snapCamera() {
       camAnchor.set(player.x, player.y, player.z);
@@ -290,9 +328,12 @@ export default function JourneyWorld(props: Props) {
 
     function updateCutaway() {
       const current = CHAPTERS[chapter];
-      const hidden = cutawaySides(interior(current), camera.position);
+      const opacity = cutawayOpacity(interior(current), camera.position);
       const walls = room(chapter).walls;
-      for (const side of Object.keys(walls) as RoomSide[]) walls[side].visible = !hidden.has(side);
+      for (const side of Object.keys(walls) as RoomSide[]) {
+        walls[side].group.visible = opacity[side] > 0;
+        setOpacity(walls[side].material, opacity[side]);
+      }
     }
 
     function updateDoors(ease: number) {
@@ -384,17 +425,23 @@ export default function JourneyWorld(props: Props) {
         ray.direction.normalize();
       }
       const ease = motion.matches ? 1 : 1 - Math.exp(-dt * 22);
-      for (const { holder, bounds, material, glass } of room(chapter).props) {
-        const obscures = !intro && holder.parent?.visible && (bounds.containsPoint(camera.position) ||
+      const { props, walls } = room(chapter);
+      for (const prop of props) {
+        const { holder, bounds, material, glass, wall } = prop;
+        const obscures = !intro && !wall && (bounds.containsPoint(camera.position) ||
           sightlines.some((ray, i) => ray.intersectBox(bounds, hitPoint) && hitPoint.distanceToSquared(ray.origin) < sightDistances[i]));
         const target = obscures ? 0 : 1;
-        const opacity = material.opacity + (target - material.opacity) * ease;
-        material.opacity = Math.abs(opacity - target) < 0.01 ? target : opacity;
-        holder.visible = material.opacity > 0;
-        const fading = holder.visible && material.opacity < 1;
-        if (material.alphaHash !== fading) { material.alphaHash = fading; material.needsUpdate = true; }
-        if (glass) glass.opacity = GLASS_OPACITY * material.opacity;
-        holder.userData.faded = material.opacity < 0.5;
+        const blended = prop.visibility + (target - prop.visibility) * ease;
+        prop.visibility = Math.abs(blended - target) < 0.01 ? target : blended;
+        const opacity = prop.visibility * (wall ? walls[wall].material.opacity : 1);
+        setOpacity(material, opacity);
+        holder.visible = opacity > 0;
+        if (glass) glass.opacity = GLASS_OPACITY * opacity;
+        const faded = opacity < 0.5;
+        if (faded !== !!holder.userData.faded) {
+          holder.userData.faded = faded;
+          pointerDirty = true;
+        }
       }
     }
 
@@ -675,6 +722,14 @@ export default function JourneyWorld(props: Props) {
       if (!transition && !blockedNow && !intro) {
         updateVolleyballs(dt, activeRoom);
         kickPose = Math.max(0, kickPose - dt);
+        const npc = activeRoom.roommate;
+        if (npc) {
+          stepRoommate(npc.state, Math.hypot(player.x - npc.holder.position.x, player.z - npc.holder.position.z), dt);
+          const pose = sipPose(npc.state.elapsed, motion.matches);
+          npc.arm.rotation.x = pose.arm;
+          npc.carton.rotation.x = pose.carton;
+          npc.head.rotation.x = pose.head;
+        }
       }
 
       // Avatar pose
@@ -725,7 +780,7 @@ export default function JourneyWorld(props: Props) {
       for (const [id, item] of room(chapter).items) {
         const active = id === nearby || id === hovered;
         item.material.color.setScalar(active ? 1.32 : 1);
-        item.marker.visible = active;
+        item.marker.visible = active && item.material.opacity >= 0.5;
         item.markerMaterial.color.setScalar(visited.has(id) ? 0.45 : active ? 1.25 : 1);
         const ball = activeRoom.ballPositions.get(id);
         if (ball) item.marker.position.set(ball.x, ball.y + ball.radius + 4, ball.z);
@@ -734,8 +789,9 @@ export default function JourneyWorld(props: Props) {
         item.marker.rotation.y = motion.matches ? 0.6 : time * 1.6;
         item.marker.scale.setScalar(0.65);
       }
-      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}`;
-      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action }); }
+      const roommate = !intro && !transition && activeRoom.roommate?.state.near ? activeRoom.roommate.name : undefined;
+      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}|${roommate ?? ""}`;
+      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action, roommate }); }
 
       renderer.render(scene, camera);
       // Show the avatar through foreground props without drawing it solidly in front of them.
@@ -767,6 +823,7 @@ export default function JourneyWorld(props: Props) {
       rooms.forEach(r => {
         r.props.forEach(p => { p.material.dispose(); p.glass?.dispose(); });
         r.items.forEach(i => i.markerMaterial.dispose());
+        Object.values(r.walls).forEach(wall => wall.material.dispose());
       });
       shadow.material.dispose();
       occludedMaterial.dispose();

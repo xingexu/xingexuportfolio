@@ -9,9 +9,9 @@ export type JourneyItem = Placement & {
   id: string;
   label: string;
   title: string;
-  description: string;
+  description?: string;
   links?: JourneyLink[];
-  video?: { src: string; label: string; captions: string; poster: string };
+  video?: { src: string; label: string; captions?: string; poster: string };
 };
 export type Outfit = "kid" | "starwars" | "essentials" | "western";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate";
@@ -39,6 +39,7 @@ export type Chapter = {
   stopNote?: string;
   items: JourneyItem[];
   decor: Placement[];
+  roommate?: { name: string; x: number; z: number };
 };
 
 const gh = (repo: string, label = `View ${repo} on GitHub`): JourneyLink => ({ href: `${LINKS.github}/${repo}`, label });
@@ -56,18 +57,14 @@ function expandRoom(chapter: Chapter): Chapter {
 const ROOMS: Chapter[] = [
   {
     id: "arrival", stop: "Canada", number: "01", place: "Arriving in Canada", location: "Canada", heading: "Seven years old. A new country.",
-    intro: "Step off the plane and walk forward into the arrivals hall. Everything you can see glows when you get close; press E or tap it to look closer.",
+    intro: "Arrival in Canada at age seven.",
     ageFrom: 7, ageTo: 7, outfit: "kid", outfitLabel: "Propeller cap · rainbow lollipop · shorts",
     width: 120, depth: 96, floor: "tarmac", wall: 0xd8dde3, trim: 0x2f5f8a, background: 0x8ec9ef, outdoor: true, doorLabel: "ARRIVALS",
     items: [
-      { id: "plane", model: "plane", x: -31, z: 2, label: "Plane", title: "Seven years old. A new country.",
-        description: "I came to Canada when I was seven. This is where the walk begins: stepping off the plane in my propeller cap, lollipop in hand, with the rest of my life still ahead of me." },
-      { id: "airstairs", model: "airstairs", x: -16, z: -12, label: "Airstairs", title: "First steps.",
-        description: "The first steps I took in Canada were down these stairs, one at a time." },
-      { id: "suitcases", model: "luggage-cart", x: 18, z: 8, rot: 3, label: "Suitcases", title: "Packed for a new country.",
-        description: "A cart of suitcases packed for a brand-new country, headed for our first home at 18 Holsworthy Crescent." },
-      { id: "welcome", model: "welcome-sign", x: 30, z: -10, rot: 3, label: "Welcome to Canada sign", title: "Welcome to Canada.",
-        description: "A new country, a new language, and a lot of firsts waiting just past the arrivals doors." },
+      { id: "plane", model: "plane", x: -31, z: 2, label: "Plane", title: "Arrival in Canada.", description: "I moved to Canada at seven." },
+      { id: "airstairs", model: "airstairs", x: -16, z: -12, label: "Airstairs", title: "Airstairs." },
+      { id: "suitcases", model: "luggage-cart", x: 18, z: 8, rot: 3, label: "Suitcases", title: "Suitcases.", description: "Next stop: 18 Holsworthy Crescent." },
+      { id: "welcome", model: "welcome-sign", x: 30, z: -10, rot: 3, label: "Welcome to Canada sign", title: "Welcome to Canada." },
     ],
     decor: [
       { model: "cone", x: 10, z: 26, bump: "tip" }, { model: "cone", x: 12, z: -26, bump: "tip" }, { model: "cone", x: -10, z: -28, bump: "tip" },
@@ -203,7 +200,7 @@ const ROOMS: Chapter[] = [
   },
   {
     id: "western", stop: "University", number: "06", place: "Ontario Hall", location: "Western University · London, Ontario", heading: "Where I am now.",
-    intro: "Eighteen, in my room in Ontario Hall at Western: Computer Science + Ivey, and three clubs.",
+    intro: "My first-year double room at Western.",
     ageFrom: 18, ageTo: 18, outfit: "western", outfitLabel: "Black Aritzia hoodie & tapered sweatpants · black UGGs",
     width: 88, depth: 96, floor: "laminate", wall: 0x3f3c4e, trim: 0x554463, background: 0x0d0c16, doorLabel: "NEXT",
     items: [
@@ -223,7 +220,8 @@ const ROOMS: Chapter[] = [
         description: "Director for the Projects portfolio at Western Founders Network.",
         links: [{ href: "https://linktr.ee/westernfoundersnetwork", label: "Western Founders Network" }, { href: "https://www.instagram.com/westernfoundersnetwork/", label: "@westernfoundersnetwork" }] },
       { id: "ohall-bed", model: "bed-western", x: 32, z: 26, label: "Blue and beige bed", title: "My room in O-Hall.",
-        description: "My first-year room in Ontario Hall (O-Hall) at Western." },
+        description: "My bed in our Ontario Hall double." },
+      { id: "richards-bed", model: "bed-roommate", x: -32, z: 30, rot: 2, label: "Richard’s bed", title: "Richard Su", description: "My roommate in Ontario Hall." },
       { id: "jellycat", model: "jellycat-frog", x: 32, z: 17, y: 7, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog.",
         description: "My Jellycat frog, permanent resident of the bed." },
       { id: "standing-desk", model: "standing-desk", x: 34, z: -12, rot: 3, label: "Stand-up desk", title: "Stand-up desk.",
@@ -235,7 +233,7 @@ const ROOMS: Chapter[] = [
         description: "Late-night light for late-night commits." },
       { id: "buldak", model: "buldak-bowl", x: 32, z: -3, y: 18, rot: 3, solid: false, label: "Buldak noodles", title: "Buldak at 5 a.m.",
         description: "A bowl of Buldak noodles from our 5 a.m. taste test.",
-        video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m.", captions: "/videos/journey/buldak.en.vtt", poster: "/videos/journey/buldak.webp" } },
+        video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m. (silent)", poster: "/videos/journey/buldak.webp" } },
       { id: "mini-fridge", model: "mini-fridge", x: 24, z: -38, label: "Mini fridge", title: "Dorm essentials.",
         description: "Snacks and drinks, within arm’s reach of the desk." },
       { id: "fragrances", model: "fragrances", x: 24, z: -38, y: 13, solid: false, label: "Fragrances", title: "The collection.",
@@ -252,6 +250,7 @@ const ROOMS: Chapter[] = [
         description: "A laundry basket tucked near the closet." },
     ],
     decor: [{ model: "rug-western", x: 2, z: 10, solid: false }, { model: "nightstand", x: 18, z: 17, rot: 3 }],
+    roommate: { name: "Richard Su", x: -24, z: 30 },
   },
 ];
 

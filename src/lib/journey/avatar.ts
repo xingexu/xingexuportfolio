@@ -59,22 +59,23 @@ function fullerHoodie(head: Grid, torso: Grid, armL: Grid, armR: Grid, W: number
   head.box(-6, 3, -12, 12, 1, 1, seam);
 }
 
-function fluffyHair(head: Grid, height: number) {
-  for (let z = -9; z <= 9; z++) for (let x = -10; x < 10; x++) {
+function sweptHair(head: Grid, height: number) {
+  for (let z = -8; z <= 9; z++) for (let x = -9; x < 9; x++) {
     const side = Math.abs(x + 0.5);
-    const d = (side / 10.4) ** 2 + ((z - 0.6) / 10.8) ** 2;
+    const d = (side / 9.75) ** 2 + ((z - 0.5) / 10.4) ** 2;
     if (d >= 1) {
-      if (side < 8 && z >= -8 && z < 8) head.set(x, height - 1, z, HAIR);
+      if (side < 8 && z < 8) head.set(x, height - 1, z, HAIR);
       continue;
     }
-    // A broad, shallow dome with overlapping locks instead of a raised center stripe.
-    const sweep = x + z * 0.48;
-    const curl = 0.62 * Math.cos(sweep * 1.1) + 0.52 * Math.sin(z * 1.28 - x * 0.35);
-    const crown = height + Math.floor(0.6 + 4.25 * (1 - d) ** 0.38 + curl);
-    const base = z < -5 ? height - 6 : side > 6.5 ? height - 3 : z >= 5 ? height - 4 - Number(x < 0) : height - 5;
+    const sweep = x - z * 0.64;
+    const lock = Math.cos(sweep * 0.86 + 0.25 * Math.sin(z * 0.6));
+    const curl = lock * (z > 2 ? 0.85 : 0.45);
+    const crown = height + Math.floor(0.2 + 3.7 * (1 - d) ** 0.55 + curl);
+    const fringe = z >= 6 && x > -5 && x < 5 ? Math.round(3 + lock) : 1;
+    const base = z < -5 ? height - 5 : side > 6.5 ? height - 2 : z >= 5 ? height - 2 - fringe : height - 3;
     for (let y = base; y < crown; y++) {
-      const strand = 1.04 + 0.15 * Math.cos(sweep * 1.23 + y * 0.57) + 0.16 * hash3(x, y, z);
-      head.set(x, y, z, shade(HAIR, strand + (y === crown - 1 ? 0.17 : 0)));
+      const strand = 1.08 + 0.16 * lock + 0.06 * hash3(x, y, z);
+      head.set(x, y, z, shade(HAIR, strand + (y === crown - 1 ? 0.15 : 0)));
     }
   }
 }
@@ -83,7 +84,7 @@ function sculptFace(head: Grid, height: number) {
   for (const x of [-8, 7]) for (const z of [-8, 7]) head.box(x, 0, z, 1, height - 4, 1, -1);
   for (const x of [-8, 7]) head.box(x, 0, -5, 1, 4, 11, -1);
   for (const x of [-7, 6]) head.box(x, 0, 6, 1, 3, 2, -1);
-  head.box(-1, height - 12, 8, 2, 4, 1, SKIN).box(-1, height - 12, 9, 2, 1, 1, shade(SKIN, 0.94));
+  head.box(-1, height - 12, 8, 2, 3, 1, shade(SKIN, 0.98));
   for (const x of [-8, 7]) head.box(x, height - 12, 1, 1, 4, 2, shade(SKIN, 0.95));
 }
 
@@ -236,7 +237,7 @@ export function buildAvatar(age: number, outfit: Outfit): AvatarParts {
   const fineArmL = finePart(armL, look.top, look.topDark), fineArmR = finePart(armR, look.top, look.topDark);
   if (western) {
     sculptFace(fineHead, headH * 2);
-    fluffyHair(fineHead, headH * 2);
+    sweptHair(fineHead, headH * 2);
     taperedHoodie(fineHead, fineTorso, fineArmL, fineArmR, W, torsoH * 2, armLen, look);
   } else if (look.hood) fullerHoodie(fineHead, fineTorso, fineArmL, fineArmR, W, torsoH, armLen, look);
   return {

@@ -25,6 +25,7 @@ const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODE
 const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
+const R = load('src/lib/journey/roommate.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 
@@ -32,9 +33,9 @@ test('every item is written out, linked properly and has a model', () => {
   const ids = new Set();
   for (const item of ALL_ITEMS) {
     assert.ok(!ids.has(item.id), `duplicate id ${item.id}`); ids.add(item.id);
-    for (const field of ['label', 'title', 'description']) {
-      assert.ok(item[field].trim().length > 2, `${item.id}.${field}`);
-      assert.doesNotMatch(item[field], /\bXX+\b|TODO|lorem|placeholder|test text/i, `${item.id}.${field}`);
+    for (const value of [item.label, item.title, ...(item.description ? [item.description] : [])]) {
+      assert.ok(value.trim().length > 2, item.id);
+      assert.doesNotMatch(value, /\bXX+\b|TODO|lorem|placeholder|test text/i, item.id);
     }
     assert.ok(MODEL_IDS.includes(item.model), `${item.id} model`);
     for (const link of item.links ?? []) assert.match(link.href, /^(https:\/\/|\/)/, `${item.id} link`);
@@ -42,14 +43,36 @@ test('every item is written out, linked properly and has a model', () => {
   for (const chapter of CHAPTERS) for (const p of chapter.decor) assert.ok(MODEL_IDS.includes(p.model), p.model);
 });
 
-test('the CSA poster and Buldak bowl have the right playable video and captions', () => {
+function mp4Tracks(file) {
+  const tracks = [];
+  function read(start, end) {
+    for (let at = start; at + 8 <= end;) {
+      const size = file.readUInt32BE(at);
+      const type = file.toString('ascii', at + 4, at + 8);
+      assert.ok(size >= 8 && at + size <= end, 'valid MP4 box size');
+      if (type === 'hdlr') tracks.push(file.toString('ascii', at + 16, at + 20));
+      if (['moov', 'trak', 'mdia'].includes(type)) read(at + 8, at + size);
+      at += size;
+    }
+  }
+  read(0, file.length);
+  return tracks.sort();
+}
+
+test('CSA keeps its captioned audio and Buldak ships as a genuinely silent video', () => {
   for (const [id, filename] of [['csa', 'csa'], ['buldak', 'buldak']]) {
     const { video } = ALL_ITEMS.find(item => item.id === id);
     assert.equal(video.src, `/videos/journey/${filename}.mp4`);
     assert.ok(video.label);
     const mp4 = fs.readFileSync(path.join(root, 'public', video.src));
     assert.equal(mp4.toString('ascii', 4, 8), 'ftyp');
-    assert.match(fs.readFileSync(path.join(root, 'public', video.captions), 'utf8'), /^WEBVTT\n/);
+    if (id === 'csa') {
+      assert.deepEqual(mp4Tracks(mp4), ['soun', 'vide']);
+      assert.match(fs.readFileSync(path.join(root, 'public', video.captions), 'utf8'), /^WEBVTT\n/);
+    } else {
+      assert.deepEqual(mp4Tracks(mp4), ['vide']);
+      assert.equal(video.captions, undefined);
+    }
     assert.equal(fs.readFileSync(path.join(root, 'public', video.poster)).toString('ascii', 8, 12), 'WEBP');
   }
 });
@@ -334,8 +357,8 @@ test('indoor cutaways leave the floor and cut only camera-side walls', () => {
     assert.ok(fixed.has(0, -1, 0), chapter.id);
     assert.ok(Object.values(walls).every(wall => wall.size > 0), chapter.id);
     assert.equal(fixed.size + Object.values(walls).reduce((sum, wall) => sum + wall.size, 0), W.buildRoomShell(index).size, chapter.id);
-    assert.deepEqual(W.cutawaySides(bounds, { x: bounds.minX - 1, z: bounds.maxZ + 1 }), new Set(['left', 'back']));
-    assert.deepEqual(W.cutawaySides(bounds, { x: 0, z: 0 }), new Set());
+    assert.deepEqual(W.cutawayOpacity(bounds, { x: bounds.minX - 1, z: bounds.maxZ + 1 }), { left: 0, right: 1, front: 1, back: 0 });
+    assert.deepEqual(W.cutawayOpacity(bounds, { x: 0, z: 0 }), { left: 1, right: 1, front: 1, back: 1 });
   }
 });
 
@@ -344,8 +367,26 @@ test('the terminal facade can be cut away without losing the apron floor', () =>
   const facadeZ = -CHAPTERS[0].depth / 2;
   assert.ok(walls.front.has(-12, 12, facadeZ));
   assert.ok(fixed.has(-12, -1, facadeZ));
-  assert.ok(W.cutawaySides(bounds, { x: 0, z: bounds.minZ - 1 }).has('front'));
-  assert.ok(!W.cutawaySides(bounds, { x: 0, z: bounds.minZ + 1 }).has('front'));
+  assert.equal(W.cutawayOpacity(bounds, { x: 0, z: bounds.minZ - 1 }).front, 0);
+  assert.equal(W.cutawayOpacity(bounds, { x: 0, z: bounds.minZ + 5 }).front, 0.5);
+  assert.equal(W.cutawayOpacity(bounds, { x: 0, z: bounds.minZ + 8 }).front, 1);
+});
+
+test('near-wall framing stops looking through the wall and cutaways fade on both sides of a corner', () => {
+  const bounds = W.interior(CHAPTERS.at(-1));
+  const player = { x: bounds.maxX - 3, z: bounds.minZ + 3 };
+  const lead = W.cameraLookAhead(bounds, player, { x: 1, z: -1 }, 10);
+  assert.equal(lead, 1);
+  assert.equal(W.cameraLookAhead(bounds, player, { x: -1, z: 1 }, 10), 10);
+  assert.equal(W.cameraLookAhead(bounds, { x: 0, z: bounds.minZ - 3 }, { x: 0, z: -1 }, 10), 0);
+  for (let gap = 0; gap <= 10; gap += 0.125) {
+    const opacity = W.cutawayOpacity(bounds, { x: bounds.maxX - gap, z: bounds.minZ + gap });
+    const next = W.cutawayOpacity(bounds, { x: bounds.maxX - gap - 0.125, z: bounds.minZ + gap + 0.125 });
+    assert.ok(next.right >= opacity.right && next.right - opacity.right < 0.04);
+    assert.equal(opacity.right, opacity.front);
+    assert.equal(opacity.left, 1);
+    assert.equal(opacity.back, 1);
+  }
 });
 
 test('door leaves fit the opening and open before you reach either threshold', () => {
@@ -400,7 +441,7 @@ test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading
   }
 });
 
-test('the Western avatar has a tapered silhouette, UGGs and full rounded hair without blush', () => {
+test('the Western avatar keeps tapered clothes, UGGs and a low, textured fringe', () => {
   const current = buildAvatar(18, 'western');
   const width = grid => grid.bounds().maxX - grid.bounds().minX + 1;
   const spanAt = (grid, layer) => {
@@ -426,12 +467,49 @@ test('the Western avatar has a tapered silhouette, UGGs and full rounded hair wi
       strandColors.add(color);
     }
   });
-  assert.ok(heights.size >= 5 && strandColors.size >= 8);
-  assert.ok(spanAt(current.head, 17).every(span => span >= 16), 'full hair spreads front to back and side to side');
-  assert.ok(spanAt(current.head, 19).every(span => span >= 11), 'the crown has volume across its width and depth');
-  assert.ok(current.head.bounds().maxY <= 21, 'the hair stays low and rounded');
+  assert.ok(heights.size >= 4 && strandColors.size >= 8);
+  assert.ok(spanAt(current.head, 17).every(span => span >= 14), 'texture covers the full crown');
+  assert.ok(current.head.bounds().maxY <= 20, 'the crown stays low');
+  assert.ok(current.head.has(1, 12, 8) && !current.head.has(-7, 12, 8), 'fringe leaves the temples uncovered');
   assert.equal(current.head.get(-8, 9, 2), 0xf8e1d0, 'sides are trimmed above the ear');
   assert.match(CHAPTERS.at(-1).outfitLabel, /UGGs/);
+});
+
+test('Richard sits on the second bed with a white hoodie, shorts, a cap and a milk carton', () => {
+  const room = CHAPTERS.at(-1), index = CHAPTERS.length - 1;
+  const beds = room.items.filter(item => item.model.startsWith('bed-'));
+  assert.equal(beds.length, 2);
+  const bed = beds.find(item => item.id === 'richards-bed'), box = W.placementBox(bed), at = room.roommate;
+  assert.equal(bed.title, at.name);
+  assert.ok(at.x > box.minX && at.x <= box.maxX && at.z > box.minZ && at.z < box.maxZ);
+  assert.equal(buildModel(bed.model).get(7, R.ROOMMATE_SEAT - 1, 0) >= 0, true);
+  assert.ok(W.blocked(index, at.x + 5, at.z, 1), 'the aisle collision includes his knees');
+  assert.ok(!W.blocked(index, at.x + 11, at.z, 2), 'there is still room to walk up');
+  const { seated, head, forearm, carton } = R.buildRoommate();
+  assert.equal(seated.get(-5, -1, 4), 0x384351, 'shorts');
+  assert.equal(seated.get(-5, -6, 10), 0xe9bf9d, 'bare shins');
+  assert.equal(seated.get(0, 14, 0) >>> 16 >= 0xcc, true, 'white fleece');
+  assert.equal(head.get(0, 7, 9), 0x31415e, 'cap brim');
+  assert.ok(forearm.size > 0 && carton.size > 0);
+});
+
+test('the milk sip plays once per approach, with a still pose for reduced motion', () => {
+  const state = { near: false, elapsed: R.SIP_DURATION };
+  R.stepRoommate(state, 12, 0.1);
+  assert.equal(state.elapsed, R.SIP_DURATION);
+  R.stepRoommate(state, 10, 0.9);
+  assert.equal(state.near, true);
+  for (const reduced of [false, true]) {
+    const pose = R.sipPose(state.elapsed, reduced);
+    assert.ok(pose.arm < -1 && pose.carton > 0.7 && pose.head < 0);
+    assert.deepEqual(R.sipPose(R.SIP_DURATION, reduced), R.sipPose(0, reduced));
+  }
+  R.stepRoommate(state, 12, R.SIP_DURATION);
+  R.stepRoommate(state, 10, 0.05);
+  assert.equal(state.elapsed, R.SIP_DURATION, 'staying nearby does not replay');
+  R.stepRoommate(state, 15, 0.05);
+  R.stepRoommate(state, 10, 0.05);
+  assert.ok(state.elapsed < 0.1, 'walking back retriggers the sip');
 });
 
 test('the Western dorm keeps small props and signs proportional to the furniture', () => {

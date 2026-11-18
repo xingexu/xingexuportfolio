@@ -108,6 +108,28 @@ test('touching voxel surfaces cast corner shadow without adding hidden faces', (
   alone.dispose(); joined.dispose();
 });
 
+test('scene artwork has solid relief with recessed art and raised details', () => {
+  const details = [
+    ['window', 0x9cbf9c, 0, -1, 3],
+    ['starwars-posters', 0x9aa0a6, 2, 0, 4],
+    ['poster-starwars-big', 0xd8faff, 3, 0, 5],
+    ['brawl-stand', 0xffce1f, 1, -1, 5],
+  ];
+  for (const [id, ink, top, backing, maxDepth] of details) {
+    const art = buildModel(id), { minZ, maxZ } = art.bounds();
+    const matches = [];
+    art.forEach((x, y, z, color) => { if (z === top && color === ink) matches.push([x, y]); });
+    assert.ok(matches.length >= 5, id);
+    for (const [x, y] of matches) for (let z = backing; z < top; z++) assert.ok(art.has(x, y, z), id);
+    assert.ok(maxZ - minZ <= maxDepth, id);
+  }
+  assert.equal(buildModel('window').get(-1, 5, 1), 0xd4cfc4);
+  const poster = buildModel('poster-starwars-big'), { minX, maxX } = poster.bounds();
+  poster.forEach((x, _y, z, color) => {
+    if (z === 2 && color === 0xf6d23c) assert.ok(x - minX >= 3 && maxX - x >= 3);
+  });
+});
+
 test('every model uses an aligned voxel grid and fits its world footprint', () => {
   for (const id of MODEL_IDS) {
     const grid = buildModel(id);

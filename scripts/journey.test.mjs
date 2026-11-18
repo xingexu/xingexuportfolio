@@ -221,6 +221,19 @@ test('Mikasa hits clear the tape from both sides while low airborne balls bounce
   assert.ok(low.vz > 0 && low.z > net.z, 'hitting the mesh reverses motion');
 });
 
+test('a low diagonal Mikasa hit near the net clears the taller post', () => {
+  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview')), { net } = field;
+  const b = V.makeBall(net.maxX + 2, 20 - 1.75, net.z + 3, 1.75);
+  V.launchBall(b, V.spikeVelocity(b, field, { x: 0, z: -1 }));
+  let crossed = false;
+  for (let i = 0; i < 240; i++) {
+    V.stepBall(b, field, 1 / 120);
+    assert.ok(b.vz <= 0, 'never rebounds off the near post');
+    if (b.z <= net.z) crossed = true;
+  }
+  assert.ok(crossed && b.z < net.z - 3);
+});
+
 test('volleyballs bounce off the floor and walls, then settle', () => {
   const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview'));
   const b = V.makeBall(0, 0, field.minZ + 2, 1.75);

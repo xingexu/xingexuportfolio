@@ -106,7 +106,7 @@ export function buildBallField(index: number): BallField {
     const box = placementBox(p), bottom = p.y ?? 0;
     if (p.model === "volleyball-net") {
       const { halfWidth, bottom, top, postTop } = VOLLEYBALL_NET;
-      net = { minX: p.x - halfWidth, maxX: p.x + halfWidth, minZ: p.z, maxZ: p.z + 1, z: p.z + 0.5, bottom, top };
+      net = { minX: p.x - halfWidth, maxX: p.x + halfWidth, minZ: p.z, maxZ: p.z + 1, z: p.z + 0.5, bottom, top, postTop };
       const posts = [p.x - halfWidth - 1, p.x + halfWidth].map(x =>
         ({ minX: x, maxX: x + 1, minZ: p.z, maxZ: p.z + 1, bottom: 0, top: postTop }));
       return [net, ...posts];

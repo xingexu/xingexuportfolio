@@ -8,12 +8,14 @@ export type Ball = Point & {
   grounded: boolean; tossed: boolean; kickDelay: number;
 };
 export type BallBlock = Box & { bottom: number; top: number };
-export type CourtNet = BallBlock & { z: number };
+export type CourtNet = BallBlock & { z: number; postTop: number };
 export type BallField = Box & { ceiling: number; blocks: BallBlock[]; net?: CourtNet };
 
 const GRAVITY = 86;
+const AIR_DRAG = 0.2;
 export const HIT_WINDUP = 0.11;
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+const travelTime = (t: number, drag: number) => -Math.expm1(-t * drag) / drag;
 
 export function makeBall(x: number, base: number, z: number, radius: number): Ball {
   return { x, y: base + radius, z, radius, vx: 0, vy: 0, vz: 0, grounded: true, tossed: false, kickDelay: 0 };
@@ -87,17 +89,26 @@ export function spikeVelocity(ball: Ball, field: BallField, forward: Vec): Point
   if (distance < 2 || distance > 34 || Math.abs(ball.x - crossingX) > 16) return direct;
   const side = Math.sign(net.z - ball.z);
   const landingZ = clamp(net.z + side * Math.max(11, distance * 0.83), field.minZ + r + 2, field.maxZ - r - 2);
-  const fraction = distance / Math.abs(landingZ - ball.z);
-  // Clear the tape as the front of the sphere enters the net, not just at the center plane.
+  const edgeShot = ball.x < net.minX + r || ball.x > net.maxX - r;
+  const clearance = (edgeShot ? net.postTop : net.top) + r + 0.45;
   const span = (net.maxZ - net.minZ) / 2 + r;
-  const entry = clamp(fraction - span / Math.abs(landingZ - ball.z), 0.04, 0.95);
-  const exit = clamp(fraction + span / Math.abs(landingZ - ball.z), 0.05, 0.96);
-  const clear = (t: number) => (net.top + r + 0.8 - ball.y * (1 - t) - r * t) / (GRAVITY / 2 * t * (1 - t));
-  const duration = Math.sqrt(Math.max(0.6 ** 2, clear(entry), clear(exit)));
-  const vx = (crossingX - ball.x) / (fraction * duration);
-  const vy = (r - ball.y) / duration + GRAVITY * duration / 2;
-  const vz = (landingZ - ball.z) / duration;
-  return { x: vx, y: vy, z: vz };
+  const maxPeak = field.ceiling - r - 0.4;
+  let peak = Math.max(ball.y, clearance + 2.5);
+  // Choose a speed that keeps the full ball above the net for the entire crossing.
+  for (; peak <= maxPeak; peak = Math.min(maxPeak, peak + 1)) {
+    const vy = Math.sqrt(2 * GRAVITY * (peak - ball.y));
+    const apexTime = vy / GRAVITY, clearTime = Math.sqrt(2 * (peak - clearance) / GRAVITY);
+    const earliest = apexTime - clearTime, latest = apexTime + clearTime;
+    const minSpeed = (distance + span) / travelTime(latest, AIR_DRAG);
+    const maxSpeed = earliest > 0 ? Math.max(0, distance - span) / travelTime(earliest, AIR_DRAG) : Infinity;
+    if (minSpeed <= maxSpeed) {
+      const duration = apexTime + Math.sqrt(2 * (peak - r) / GRAVITY);
+      const speed = clamp(Math.abs(landingZ - ball.z) / travelTime(duration, AIR_DRAG), minSpeed, maxSpeed);
+      return { x: (crossingX - ball.x) * speed / distance, y: vy, z: side * speed };
+    }
+    if (peak === maxPeak) break;
+  }
+  return direct;
 }
 
 export function stepBall(ball: Ball, field: BallField, dt: number) {
@@ -123,11 +134,12 @@ export function stepBall(ball: Ball, field: BallField, dt: number) {
     } else if (nextY >= ceiling) {
       ball.y = ceiling; ball.vy = -Math.abs(ball.vy) * 0.48; ball.grounded = false;
     } else { ball.y = nextY; ball.grounded = false; }
-    const x = ball.x + ball.vx * h, z = ball.z + ball.vz * h;
+    const drag = ball.grounded ? 2.7 : AIR_DRAG, travel = travelTime(h, drag);
+    const x = ball.x + ball.vx * travel, z = ball.z + ball.vz * travel;
     if (ball.vx) { if (free(x, ball.z)) ball.x = x; else ball.vx *= -0.54; }
     if (ball.vz) { if (free(ball.x, z)) ball.z = z; else ball.vz *= -0.54; }
-    const drag = Math.exp(-(ball.grounded ? 2.7 : 0.2) * h);
-    ball.vx *= drag; ball.vz *= drag;
+    const decay = Math.exp(-drag * h);
+    ball.vx *= decay; ball.vz *= decay;
     if (ball.grounded && Math.hypot(ball.vx, ball.vz) < 0.12) ball.vx = ball.vz = 0;
   }
 }

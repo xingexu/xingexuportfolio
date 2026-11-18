@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
-import { Color, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, PerspectiveCamera, Raycaster, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
+import { Box3, Color, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, PerspectiveCamera, Ray, Raycaster, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
 import { CHAPTERS, type Placement } from "@/lib/journey/data";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
-import { buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
+import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { ageAt, buildCutawayShell, cutawaySides, interior, nearbyItems, placementBox, renderPixelSize, roomSide, spawn, step, walkSpeed, AVATAR_SCALE, INTRO_END, type RoomSide } from "@/lib/journey/world";
+import { ageAt, buildCutawayShell, cameraOffsets, cutawaySides, interior, nearbyItems, placementBox, renderPixelSize, roomSide, spawn, step, walkSpeed, AVATAR_SCALE, INTRO_END, type RoomSide } from "@/lib/journey/world";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -15,7 +15,9 @@ export type JourneyControls = {
   goTo: (index: number) => void;
   skip: () => void;
   focus: () => void;
+  toggleCamera: (mode: keyof CameraMode) => void;
 };
+export type CameraMode = { front: boolean; tilt: boolean };
 export type JourneyStatus = { chapter: number; age: number; nearby: string[] };
 export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" };
 type Props = {
@@ -28,6 +30,7 @@ type Props = {
   onIntro: (playing: boolean) => void;
   onFinale: () => void;
   onMove: () => void;
+  onCameraChange: (mode: CameraMode) => void;
 };
 
 const KEYS: Record<string, "up" | "down" | "left" | "right"> = {
@@ -90,12 +93,15 @@ export default function JourneyWorld(props: Props) {
       return holder;
     }
     const markerGrid = new Grid();
-    for (let x = -2; x <= 2; x++) for (let y = -2; y <= 2; y++) for (let z = -2; z <= 2; z++) if (Math.abs(x) + Math.abs(y) + Math.abs(z) <= 2) markerGrid.set(x, y, z, 0xffd84a);
-    const markerGeometry = gridGeometry(markerGrid, [-0.5, -0.5, -0.5], 0);
+    for (let x = -4; x <= 4; x++) for (let y = -4; y <= 4; y++) for (let z = -4; z <= 4; z++) {
+      if (Math.abs(x) + Math.abs(y) + Math.abs(z) <= 4) markerGrid.set(x, y, z, y >= 2 ? 0xffef9e : y < -1 ? 0xe5ac41 : 0xffd84a);
+    }
+    const markerGeometry = gridGeometry(markerGrid, [-0.25, -0.25, -0.25], 0, 0.5);
     owned.push(markerGeometry);
 
     type ItemView = { material: MeshBasicMaterial; marker: Mesh; markerMaterial: MeshBasicMaterial; markerY: number };
-    type RoomView = { group: Group; items: Map<string, ItemView>; pickables: Object3D[]; walls: Record<RoomSide, Group> };
+    type PropView = { holder: Group; bounds: Box3; material: MeshBasicMaterial; glass?: MeshBasicMaterial };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; pickables: Object3D[]; walls: Record<RoomSide, Group> };
     const rooms = new Map<number, RoomView>();
     function room(index: number): RoomView {
       const cached = rooms.get(index);
@@ -118,12 +124,22 @@ export default function JourneyWorld(props: Props) {
         const side = !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) : null;
         return side ? walls[side] : group;
       };
-      for (const p of chapter.decor) parentFor(p).add(place(p, baseMaterial));
+      const props: PropView[] = [];
+      const addProp = (p: Placement) => {
+        const material = baseMaterial.clone(), holder = place(p, material);
+        const glass = modelHasGlass(p.model) ? glassMaterial.clone() : undefined;
+        if (glass) (holder.children[1] as Mesh).material = glass;
+        const bounds = new Box3().setFromObject(holder);
+        if (!bounds.isEmpty()) bounds.expandByScalar(1);
+        props.push({ holder, bounds, material, glass });
+        parentFor(p).add(holder);
+        return { holder, material };
+      };
+      for (const p of chapter.decor) addProp(p);
       for (const item of chapter.items) {
-        const material = baseMaterial.clone(), holder = place(item, material);
+        const { holder, material } = addProp(item);
         holder.traverse(object => { object.userData.itemId = item.id; if (object instanceof Mesh) pickables.push(object); });
         const parent = parentFor(item);
-        parent.add(holder);
         const box = placementBox(item), markerMaterial = new MeshBasicMaterial({ vertexColors: true });
         const marker = new Mesh(markerGeometry, markerMaterial);
         const markerY = Math.min(40, (item.y ?? 0) + modelFootprint(item.model).height + 5);
@@ -131,7 +147,7 @@ export default function JourneyWorld(props: Props) {
         parent.add(marker);
         items.set(item.id, { material, marker, markerMaterial, markerY });
       }
-      const view = { group, items, pickables, walls };
+      const view = { group, items, props, pickables, walls };
       rooms.set(index, view);
       return view;
     }
@@ -161,7 +177,7 @@ export default function JourneyWorld(props: Props) {
       body.children.filter(child => !Object.values(limbs).includes(child as Group)).forEach(child => body.remove(child));
       const next = buildAvatar(age, outfit);
       parts = next;
-      const mesh = (grid: Grid) => { const g = gridGeometry(grid, [0, 0, 0], 0.02); avatarGeometries.push(g); return new Mesh(g, baseMaterial); };
+      const mesh = (grid: Grid) => { const g = gridGeometry(grid, [0, 0, 0], 0.02, AVATAR_VOXEL_SIZE); avatarGeometries.push(g); return new Mesh(g, baseMaterial); };
       const torsoTop = next.shoulder + 1;
       const torso = mesh(next.torso); torso.position.y = next.hip; body.add(torso);
       limbs.legL.add(mesh(next.legL)); limbs.legL.position.set(0, next.hip, 0);
@@ -181,6 +197,8 @@ export default function JourneyWorld(props: Props) {
     let nearby: string | null = null, hovered: string | null = null, lastStatus = "", moved = false, disposed = false, readySent = false;
     const camAnchor = new Vector3(), camLook = new Vector3(), goalPos = new Vector3(), goalLook = new Vector3();
     let camYaw = player.yaw;
+    let cameraMode: CameraMode = { front: false, tilt: false };
+    let frontBlend = 0, tiltBlend = 0;
     const pointer = new Vector2(), raycaster = new Raycaster();
     let pointerDirty = false, pointerInside = false;
 
@@ -203,15 +221,16 @@ export default function JourneyWorld(props: Props) {
 
     function cameraGoal(pos: Vector3, look: Vector3, x: number, y: number, z: number, yaw: number) {
       const height = (parts?.height ?? 20) * AVATAR_SCALE;
-      const portrait = Math.max(0, 1 - camera.aspect);
-      const fx = Math.sin(yaw), fz = Math.cos(yaw);
-      const distance = 40 + 18 * portrait;
-      pos.set(x - fx * distance, y + 44 + 10 * portrait, z - fz * distance);
-      look.set(x + fx * 10, y + height * 0.43, z + fz * 10);
+      const view = cameraOffsets(height, camera.aspect, frontBlend, tiltBlend);
+      const fx = Math.sin(yaw + view.orbit), fz = Math.cos(yaw + view.orbit);
+      pos.set(x - fx * view.distance, y + view.rise, z - fz * view.distance);
+      look.set(x + fx * view.lead, y + view.lookHeight, z + fz * view.lead);
     }
     function snapCamera() {
       camAnchor.set(player.x, player.y, player.z);
       camYaw = player.yaw;
+      frontBlend = Number(cameraMode.front);
+      tiltBlend = Number(cameraMode.tilt);
       cameraGoal(camera.position, camLook, camAnchor.x, camAnchor.y, camAnchor.z, camYaw);
       camera.lookAt(camLook);
     }
@@ -221,6 +240,32 @@ export default function JourneyWorld(props: Props) {
       const hidden = cutawaySides(interior(current), camera.position);
       const walls = room(chapter).walls;
       for (const side of Object.keys(walls) as RoomSide[]) walls[side].visible = !hidden.has(side);
+    }
+
+    const sightlines = [new Ray(), new Ray(), new Ray()];
+    const sightDistances = [0, 0, 0], hitPoint = new Vector3();
+    function fadeForeground(dt: number) {
+      const height = (parts?.height ?? 20) * AVATAR_SCALE;
+      for (let i = 0; i < sightlines.length; i++) {
+        const ray = sightlines[i];
+        ray.origin.copy(camera.position);
+        ray.direction.set(player.x, player.y + height * (0.1 + 0.4 * i), player.z).sub(ray.origin);
+        sightDistances[i] = ray.direction.lengthSq();
+        ray.direction.normalize();
+      }
+      const ease = motion.matches ? 1 : 1 - Math.exp(-dt * 22);
+      for (const { holder, bounds, material, glass } of room(chapter).props) {
+        const obscures = !intro && holder.parent?.visible && (bounds.containsPoint(camera.position) ||
+          sightlines.some((ray, i) => ray.intersectBox(bounds, hitPoint) && hitPoint.distanceToSquared(ray.origin) < sightDistances[i]));
+        const target = obscures ? 0 : 1;
+        const opacity = material.opacity + (target - material.opacity) * ease;
+        material.opacity = Math.abs(opacity - target) < 0.01 ? target : opacity;
+        holder.visible = material.opacity > 0;
+        const fading = holder.visible && material.opacity < 1;
+        if (material.alphaHash !== fading) { material.alphaHash = fading; material.needsUpdate = true; }
+        if (glass) glass.opacity = GLASS_OPACITY * material.opacity;
+        holder.userData.faded = material.opacity < 0.5;
+      }
     }
 
     function resize() {
@@ -290,6 +335,12 @@ export default function JourneyWorld(props: Props) {
       goTo: index => { if (index !== chapter || intro) startTransition(index, "jump"); },
       skip: () => { if (transition) finishTransition(); else if (intro) finishIntro(); },
       focus: () => region.focus({ preventScroll: true }),
+      toggleCamera: mode => {
+        if (transition || intro || live.current.blocked) return;
+        cameraMode = { ...cameraMode, [mode]: !cameraMode[mode] };
+        live.current.onCameraChange(cameraMode);
+        onPointerLeave();
+      },
     };
     const handle = live.current.controls;
     handle.current = control;
@@ -307,6 +358,10 @@ export default function JourneyWorld(props: Props) {
         return;
       }
       const onButton = (event.target as HTMLElement | null)?.closest?.("button, a");
+      if (key === "q" || key === "f") {
+        if (!event.repeat) control.toggleCamera(key === "q" ? "tilt" : "front");
+        return;
+      }
       if (key === "e" || ((key === "enter" || key === " ") && !onButton)) { event.preventDefault(); interact(); }
       if (key === "escape" && (transition || intro)) { event.preventDefault(); control.skip(); }
     }
@@ -329,7 +384,7 @@ export default function JourneyWorld(props: Props) {
       camera.updateMatrixWorld();
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObjects(room(chapter).pickables, false).find(({ object }) => {
-        for (let node: Object3D | null = object; node; node = node.parent) if (!node.visible) return false;
+        for (let node: Object3D | null = object; node; node = node.parent) if (!node.visible || node.userData.faded) return false;
         return true;
       });
       return (hit?.object.userData.itemId as string | undefined) ?? null;
@@ -447,6 +502,9 @@ export default function JourneyWorld(props: Props) {
         camAnchor.y += (player.y - camAnchor.y) * follow;
         camAnchor.z += (player.z - camAnchor.z) * follow;
         camYaw += (player.yaw - camYaw) * follow;
+        const orbitEase = motion.matches ? 1 : 1 - Math.exp(-dt * 9);
+        frontBlend += (Number(cameraMode.front) - frontBlend) * orbitEase;
+        tiltBlend += (Number(cameraMode.tilt) - tiltBlend) * follow;
         cameraGoal(camera.position, camLook, camAnchor.x, camAnchor.y, camAnchor.z, camYaw);
         camera.lookAt(camLook);
       }
@@ -475,6 +533,7 @@ export default function JourneyWorld(props: Props) {
       body.position.y = Math.abs(Math.sin(player.phase)) * 0.7 * Math.min(1, speedNow * 1.4);
       limbs.propeller.rotation.y += dt * (6 + speedNow * 18);
       updateCutaway();
+      fadeForeground(dt);
 
       // Nearby + hover highlights
       const nearList = intro || transition ? [] : nearbyItems(chapter, player).map(item => item.id);
@@ -528,7 +587,10 @@ export default function JourneyWorld(props: Props) {
       region.removeEventListener("pointerleave", onPointerLeave);
       if (handle.current === control) handle.current = null;
       geometries.forEach(g => g.dispose()); owned.forEach(g => g.dispose()); avatarGeometries.forEach(g => g.dispose());
-      rooms.forEach(r => r.items.forEach(i => { i.material.dispose(); i.markerMaterial.dispose(); }));
+      rooms.forEach(r => {
+        r.props.forEach(p => { p.material.dispose(); p.glass?.dispose(); });
+        r.items.forEach(i => i.markerMaterial.dispose());
+      });
       shadow.material.dispose();
       occludedMaterial.dispose();
       glassMaterial.dispose();
@@ -552,7 +614,7 @@ export default function JourneyWorld(props: Props) {
             <ul>{entry.items.map(item => (
               <li key={item.id}><strong>{item.label}:</strong> {item.description}{item.links?.map(link => (
                 <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer"> {link.label} ↗</a>
-              ))}</li>
+              ))}{item.video && <a href={item.video.src}> Watch {item.video.label}</a>}</li>
             ))}</ul>
           </section>
         ))}

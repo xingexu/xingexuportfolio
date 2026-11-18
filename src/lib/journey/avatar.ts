@@ -1,4 +1,4 @@
-import { Grid, type Color } from "./voxel";
+import { Grid, hash3, shade, type Color } from "./voxel";
 import type { Outfit } from "./data";
 
 /** Body parts are built around their joint so the renderer can swing them. */
@@ -16,6 +16,7 @@ export type AvatarParts = {
 const SKIN = 0xf8e1d0, SKIN_DARK = 0xecc9b4, HAIR = 0x1d1714, EYE = 0x15161a;
 const HEIGHTS: Record<number, number> = { 7: 20, 8: 21, 9: 22, 10: 23, 11: 24, 12: 26, 13: 27, 14: 29, 15: 30, 16: 31, 17: 32, 18: 34 };
 export const avatarHeight = (age: number) => HEIGHTS[Math.max(7, Math.min(18, Math.round(age)))];
+export const AVATAR_VOXEL_SIZE = 0.5;
 
 type Look = { top: Color; topDark: Color; pants: Color; shoe: Color; sole: Color; accent: Color; hood: boolean; shorts: boolean; slides: boolean };
 const LOOKS: Record<Outfit, Look> = {
@@ -24,6 +25,39 @@ const LOOKS: Record<Outfit, Look> = {
   essentials: { top: 0xcdbb9e, topDark: 0xb7a587, pants: 0x8d8f94, shoe: 0xd8ccb4, sole: 0xc6b99d, accent: 0x6e6455, hood: true, shorts: false, slides: true },
   western: { top: 0x17171a, topDark: 0x0e0e10, pants: 0x1c1c20, shoe: 0x1a1a1c, sole: 0x2e2e33, accent: 0x3c3c42, hood: true, shorts: false, slides: false },
 };
+
+const fabric = (tone: Color, lift = 1) => (x: number, y: number, z: number) =>
+  shade(tone, lift * (0.95 + hash3(x, y, z) * 0.12 + ((x + y * 2 + z) % 5 === 0 ? 0.06 : 0)));
+
+function finePart(source: Grid, ...cloth: Color[]) {
+  const fine = new Grid();
+  source.forEach((x, y, z, color) => fine.box(x * 2, y * 2, z * 2, 2, 2, 2, cloth.includes(color) ? fabric(color) : color));
+  return fine;
+}
+
+function fullerHoodie(head: Grid, torso: Grid, armL: Grid, armR: Grid, W: number, H: number, armLen: number, look: Look) {
+  const weave = fabric(look.top), seam = fabric(look.top, 1.22), shadow = fabric(look.topDark, 1.08);
+  // Lower back hangs loose; the ribbed hem stays fitted.
+  torso.box(-W + 1, 3, -6, W * 2 - 2, H * 2 - 5, 2, weave);
+  for (const x of [-W - 1, W]) torso.box(x, 3, -4, 1, H * 2 - 7, 7, weave);
+  for (let x = -W; x < W; x++) torso.set(x, 1, 4, x % 2 ? look.topDark : shade(look.top, 0.9));
+  // Pocket openings and topstitching sit one fine voxel above the fleece.
+  for (let x = -W + 3; x < W - 3; x++) torso.set(x, 2, 5, shade(look.topDark, 1.25));
+  for (let y = 3; y < 7; y++) {
+    const edge = W - 4 - Math.floor((y - 3) / 2);
+    torso.set(-edge, y, 5, seam(-edge, y, 5)).set(edge - 1, y, 5, seam(edge - 1, y, 5));
+  }
+  for (const [arm, x] of [[armL, -4], [armR, 0]] as const) {
+    const cuff = -armLen * 2 + 4, length = -cuff - 3;
+    arm.box(x, cuff + 3, -3, 4, length, 1, weave).box(x, cuff + 3, 2, 4, length, 1, weave);
+    arm.box(x + (x < 0 ? -1 : 4), cuff + 4, -2, 1, length - 2, 4, weave);
+    arm.box(x, cuff + 1, 2, 4, 1, 1, seam).box(x + 1, cuff + 4, 3, 2, 1, 1, shadow);
+  }
+  // Folded hood drapes over the neckline without covering the face.
+  head.box(-7, 0, -12, 14, 3, 2, weave).box(-6, 3, -11, 12, 3, 2, weave);
+  head.box(-8, 1, -10, 2, 5, 3, shadow).box(6, 1, -10, 2, 5, 3, shadow);
+  head.box(-6, 3, -12, 12, 1, 1, seam);
+}
 
 export function buildAvatar(age: number, outfit: Outfit): AvatarParts {
   const look = LOOKS[outfit];
@@ -110,8 +144,13 @@ export function buildAvatar(age: number, outfit: Outfit): AvatarParts {
     }
   }
 
+  const fineHead = finePart(head), fineTorso = finePart(torso, look.top, look.topDark);
+  const fineArmL = finePart(armL, look.top, look.topDark), fineArmR = finePart(armR, look.top, look.topDark);
+  if (look.hood) fullerHoodie(fineHead, fineTorso, fineArmL, fineArmR, W, torsoH, armLen, look);
   return {
     height: H, hip: legs, shoulder: legs + torsoH - 1, shoulderX: hw, hipX: 0,
-    head, torso, armL, armR, legL, legR, propeller, propellerY: headH + 3,
+    head: fineHead, torso: fineTorso, armL: fineArmL, armR: fineArmR,
+    legL: finePart(legL, look.pants), legR: finePart(legR, look.pants),
+    propeller: propeller && finePart(propeller), propellerY: headH + 3,
   };
 }

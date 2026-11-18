@@ -10,7 +10,7 @@ export type JourneyItem = Placement & {
   title: string;
   description: string;
   links?: JourneyLink[];
-  video?: { src: string; label: string; captions: string };
+  video?: { src: string; label: string; captions: string; poster: string };
 };
 export type Outfit = "kid" | "starwars" | "essentials" | "western";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate";
@@ -209,7 +209,7 @@ const ROOMS: Chapter[] = [
         description: "A Western Mustangs poster above the bed.", links: [{ href: "https://westernmustangs.ca/", label: "Western Mustangs" }] },
       { id: "csa", model: "poster-csa", x: -41, z: -13, y: 14, rot: 1, solid: false, label: "CSA poster", title: "Chinese Students’ Association.",
         description: "Productions Executive with the Chinese Students’ Association (CSA) at Western.",
-        video: { src: "/videos/journey/csa.mp4", label: "CSA at Western", captions: "/videos/journey/csa.en.vtt" },
+        video: { src: "/videos/journey/csa.mp4", label: "CSA at Western", captions: "/videos/journey/csa.en.vtt", poster: "/videos/journey/csa.webp" },
         links: [{ href: "https://csawestern.com/links", label: "CSA Western" }, { href: "https://www.instagram.com/csawestern/", label: "@csawestern" }] },
       { id: "wds", model: "poster-wds", x: -41, z: 2, y: 14, rot: 1, solid: false, label: "Western Developers Society poster", title: "Western Developers Society.",
         description: "Director of Internals at the Western Developers Society.",
@@ -230,7 +230,7 @@ const ROOMS: Chapter[] = [
         description: "Late-night light for late-night commits." },
       { id: "buldak", model: "buldak-bowl", x: 32, z: -3, y: 18, rot: 3, solid: false, label: "Buldak noodles", title: "Buldak at 5 a.m.",
         description: "A bowl of Buldak noodles from our 5 a.m. taste test.",
-        video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m.", captions: "/videos/journey/buldak.en.vtt" } },
+        video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m.", captions: "/videos/journey/buldak.en.vtt", poster: "/videos/journey/buldak.webp" } },
       { id: "mini-fridge", model: "mini-fridge", x: 24, z: -38, label: "Mini fridge", title: "Dorm essentials.",
         description: "Snacks and drinks, within arm’s reach of the desk." },
       { id: "fragrances", model: "fragrances", x: 24, z: -38, y: 13, solid: false, label: "Fragrances", title: "The collection.",

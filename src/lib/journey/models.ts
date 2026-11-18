@@ -179,31 +179,45 @@ function suitcase(g: Grid, x: number, y: number, z: number, w: number, h: number
 }
 
 
-/** A framed plaque showing a pixelized logo and its wordmark in the voxel font. */
-function plaque(g: Grid, logo: PixelLogo, cols: [number, number], rowCount: number, word: string, border: Color) {
-  const rows = logo.rows.slice(0, rowCount).map(row => row.slice(cols[0], cols[1]));
-  const lw = cols[1] - cols[0], w = Math.max(lw, textWidth(word)) + 4, h = rowCount + 10;
-  frame(g, w, h, border, () => logo.paper);
-  const x0 = -Math.floor(lw / 2);
-  rows.forEach((row, r) => [...row].forEach((c, i) => { if (c === "#") g.set(x0 + i, h - 3 - r, 1, logo.ink); }));
-  centeredText(g, word, 2, 1, logo.ink);
+function plaque(g: Grid, logo: PixelLogo, border: Color, word?: string) {
+  const scale = word ? 2 : 1, logoW = Math.max(...logo.rows.map(row => row.length)) * scale;
+  const w = logoW + 8, h = word ? logo.rows.length * scale + 20 : 32;
+  const left = -Math.floor(w / 2), bottom = word ? 16 : Math.floor((h - logo.rows.length) / 2);
+  g.box(left, 0, -2, w, h, 3, border);
+  g.box(left + 2, 2, 0, w - 4, h - 4, 1, logo.paper);
+  for (let x = left; x < left + w; x++) for (let y = 0; y < h; y++) {
+    if (x === left || x === left + w - 1 || y === 0 || y === h - 1) {
+      g.set(x, y, 1, shade(border, y === h - 1 || x === left ? 1.23 : 0.78));
+    }
+  }
+  logo.rows.forEach((row, r) => [...row].forEach((c, i) => {
+    if (c === "#") g.box(-Math.floor(logoW / 2) + i * scale, bottom + (logo.rows.length - 1 - r) * scale, 0, scale, scale, 1, logo.ink);
+  }));
+  if (word) centeredText(g, word, 4, 0, logo.ink, 0, 2);
+  else g.box(left + 9, 6, 0, w - 18, 1, 1, 0xc0cddf);
 }
 
 type Pen = (x: number, y: number, color: Color) => void;
 
-function badge(g: Grid, d: number, bg: Color, ring: Color, ink: (pen: Pen) => void) {
-  const r = (d - 1) / 2;
+function badge(g: Grid, radius: number, bg: Color, ring: Color, ink: (pen: Pen) => void) {
+  const r = radius * 2;
   for (let x = -r; x <= r; x++) for (let y = -r; y <= r; y++) {
     const q = x * x + y * y;
     if (q > (r + 0.5) ** 2) continue;
-    g.set(x, y + r + 1, -1, ring).set(x, y + r + 1, 0, q <= (r - 0.6) ** 2 ? bg : ring);
+    const paper = q <= (r - 1.6) ** 2;
+    g.box(x, y + r, -2, 1, 1, 2, ring).set(x, y + r, 0, paper ? bg : shade(ring, y > 0 ? 1.07 : 0.82));
   }
-  ink((x, y, color) => g.set(x, y + r + 1, 1, color));
+  ink((x, y, color) => g.set(x, y + r, 0, color));
 }
 
 function line(pen: Pen, x0: number, y0: number, x1: number, y1: number, color: Color) {
+  x0 *= 2; y0 *= 2; x1 *= 2; y1 *= 2;
   const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
-  for (let i = 0; i <= n; i++) pen(Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), color);
+  for (let i = 0; i <= n; i++) {
+    const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
+    pen(x, y, color);
+    pen(x + 1, y, color);
+  }
 }
 
 function tee(g: Grid, x: number, color: Color, year: string) {
@@ -215,9 +229,70 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 }
 
 const GLASS = 0x9dd8e4;
-const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey"]);
+const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn"]);
 const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog"]);
-export const modelVoxelSize = (id: string) => DETAIL_VOXELS.has(id) ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") || id.startsWith("plaque-") ? 0.5 : 1;
+export const modelVoxelSize = (id: string) => id === "chess-table" ? 0.125 : DETAIL_VOXELS.has(id) || id.startsWith("plaque-") ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") ? 0.5 : 1;
+
+type ChessMan = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
+
+function chessPiece(g: Grid, kind: ChessMan, cx: number, cy: number, cz: number, tone: Color, forward: 1 | -1) {
+  const color = (x: number, y: number, z: number) => shade(tone, 0.91 + hash3(x, y, z) * 0.12);
+  const rings = (height: number, radii: number[]) => radii.forEach((r, i) =>
+    disc(g, cx, cy + height + i, cz, r, (x, z) => color(cx + x, cy + height + i, cz + z)));
+  rings(0, [3.4, 3.4, 2.65]);
+  if (kind === "pawn") {
+    rings(3, [1.55, 1.55, 2.1]);
+    sphere(g, cx, cy + 7, cz, 1.55, (x, y, z) => color(cx + x, cy + 7 + y, cz + z));
+  } else if (kind === "rook") {
+    rings(3, [2.1, 2.1, 2.1, 2.65, 3.15]);
+    for (const dx of [-2, 1]) for (const dz of [-2, 1]) g.box(cx + dx, cy + 8, cz + dz, 2, 2, 2, color);
+  } else if (kind === "knight") {
+    rings(3, [2.1, 2.1]);
+    for (let y = 5; y <= 9; y++) g.box(cx - 1, cy + y, cz - (forward === 1 ? 1 : 2), 3, 1, 4, color);
+    g.box(cx - 1, cy + 8, cz + forward * 2 - (forward === -1 ? 1 : 0), 3, 2, 2, color);
+    for (const x of [-1, 1]) {
+      g.set(cx + x, cy + 10, cz - forward, tone);
+      g.set(cx + x, cy + 9, cz + forward, shade(tone, 0.48));
+    }
+  } else if (kind === "bishop") {
+    rings(3, [1.55, 1.55, 1.55, 2.65, 2.1, 1.55, 1.55, 0.6]);
+    for (const x of [0, 1]) g.set(cx + x, cy + 8 + x, cz + forward, -1);
+    g.set(cx, cy + 11, cz, tone);
+  } else {
+    rings(3, [2.1, 1.55, 1.55, 1.55, 2.65, 2.1, 1.55, 2.65]);
+    if (kind === "queen") {
+      for (const [x, z] of [[-2, 0], [0, -2], [2, 0], [0, 2]]) g.set(cx + x, cy + 11, cz + z, tone);
+      rings(11, [1.15, 0.6]);
+    } else {
+      rings(11, [1.55, 0.6]);
+      g.box(cx - 2, cy + 13, cz, 5, 1, 1, color).box(cx, cy + 12, cz, 1, 4, 1, color);
+    }
+  }
+}
+
+function chessTable(g: Grid) {
+  const grain = (wood: Color) => (x: number, y: number, z: number) => shade(wood, 0.87 + hash3(Math.floor(x / 9), y, z) * 0.2);
+  const walnut = grain(0x79502f), dark = grain(0x442b1d);
+  g.box(-48, 56, -48, 96, 6, 96, walnut).box(-46, 62, -46, 92, 2, 92, dark);
+  for (const x of [-43, 35]) for (const z of [-43, 35]) {
+    g.box(x, 0, z, 8, 56, 8, walnut).box(x - 1, 0, z - 1, 10, 4, 10, dark);
+  }
+  g.box(-48, 50, -44, 96, 6, 3, dark).box(-48, 50, 41, 96, 6, 3, dark);
+  g.box(-40, 64, -40, 80, 4, 80, walnut).box(-34, 68, -34, 68, 2, 68, dark);
+  const squares = [grain(0xebcca2), grain(0x8a5836)], back: ChessMan[] = ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"];
+  for (let file = 0; file < 8; file++) for (let rank = 0; rank < 8; rank++) {
+    const x = -32 + 8 * file, z = -32 + 8 * rank;
+    g.box(x, 70, z, 8, 1, 8, squares[(file + rank) % 2]);
+    if (rank < 2 || rank > 5) {
+      const white = rank > 5;
+      chessPiece(g, rank === 1 || rank === 6 ? "pawn" : back[file], x + 4, 71, z + 4, white ? 0xf6e3c4 : 0x40332d, white ? -1 : 1);
+    }
+  }
+  for (const z of [-96, 64]) {
+    for (const x of [-16, 10]) for (const legZ of [z, z + 26]) g.box(x, 0, legZ, 6, 31, 6, dark);
+    g.box(-16, 30, z, 32, 4, 32, walnut).box(-14, 34, z + 2, 28, 6, 28, grain(0x6a7b91));
+  }
+}
 export const modelHasGlass = (id: string) => id.startsWith("glass-trophy-");
 export const isGlass = (color: Color) => color === GLASS;
 export const GLASS_OPACITY = 0.34;
@@ -298,17 +373,7 @@ const MODELS: Record<string, (g: Grid) => void> = {
       g.box(x, y, -2, 3, 3, 4, color).set(x + 1, y + 1, 2, WHITE);
     }
   },
-  "chess-table": g => {
-    table(g, 12, 12, 8, WOOD_DARK, WOOD_DARK);
-    g.box(-5, 8, -5, 10, 1, 10, 0x3b2616);
-    for (let f = 0; f < 8; f++) for (let r = 0; r < 8; r++) g.set(-4 + f, 9, -4 + r, (f + r) % 2 ? 0x6d4528 : 0xf0d9b5);
-    const back = [2, 2, 2, 3, 4, 2, 2, 2];
-    for (let f = 0; f < 8; f++) {
-      g.box(-4 + f, 10, -4, 1, back[f], 1, 0x2a2a2e).box(-4 + f, 10, -3, 1, 1, 1, 0x2a2a2e);
-      g.box(-4 + f, 10, 3, 1, back[f], 1, 0xfaf6ea).box(-4 + f, 10, 2, 1, 1, 1, 0xfaf6ea);
-    }
-    g.box(-2, 0, -12, 4, 5, 4, WOOD).box(-2, 0, 8, 4, 5, 4, WOOD);
-  },
+  "chess-table": chessTable,
   "computer-desk-agario": g => desk(g, agar, 0xd3473c),
   "computer-desk-scratch": g => desk(g, scratch, 0x3d7dd8, 0xc9c2b2, METAL_DARK),
   "computer-desk-code": g => desk(g, code(4), 0x3b3f4a),
@@ -494,9 +559,9 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.box(-8, 8, -4, 16, 1, 8, 0x41372e).box(-6, 3, 3, 12, 4, 1, 0x494038);
     g.box(-4, 6, 4, 3, 1, 1, METAL).box(2, 6, 4, 3, 1, 1, METAL);
   },
-  "plaque-cemc": g => plaque(g, LOGOS.cemc, [0, 17], 15, "CEMC", 0x3e2c6e),
-  "plaque-cemc-gold": g => plaque(g, LOGOS.cemc, [0, 17], 15, "CEMC", GOLD),
-  "plaque-maa": g => plaque(g, LOGOS.maa, [0, 13], 11, "MAA", 0x0b5cad),
+  "plaque-cemc": g => plaque(g, LOGOS.cemc, 0x3e2c6e, "CEMC"),
+  "plaque-cemc-gold": g => plaque(g, LOGOS.cemc, GOLD, "CEMC"),
+  "plaque-maa": g => plaque(g, LOGOS.maa, 0x0b5cad),
   "jane-street-tees": g => { g.box(-15, 14, 0, 30, 1, 1, METAL_DARK); tee(g, -14, 0x1d2b4f, "24"); tee(g, 1, 0x1d2b4f, "25"); },
   lockers: g => {
     for (let i = 0; i < 4; i++) {
@@ -518,23 +583,23 @@ const MODELS: Record<string, (g: Grid) => void> = {
     centeredText(g, "GO", 9, 1, 0xd7beff);
     centeredText(g, "MUSTANGS", 3, 1, 0xf7eee6);
   },
-  "poster-csa": g => badge(g, 19, 0xc0473a, 0xe5e7eb, pen => {
+  "poster-csa": g => badge(g, 9, 0xc0473a, 0xe5e7eb, pen => {
     [[-1, 7, -6, -3], [-6, -3, 0, -3], [0, -3, 2, 1], [-1, 7, 2, 1], [2, 1, -2, -7], [4, 1, 2, -3], [2, -3, 6, -3], [6, -3, 4, 1]]
       .forEach(([x0, y0, x1, y1]) => line(pen, x0, y0, x1, y1, 0xfafafa));
   }),
-  "poster-wds": g => badge(g, 21, 0xfafafa, 0xd1d5db, pen => {
+  "poster-wds": g => badge(g, 10, 0xfafafa, 0xd1d5db, pen => {
     const navy = 0x1b2a4e, t = new Grid();
-    t.text("WDS", -6, -2, 0, navy);
+    t.text("WDS", -12, -4, 0, navy, 2);
     t.forEach((x, y, _z, color) => pen(x, y, color));
     line(pen, -9, 0, -8, 1, navy); line(pen, -9, 0, -8, -1, navy); line(pen, 9, 0, 8, 1, navy); line(pen, 9, 0, 8, -1, navy);
     line(pen, -3, -3, -1, 3, navy);
   }),
-  "poster-wfn": g => badge(g, 19, 0x262626, 0x3f3f46, pen => {
-    let x = -7;
+  "poster-wfn": g => badge(g, 9, 0x262626, 0x3f3f46, pen => {
+    let x = -14;
     ["W", "F", "N"].forEach((char, i) => {
-      const t = new Grid(), w = t.text(char, x, -2, 0, [0xc86aa6, 0xd98c96, 0xe3ad7e][i]);
+      const t = new Grid(), w = t.text(char, x, -4, 0, [0xc86aa6, 0xd98c96, 0xe3ad7e][i], 2);
       t.forEach((px, py, _z, color) => pen(px, py, color));
-      x += w + 1;
+      x += w + 2;
     });
   }),
   "jellycat-frog": g => {

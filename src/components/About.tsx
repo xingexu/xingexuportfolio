@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { CHAPTERS, ageLabel, itemById, type JourneyLink } from "@/lib/journey/data";
 import { LINKS } from "@/app/data";
-import JourneyWorld, { type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
+import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
 import ObjectPreview from "./ObjectPreview";
 import { TransitionLink } from "./PageTransitions";
 
@@ -104,6 +104,7 @@ export default function About() {
   const [transition, setTransition] = useState<TransitionInfo | null>(null);
   const [intro, setIntro] = useState(false);
   const [moved, setMoved] = useState(false);
+  const [camera, setCamera] = useState<CameraMode>({ front: false, tilt: false });
   const near = status.nearby.map(id => itemById(id)).find(Boolean) ?? null;
   const item = opened?.kind === "item" ? itemById(opened.id) : null;
 
@@ -137,9 +138,9 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={CHAPTERS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S move. A and D turn. Press E to inspect an object, or drag to move and tap or click to inspect. Use Objects to browse without walking.</p>
+      <p className="sr-only" id="journey-help">W and S move. A and D turn. Q tilts up and F switches between front and rear camera views. Press E to inspect an object, or drag to move and tap or click to inspect. Use Objects to browse without walking.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
-        onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} />
+        onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
       {intro && <div className="journey-intro" role="status"><Typed text="Welcome to Canada." delay={300} /></div>}
 
@@ -170,7 +171,11 @@ export default function About() {
       )}
 
       {!intro && !transition && <Joystick controls={controls} />}
-      {!intro && !transition && <button type="button" className="journey-objects" onClick={() => browse(status.chapter)} aria-haspopup="dialog">Objects</button>}
+      {!intro && !transition && <div className="journey-tools" role="group" aria-label="Camera and objects">
+        <button type="button" onClick={() => controls.current?.toggleCamera("tilt")} aria-pressed={camera.tilt} aria-keyshortcuts="Q">Tilt up <kbd aria-hidden="true">Q</kbd></button>
+        <button type="button" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
+        <button type="button" onClick={() => browse(status.chapter)} aria-haspopup="dialog">Objects</button>
+      </div>}
       {MUSIC_URL && <JourneyMusic src={MUSIC_URL} />}
       <TransitionLink href="/" className="journey-back" aria-label="Go back to the home page"><span aria-hidden="true">←</span> Back</TransitionLink>
 
@@ -197,12 +202,11 @@ export default function About() {
           return <>
             <p className="journey-eyebrow">{home.stop} · age {ageLabel(home)}</p>
             <h2 id="journey-dialog-title">{item.title}</h2>
-            <ObjectPreview model={item.model} label={item.label} />
-            <p className="journey-copy">{item.description}</p>
-            {item.video && <video key={item.video.src} className="journey-video" src={item.video.src} controls playsInline preload="metadata" aria-label={item.video.label}>
+            {item.video ? <video key={item.video.src} className="journey-video" src={item.video.src} poster={item.video.poster} controls playsInline preload="metadata" aria-label={item.video.label}>
               <track kind="captions" src={item.video.captions} srcLang="en" label="English" />
               <a href={item.video.src}>Watch {item.video.label}</a>
-            </video>}
+            </video> : <ObjectPreview model={item.model} label={item.label} />}
+            <p className="journey-copy">{item.description}</p>
             {item.links && <div className="journey-links">{item.links.map(link => <StoryLink key={link.href} link={link} />)}</div>}
             {chapterItems.length > 1 && <nav className="journey-item-nav" aria-label={`More from ${home.place}`}>
               <button type="button" onClick={() => openItem(chapterItems[(itemIndex + chapterItems.length - 1) % chapterItems.length].id)} aria-label="Previous object">←</button>

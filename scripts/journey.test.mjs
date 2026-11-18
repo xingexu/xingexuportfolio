@@ -20,7 +20,7 @@ function load(file) {
 }
 const { CHAPTERS, ALL_ITEMS } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
-const { buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
+const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 
 test('every item is written out, linked properly and has a model', () => {
@@ -45,6 +45,35 @@ test('the CSA poster and Buldak bowl have the right playable video and captions'
     const mp4 = fs.readFileSync(path.join(root, 'public', video.src));
     assert.equal(mp4.toString('ascii', 4, 8), 'ftyp');
     assert.match(fs.readFileSync(path.join(root, 'public', video.captions), 'utf8'), /^WEBVTT\n/);
+    assert.equal(fs.readFileSync(path.join(root, 'public', video.poster)).toString('ascii', 8, 12), 'WEBP');
+  }
+});
+
+test('all 32 chess pieces are present with six distinct silhouettes per side', () => {
+  const chess = buildModel('chess-table');
+  assert.equal(modelVoxelSize('chess-table'), 0.125);
+  const ranks = Array.from({ length: 8 }, () => Array(8).fill(0));
+  chess.forEach((x, y, z) => {
+    if (y < 71) return;
+    const file = Math.floor((x + 32) / 8), rank = Math.floor((z + 32) / 8);
+    ranks[rank][file] = Math.max(ranks[rank][file], y - 70);
+  });
+  assert.equal(ranks.flat().filter(Boolean).length, 32);
+  for (const rank of [0, 7]) {
+    assert.equal(new Set([ranks[rank + (rank === 0 ? 1 : -1)][0], ...ranks[rank]]).size, 6);
+    assert.equal(ranks[rank][4], Math.max(...ranks[rank]));
+  }
+});
+
+test('CEMC and MAA logos are printed into white paper, not floating in front of it', () => {
+  for (const id of ['plaque-cemc', 'plaque-cemc-gold', 'plaque-maa']) {
+    const grid = buildModel(id);
+    let white = 0, ink = 0;
+    grid.forEach((_x, _y, z, color) => {
+      if (z === 0 && color === 0xffffff) white++;
+      if (z === 0 && (color === 0x1a1a1a || color === 0x0b5cad)) ink++;
+    });
+    assert.ok(white > 800 && ink > 100, id);
   }
 });
 
@@ -93,6 +122,36 @@ test('the terminal facade can be cut away without losing the apron floor', () =>
 test('render pixels use half the old pitch at desktop and phone sizes', () => {
   for (const [w, h, pixel] of [[1920, 1080, 1.5], [1280, 720, 1], [400, 754, 0.5]]) {
     assert.equal(W.renderPixelSize(w, h), pixel);
+  }
+});
+
+test('front and tilt camera modes keep the full avatar inside the vertical field of view', () => {
+  for (const age of [7, 18]) for (const aspect of [0.46, 16 / 9]) {
+    const height = avatarHeight(age) * W.AVATAR_SCALE;
+    for (const front of [0, 0.5, 1]) for (const tilt of [0, 0.5, 1]) {
+      const view = W.cameraOffsets(height, aspect, front, tilt);
+      const lookAngle = Math.atan2(view.lookHeight - view.rise, view.distance + view.lead);
+      for (const depth of [-6, 6]) for (const y of [-1, height + 4 * W.AVATAR_SCALE]) {
+        const angle = Math.atan2(y - view.rise, view.distance + depth);
+        const screenY = Math.tan(angle - lookAngle) / Math.tan(24 * Math.PI / 180);
+        assert.ok(Math.abs(screenY) < (tilt === 1 ? 0.78 : 0.96), `age ${age}, aspect ${aspect}, front ${front}, tilt ${tilt}: ${screenY}`);
+      }
+      if (tilt === 1) assert.ok(lookAngle > 0, 'tilts above the horizon');
+      if (front === 1) assert.equal(view.orbit, Math.PI);
+    }
+  }
+});
+
+test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading', () => {
+  assert.equal(AVATAR_VOXEL_SIZE, 0.5);
+  for (const outfit of ['starwars', 'essentials', 'western']) {
+    const parts = buildAvatar(18, outfit);
+    assert.equal(parts.height, 34);
+    assert.ok(parts.head.bounds().minZ < -10);
+    assert.ok(parts.armL.bounds().minX < -4);
+    const cuffColors = new Set();
+    parts.armL.forEach((_x, _y, z, color) => { if (z === 2) cuffColors.add(color); });
+    assert.ok(cuffColors.size > 3);
   }
 });
 

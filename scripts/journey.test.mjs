@@ -171,41 +171,85 @@ test('cones and basketball keep their existing bump reactions', () => {
   assert.ok(ball.z >= W.interior(CHAPTERS[3]).minZ + ball.radius);
 });
 
-test('both volleyball styles respond to proximity, a toss or set, and a walking kick', () => {
+test('both volleyball styles respond to proximity and a walking kick', () => {
   const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview'));
   for (const kind of ['mikasa', 'molten']) {
     const b = V.makeBall(0, 0, 0, 1.75), player = { x: -3, z: 0 };
     assert.equal(V.volleyAction(kind, b, { x: 30, z: 0 }, 22, field), null);
-    assert.equal(V.volleyAction(kind, b, player, 22, field), kind === 'mikasa' ? 'Toss' : 'Set');
+    assert.equal(V.volleyAction(kind, b, player, 22, field), kind === 'mikasa' ? 'Spike' : 'Set');
     assert.equal(V.kickBall(b, player, { x: -0.3, z: 0 }, 2, 0.016), false);
     assert.equal(V.kickBall(b, player, { x: 0.3, z: 0 }, 2, 0.016), true);
     assert.ok(b.vx > 0 && b.vy > 0, 'a kick sends the ball forward and a little upward');
     assert.equal(V.kickBall(b, player, { x: 0.3, z: 0 }, 2, 0.016), false);
-    b.y = 17;
-    V.launchBall(b, { x: 0, y: 40, z: 0 }, kind === 'mikasa');
-    assert.equal(V.volleyAction(kind, b, player, 22, field), kind === 'mikasa' ? 'Hit' : null);
+    assert.equal(V.volleyAction(kind, b, player, 22, field), null);
     for (let i = 0; i < 480; i++) V.stepBall(b, field, 1 / 120);
     assert.equal(b.y, b.radius);
-    assert.ok(b.grounded && !b.tossed);
+    assert.ok(b.grounded);
   }
 });
 
-test('Hit is offered only if the ball is reachable through the windup', () => {
-  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview')), player = { x: 1, z: 4 };
-  const b = V.makeBall(1, 15, 0, 1.75);
-  V.launchBall(b, { x: 0, y: -36, z: 0 }, true);
-  assert.equal(V.volleyAction('mikasa', b, player, 22, field), null, 'the ball falls below arm height before impact');
-  b.y = 22;
-  assert.equal(V.volleyAction('mikasa', b, player, 22, field), 'Hit');
+test('one spike action feeds the ball, jumps before striking, and reaches a floor bounce across Bayview’s net', () => {
+  const index = CHAPTERS.findIndex(c => c.id === 'bayview'), field = W.buildBallField(index);
+  const item = CHAPTERS[index].items.find(item => item.id === 'volleyball');
+  const b = V.makeBall(item.x, 0, item.z, 1.75), player = { x: b.x, z: b.z + 5 };
+  const avatar = buildAvatar(14, CHAPTERS[index].outfit);
+  const action = V.volleyAction('mikasa', b, player, avatar.height * W.AVATAR_SCALE, field);
+  assert.equal(action, 'Spike');
+  const seq = V.startVolley(action, b, player, { x: 0, z: -1 }, (avatar.shoulder + 1) * W.AVATAR_SCALE, field);
+  V.advanceVolley(seq, b, field, V.SPIKE.feed);
+  assert.ok(b.vy > 0 && seq.contacts === 1);
+  assert.equal(V.volleyPose(action, V.SPIKE.feed).lift, 0, 'initial toss is grounded');
+  V.advanceVolley(seq, b, field, V.SPIKE.contact - V.SPIKE.feed - 0.08);
+  assert.ok(V.volleyPose(action, seq.elapsed).lift > 0);
+  assert.equal(seq.contacts, 1, 'takeoff precedes contact');
+  V.advanceVolley(seq, b, field, V.SPIKE.contact - seq.elapsed + 0.001);
+  assert.equal(seq.contacts, 2);
+  assert.ok(b.vy < 0);
+  assert.ok(V.volleyPose(action, V.SPIKE.contact).lift >= V.SPIKE.rise - 0.001);
+  assert.ok(V.volleyPose(action, V.SPIKE.contact + 0.15).right > V.volleyPose(action, V.SPIKE.contact).right + 1);
+  let floorBounce = false;
+  while (seq.elapsed < V.SPIKE.end + 0.65 && !floorBounce) {
+    const previous = b.vy;
+    V.advanceVolley(seq, b, field, 1 / 120);
+    floorBounce = b.y === b.radius && previous < -5 && b.vy > 0;
+  }
+  assert.ok(floorBounce && b.z < field.net.z - b.radius, 'spike bounces up off the far court');
 });
 
-test('Mikasa hits clear the tape from both sides while low airborne balls bounce back', () => {
+test('three Western overhead touches raise both arms and only the last set travels forward', () => {
+  const index = CHAPTERS.findIndex(c => c.id === 'western'), field = W.buildBallField(index);
+  const item = CHAPTERS[index].items.find(item => item.id === 'molten');
+  const b = V.makeBall(item.x, 0, item.z, 1.875), player = { x: b.x + 5, z: b.z };
+  const avatar = buildAvatar(18, CHAPTERS[index].outfit);
+  const action = V.volleyAction('molten', b, player, avatar.height * W.AVATAR_SCALE, field);
+  assert.equal(action, 'Set');
+  const seq = V.startVolley(action, b, player, { x: -1, z: 0 }, (avatar.shoulder + 1) * W.AVATAR_SCALE, field);
+  for (const [i, touch] of V.SET_CONTACTS.entries()) {
+    V.advanceVolley(seq, b, field, touch - seq.elapsed - 0.005);
+    if (i > 0) assert.ok(b.vy < 0, 'the ball returns to the hands before each new touch');
+    assert.equal(seq.contacts, i);
+    V.advanceVolley(seq, b, field, 0.01);
+    assert.ok(b.vy > 0 && seq.contacts === i + 1);
+    assert.ok(Math.abs(b.y - seq.release.y) < 0.2 && Math.abs(b.x - seq.release.x) < 0.1, 'contact occurs at the hands');
+    assert.equal(i === V.SET.touches - 1, b.vx < 0);
+    for (const reduced of [false, true]) {
+      const pose = V.volleyPose(action, touch, reduced), ready = V.volleyPose(action, touch - 0.15, reduced);
+      assert.ok(pose.left < -2.25 && pose.right === pose.left);
+      assert.ok(pose.leftElbow > ready.leftElbow, 'both arms extend on every contact');
+      assert.ok(V.volleyPose('Spike', V.SPIKE.contact, reduced).lift > 0, 'reduced motion retains an airborne contact pose');
+    }
+  }
+  assert.ok(V.advanceVolley(seq, b, field, V.SET.recovery));
+});
+
+test('downward Mikasa spikes clear the tape from both sides while low balls bounce back', () => {
   const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview')), { net } = field;
   const x = (net.minX + net.maxX) / 2;
   for (const side of [-1, 1]) {
-    for (const height of [17, 22, 27]) {
+    for (const height of [28, 31]) {
       const b = V.makeBall(x + 3, height - 1.75, net.z + side * 12, 1.75);
       V.launchBall(b, V.spikeVelocity(b, field, { x: 0, z: -side }));
+      assert.ok(b.vy < 0, 'initial velocity is downward');
       const samples = [];
       for (let i = 0; i < 140; i++) {
         V.stepBall(b, field, 1 / 120);
@@ -221,17 +265,15 @@ test('Mikasa hits clear the tape from both sides while low airborne balls bounce
   assert.ok(low.vz > 0 && low.z > net.z, 'hitting the mesh reverses motion');
 });
 
-test('a low diagonal Mikasa hit near the net clears the taller post', () => {
+test('a diagonal Mikasa spike near the net clears the taller post', () => {
   const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview')), { net } = field;
-  const b = V.makeBall(net.maxX + 2, 20 - 1.75, net.z + 3, 1.75);
+  const b = V.makeBall(net.maxX + 2, 29 - 1.75, net.z + 5, 1.75);
   V.launchBall(b, V.spikeVelocity(b, field, { x: 0, z: -1 }));
-  let crossed = false;
-  for (let i = 0; i < 240; i++) {
+  for (let i = 0; i < 120 && b.z > net.z - b.radius - 2; i++) {
     V.stepBall(b, field, 1 / 120);
     assert.ok(b.vz <= 0, 'never rebounds off the near post');
-    if (b.z <= net.z) crossed = true;
   }
-  assert.ok(crossed && b.z < net.z - 3);
+  assert.ok(b.z < net.z - 3);
 });
 
 test('volleyballs bounce off the floor and walls, then settle', () => {
@@ -460,7 +502,19 @@ test('spawn points are open and every object can be reached on foot', () => {
     const field = W.buildBallField(index);
     for (const placement of [...chapter.items, ...chapter.decor].filter(p => p.ball)) {
       const ball = V.makeBall(placement.x, placement.y ?? 0, placement.z, modelFootprint(placement.model).height / 2);
-      assert.ok(cells.some(c => V.volleyAction(placement.ball, ball, c, avatarHeight(chapter.ageFrom) * W.AVATAR_SCALE, field)), `${placement.model} at ${placement.x},${placement.z} is playable`);
+      assert.ok(cells.some(c => {
+        const age = W.ageAt(chapter, c.z);
+        const action = V.volleyAction(placement.ball, ball, c, avatarHeight(age) * W.AVATAR_SCALE, field);
+        const dx = ball.x - c.x, dz = ball.z - c.z, distance = Math.hypot(dx, dz);
+        if (!action || distance < 3) return false;
+        const forward = { x: dx / distance, z: dz / distance };
+        const shoulder = (buildAvatar(age, chapter.outfit).shoulder + 1) * W.AVATAR_SCALE;
+        const candidate = { ...ball };
+        const seq = V.startVolley(action, candidate, c, forward, shoulder, field);
+        const cue = action === 'Set' ? V.SET.first : V.SPIKE.contact;
+        V.advanceVolley(seq, candidate, field, cue);
+        return Math.hypot(candidate.x - seq.release.x, candidate.z - seq.release.z, candidate.y - (action === 'Set' ? seq.release.y : seq.strikeY)) < 0.5;
+      }), `${placement.model} at ${placement.x},${placement.z} is playable`);
     }
   });
 });

@@ -7,7 +7,7 @@ import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, mode
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, bumpProp, cameraOffsets, cutawaySides, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type BumpProp, type RoomSide } from "@/lib/journey/world";
-import { HIT_WINDUP, kickBall, launchBall, liftBall, makeBall, spikeVelocity, stepBall, volleyAction, type Ball, type BallAction, type BallField, type BallKind, type Point } from "@/lib/journey/volleyball";
+import { advanceVolley, kickBall, makeBall, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -105,7 +105,7 @@ export default function JourneyWorld(props: Props) {
     type PropView = { holder: Group; bounds: Box3; material: MeshBasicMaterial; glass?: MeshBasicMaterial };
     type ReactiveView = { prop: PropView; state: BumpProp; pivot: number };
     type BallView = { prop: PropView; state: Ball; kind: BallKind };
-    type Volley = { ball: BallView; action: BallAction; start: Point; contact: Point; elapsed: number; released: boolean };
+    type Volley = { ball: BallView; sequence: VolleySequence };
     type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
     type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; ballPositions: Map<string, Ball>; field?: BallField; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, Group> };
     const rooms = new Map<number, RoomView>();
@@ -201,6 +201,7 @@ export default function JourneyWorld(props: Props) {
     shadow.scale.setScalar(AVATAR_SCALE);
     const limbs = { legL: new Group(), legR: new Group(), armL: new Group(), armR: new Group(), head: new Group(), propeller: new Group() };
     Object.values(limbs).forEach(limb => body.add(limb));
+    const elbowL = new Group(), elbowR = new Group();
     let parts: AvatarParts | null = null, avatarKey = "";
     const avatarGeometries: BufferGeometry[] = [];
     function setAvatar(age: number, outfit: typeof CHAPTERS[number]["outfit"]) {
@@ -217,8 +218,22 @@ export default function JourneyWorld(props: Props) {
       const torso = mesh(next.torso); torso.position.y = next.hip; body.add(torso);
       limbs.legL.add(mesh(next.legL)); limbs.legL.position.set(0, next.hip, 0);
       limbs.legR.add(mesh(next.legR)); limbs.legR.position.set(0, next.hip, 0);
-      limbs.armL.add(mesh(next.armL)); limbs.armL.position.set(-next.shoulderX, torsoTop, 0);
-      limbs.armR.add(mesh(next.armR)); limbs.armR.position.set(next.shoulderX, torsoTop, 0);
+      for (const [limb, elbow, grid, side] of [[limbs.armL, elbowL, next.armL, -1], [limbs.armR, elbowR, next.armR, 1]] as const) {
+        limb.position.set(side * next.shoulderX, torsoTop, 0);
+        if (outfit !== "western" && outfit !== "essentials") {
+          limb.add(mesh(grid));
+          continue;
+        }
+        const upper = new Grid(), lower = new Grid(), hinge = Math.round(grid.bounds().minY / 2);
+        grid.forEach((x, y, z, color) => {
+          if (y >= hinge) upper.set(x, y, z, color);
+          else lower.set(x, y - hinge, z, color);
+        });
+        elbow.clear();
+        elbow.position.y = hinge * AVATAR_VOXEL_SIZE;
+        elbow.add(mesh(lower));
+        limb.add(mesh(upper), elbow);
+      }
       limbs.head.add(mesh(next.head)); limbs.head.position.set(0, torsoTop + 1, 0);
       if (next.propeller) { limbs.propeller.add(mesh(next.propeller)); limbs.propeller.position.set(0, torsoTop + 1 + (next.propellerY ?? 0), 0); }
     }
@@ -313,11 +328,11 @@ export default function JourneyWorld(props: Props) {
     function nextVolley() {
       const activeRoom = room(chapter), height = (parts?.height ?? 20) * AVATAR_SCALE;
       let best: { ball: BallView; action: BallAction; score: number } | undefined;
-      if (!activeRoom.field || (volley && (!volley.released || volley.elapsed < 0.16 + (volley.action === "Hit" ? HIT_WINDUP : 0.34)))) return;
+      if (!activeRoom.field || volley) return;
       for (const ball of activeRoom.balls) {
         const action = volleyAction(ball.kind, ball.state, player, height, activeRoom.field);
         if (!action) continue;
-        const score = Math.hypot(ball.state.x - player.x, ball.state.z - player.z) - (action === "Hit" ? 10 : 0);
+        const score = Math.hypot(ball.state.x - player.x, ball.state.z - player.z);
         if (!best || score < best.score) best = { ball, action, score };
       }
       return best;
@@ -325,8 +340,8 @@ export default function JourneyWorld(props: Props) {
 
     function playVolley() {
       if (intro || transition || live.current.blocked || !parts) return;
-      const next = nextVolley();
-      if (!next) return;
+      const next = nextVolley(), field = room(chapter).field;
+      if (!next || !field) return;
       const { state } = next.ball;
       const dx = state.x - player.x, dz = state.z - player.z, distance = Math.hypot(dx, dz);
       if (distance > 0.5) {
@@ -334,54 +349,19 @@ export default function JourneyWorld(props: Props) {
         player.yaw += Math.atan2(Math.sin(delta), Math.cos(delta));
       }
       player.vx = player.vz = player.spin = 0;
-      const reach = Math.min(5.1, Math.max(3, distance));
-      const contact = { x: player.x + Math.sin(player.yaw) * reach, z: player.z + Math.cos(player.yaw) * reach,
-        y: (parts.shoulder + 1) * AVATAR_SCALE + (next.action === "Set" ? 5.5 : 0.5) };
-      const field = room(chapter).field;
-      if (field) {
-        contact.x = Math.max(field.minX + state.radius, Math.min(field.maxX - state.radius, contact.x));
-        contact.z = Math.max(field.minZ + state.radius, Math.min(field.maxZ - state.radius, contact.z));
-        if (field.net && contact.x > field.net.minX && contact.x < field.net.maxX && Math.abs(player.z - field.net.z) > 0.5) {
-          const side = Math.sign(player.z - field.net.z);
-          const clearance = 2 + state.radius;
-          if ((contact.z - field.net.z) * side < clearance) contact.z = field.net.z + side * clearance;
-        }
-      }
-      volley = { ...next, start: { x: state.x, y: state.y, z: state.z }, contact, elapsed: 0, released: false };
+      const forward = { x: Math.sin(player.yaw), z: Math.cos(player.yaw) };
+      volley = { ball: next.ball, sequence: startVolley(next.action, state, player, forward, (parts.shoulder + 1) * AVATAR_SCALE, field) };
     }
 
     function updateVolleyballs(dt: number, activeRoom: RoomView) {
       if (!activeRoom.field) return;
       const field = activeRoom.field;
-      if (volley) {
-        volley.elapsed += dt;
-        if (volley.elapsed > (volley.action === "Hit" ? 0.48 : 0.61)) volley = null;
-      }
       for (const ball of activeRoom.balls) {
         const { state, prop: { holder, bounds } } = ball;
         const x = state.x, y = state.y, z = state.z;
-        const action = volley?.ball === ball ? volley : null;
-        const contactTime = action?.action === "Hit" ? HIT_WINDUP : 0.34;
-        const remainder = action?.action === "Hit" && !action.released ? Math.max(0, action.elapsed - contactTime) : 0;
-        if (action && !action.released && action.action !== "Hit") {
-          const lift = smooth(action.elapsed / contactTime);
-          liftBall(state, {
-            x: action.start.x + (action.contact.x - action.start.x) * lift,
-            z: action.start.z + (action.contact.z - action.start.z) * lift,
-            y: action.start.y + (action.contact.y - action.start.y) * lift,
-          }, field);
-        } else if (!(state.grounded && !state.vx && !state.vz && !state.kickDelay)) stepBall(state, field, dt - remainder);
-        if (action && !action.released && action.elapsed >= contactTime) {
-          action.released = true;
-          const forward = { x: Math.sin(player.yaw), z: Math.cos(player.yaw) };
-          if (action.action === "Hit") {
-            if (state.tossed) launchBall(state, spikeVelocity(state, field, forward));
-            stepBall(state, field, remainder);
-          } else {
-            const set = action.action === "Set";
-            launchBall(state, { x: forward.x * (set ? 3.5 : 0.6), y: set ? 27 : 40, z: forward.z * (set ? 3.5 : 0.6) }, !set);
-          }
-        }
+        if (volley?.ball === ball) {
+          if (advanceVolley(volley.sequence, state, field, dt)) volley = null;
+        } else if (!(state.grounded && !state.vx && !state.vz && !state.kickDelay)) stepBall(state, field, dt);
         const dx = state.x - x, dz = state.z - z, travel = Math.hypot(dx, dz);
         if (travel || state.y !== y) {
           holder.position.set(state.x, state.y, state.z);
@@ -634,7 +614,7 @@ export default function JourneyWorld(props: Props) {
         // A/D turn, W/S walk along the way you face.
         let turn = (held.has("right") ? 1 : 0) - (held.has("left") ? 1 : 0) + stick.x + gesture.x;
         let move = (held.has("up") ? 1 : 0) - (held.has("down") ? 1 : 0) - stick.y - gesture.y;
-        if (transition || blockedNow || (volley && !volley.released)) {
+        if (transition || blockedNow || volley) {
           turn = 0; move = 0;
           player.vx = 0; player.vz = 0; player.spin = 0;
         }
@@ -706,18 +686,18 @@ export default function JourneyWorld(props: Props) {
       limbs.legL.rotation.x = swing; limbs.legR.rotation.x = -swing;
       limbs.armL.rotation.x = -swing * 0.8; limbs.armR.rotation.x = swing * 0.8;
       body.position.y = Math.abs(Math.sin(player.phase)) * 0.7 * Math.min(1, speedNow * 1.4);
+      body.rotation.y = elbowL.rotation.x = elbowR.rotation.x = 0;
       limbs.armL.rotation.z = limbs.armR.rotation.z = limbs.head.rotation.x = 0;
       if (volley) {
-        const { action, elapsed } = volley;
-        const contact = action === "Hit" ? HIT_WINDUP : 0.34;
-        const weight = motion.matches ? Number(elapsed < contact + 0.12) : smooth(elapsed / contact) * (1 - smooth((elapsed - contact) / 0.26));
-        const dip = !motion.matches && action !== "Hit" ? Math.sin(Math.PI * Math.min(1, elapsed / contact)) : 0;
-        limbs.armL.rotation.x += (action === "Hit" ? -0.85 : action === "Set" ? -2.46 : -1.53) * weight;
-        limbs.armR.rotation.x += (action === "Hit" ? (elapsed < contact ? 0.6 : -0.9) - 2.05 * weight : action === "Set" ? -2.46 : -1.53) * weight;
-        limbs.armL.rotation.z = 0.33 * weight; limbs.armR.rotation.z = -0.33 * weight;
-        limbs.head.rotation.x = -0.18 * weight;
-        body.position.y -= 0.7 * dip;
-        if (action === "Hit" && !motion.matches) body.position.y += 2.7 * Math.sin(Math.PI * Math.min(1, elapsed / 0.44));
+        const { action, elapsed } = volley.sequence;
+        const pose = volleyPose(action, elapsed, motion.matches);
+        limbs.armL.rotation.set(pose.left, 0, pose.leftRoll);
+        limbs.armR.rotation.set(pose.right, 0, pose.rightRoll);
+        elbowL.rotation.x = pose.leftElbow; elbowR.rotation.x = pose.rightElbow;
+        limbs.legL.rotation.x = pose.legs; limbs.legR.rotation.x = pose.legs;
+        limbs.head.rotation.x = pose.head;
+        body.rotation.y = pose.twist;
+        body.position.y = pose.lift / AVATAR_SCALE;
       } else if (kickPose && !motion.matches) {
         limbs.legR.rotation.x = -1.04 * Math.sin(Math.PI * kickPose / 0.28);
         limbs.armL.rotation.x -= 0.22;

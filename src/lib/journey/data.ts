@@ -156,7 +156,7 @@ const ROOMS: Chapter[] = [
     width: 72, depth: 76, floor: "gym", wall: 0xc8ccd2, trim: 0x23477a, background: 0x0e1014, doorLabel: "WESTERN",
     items: [
       { id: "volleyball", model: "volleyball", x: -17, z: 17, ball: "mikasa", label: "Mikasa volleyball", title: "Off the keyboard. On court.",
-        description: "High school is where I picked up volleyball. Get close and press R or tap Toss; press it again while the ball is up to hit. Near the net, hits aim across the court. Walk into a ball on the floor to kick it.",
+        description: "High school is where I picked up volleyball. Get close and press R or tap Spike once to toss, jump, and drive the ball down. Stand behind the ball to spike across the net. Walk into a ball on the floor to kick it.",
         links: [{ href: LINKS.volleyball, label: "Follow @ziggyvb" }] },
       { id: "laptop", model: "macbook", x: 25, z: 6, y: 12, rot: 3, solid: false, label: "MacBook · competitive programming", title: "Competitive programming.",
         description: "Competitive programming took over my evenings: Canadian Computing Competition practice, LeetCode, and a lot of debugging.",
@@ -247,7 +247,7 @@ const ROOMS: Chapter[] = [
       { id: "pink-shoes", model: "pink-court-shoes", x: -25, z: -31, label: "Pink volleyball shoes", title: "Pink volleyball shoes.",
         description: "My pink court shoes, ready for the next volleyball game." },
       { id: "molten", model: "molten-volleyball", x: -30, z: -28, ball: "molten", label: "Molten volleyball", title: "Molten volleyball.",
-        description: "My Molten volleyball, next to my court shoes. Get close and press R or tap Set to send it up with both hands. Walk into it to kick it across the room." },
+        description: "My Molten volleyball, next to my court shoes. Get close and press R or tap Set for two overhead sets to yourself, then one forward. Walk into it to kick it across the room." },
       { id: "laundry", model: "laundry-basket", x: -36, z: -22, label: "Laundry basket", title: "Residence life.",
         description: "A laundry basket tucked near the closet." },
     ],

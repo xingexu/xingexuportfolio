@@ -186,16 +186,23 @@ export default function JourneyWorld(props: Props) {
       // Pull the camera in rather than letting it pass through walls or big props.
       const full = dist;
       for (let t = 6; t <= dist; t += 1.5) if (blockedAt(chapter, player.x - fx * t, player.z - fz * t, 1.5)) { dist = Math.max(6, t - 1.5); break; }
-      // When pulled in close, rise and look down past the character's head instead of filling the screen with it.
-      const lift = (1 - dist / full) * H * 0.9;
-      pos.set(player.x - fx * dist, player.y + height + lift, player.z - fz * dist);
-      look.set(player.x + fx * 26, player.y + H * 0.5, player.z + fz * 26);
+      let cx = player.x - fx * dist, cz = player.z - fz * dist;
       const chapterNow = CHAPTERS[chapter];
       if (!chapterNow.outdoor) {
         const room = interior(chapterNow);
-        pos.x = Math.max(room.minX + 1.5, Math.min(room.maxX - 1.5, pos.x));
-        pos.z = Math.max(room.minZ + 1.5, Math.min(room.maxZ - 1.5, pos.z));
-        pos.y = Math.min(WALL_HEIGHT - 2, pos.y);
+        cx = Math.max(room.minX + 1.5, Math.min(room.maxX - 1.5, cx));
+        cz = Math.max(room.minZ + 1.5, Math.min(room.maxZ - 1.5, cz));
+      }
+      // Too tight for a shoulder view (backed against a wall): see through the character's own eyes.
+      const back = Math.hypot(cx - player.x, cz - player.z);
+      const firstPerson = back < Math.min(28, full * 0.7);
+      avatar.visible = !firstPerson;
+      if (firstPerson) {
+        pos.set(player.x + fx * 1.5, player.y + H * 0.9, player.z + fz * 1.5);
+        look.set(player.x + fx * 40, player.y + H * 0.75, player.z + fz * 40);
+      } else {
+        pos.set(cx, Math.min(chapterNow.outdoor ? Infinity : WALL_HEIGHT - 2, player.y + height + (1 - back / full) * H * 0.6), cz);
+        look.set(player.x + fx * 26, player.y + H * 0.5, player.z + fz * 26);
       }
     }
     function snapCamera() { cameraGoal(camPos, camLook); camera.position.copy(camPos); camera.lookAt(camLook); }

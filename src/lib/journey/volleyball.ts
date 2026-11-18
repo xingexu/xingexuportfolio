@@ -22,6 +22,25 @@ function overlaps(box: Box, x: number, z: number, r: number) {
   return Math.hypot(x - clamp(x, box.minX, box.maxX), z - clamp(z, box.minZ, box.maxZ)) < r;
 }
 
+function ballSpace(field: BallField, r: number, x: number, y: number, z: number) {
+  return x >= field.minX + r && x <= field.maxX - r && z >= field.minZ + r && z <= field.maxZ - r &&
+    !field.blocks.some(block => y - r < block.top - 0.001 && y + r > block.bottom && overlaps(block, x, z, r));
+}
+
+/** Move a held ball toward the hands without sliding it through props. */
+export function liftBall(ball: Ball, target: Point, field: BallField) {
+  const dx = target.x - ball.x, dy = target.y - ball.y, dz = target.z - ball.z, r = ball.radius;
+  const substeps = Math.max(1, Math.ceil(Math.hypot(dx, dy, dz) / 0.25));
+  for (let i = 0; i < substeps; i++) {
+    const y = clamp(ball.y + dy / substeps, r, field.ceiling - r);
+    if (ballSpace(field, r, ball.x, y, ball.z)) ball.y = y;
+    const x = ball.x + dx / substeps, z = ball.z + dz / substeps;
+    if (ballSpace(field, r, x, ball.y, ball.z)) ball.x = x;
+    if (ballSpace(field, r, ball.x, ball.y, z)) ball.z = z;
+  }
+  ball.grounded = false;
+}
+
 export function volleyAction(kind: BallKind, ball: Ball, player: Vec, height: number, net?: CourtNet): BallAction | null {
   const dx = ball.x - player.x, dz = ball.z - player.z;
   if (Math.hypot(dx, dz) > (ball.tossed ? 9 : 8.5)) return null;
@@ -78,9 +97,7 @@ export function stepBall(ball: Ball, field: BallField, dt: number) {
   ball.kickDelay = Math.max(0, ball.kickDelay - dt);
   const r = ball.radius, steps = Math.max(1, Math.ceil(dt * 120)), h = dt / steps;
   for (let i = 0; i < steps; i++) {
-    const free = (x: number, z: number) =>
-      x >= field.minX + r && x <= field.maxX - r && z >= field.minZ + r && z <= field.maxZ - r &&
-      !field.blocks.some(block => ball.y - r < block.top - 0.001 && ball.y + r > block.bottom && overlaps(block, x, z, r));
+    const free = (x: number, z: number) => ballSpace(field, r, x, ball.y, z);
     const nextY = ball.y + ball.vy * h - GRAVITY * h * h / 2;
     ball.vy -= GRAVITY * h;
     let floor = r, ceiling = field.ceiling - r;

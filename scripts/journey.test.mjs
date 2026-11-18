@@ -229,6 +229,18 @@ test('volleyballs bounce off the floor and walls, then settle', () => {
   assert.equal(b.vz, 0);
 });
 
+test('lifting a Molten beside a tall closet does not pull it inside', () => {
+  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'western'));
+  const closet = field.blocks.find(p => p.minX < -27 && p.maxX > -27 && p.minZ < -39 && p.maxZ > -39);
+  const ball = V.makeBall(-31, 0, closet.maxZ + 2, 1.875);
+  V.liftBall(ball, { x: ball.x, y: 23, z: closet.maxZ - 1 }, field);
+  assert.ok(Math.abs(ball.y - 23) < 1e-6);
+  assert.ok(ball.z >= closet.maxZ + ball.radius);
+  V.launchBall(ball, { x: 0, y: 27, z: -3.5 });
+  for (let i = 0; i < 360; i++) V.stepBall(ball, field, 1 / 120);
+  assert.ok(ball.grounded && (ball.y === ball.radius || ball.y >= closet.top + ball.radius));
+});
+
 test('every model uses an aligned voxel grid and fits its world footprint', () => {
   for (const id of MODEL_IDS) {
     const grid = buildModel(id);

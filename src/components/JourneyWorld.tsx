@@ -7,7 +7,7 @@ import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, mode
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, bumpProp, cameraOffsets, cutawaySides, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type BumpProp, type RoomSide } from "@/lib/journey/world";
-import { kickBall, launchBall, makeBall, spikeVelocity, stepBall, volleyAction, type Ball, type BallAction, type BallField, type BallKind, type Point } from "@/lib/journey/volleyball";
+import { kickBall, launchBall, liftBall, makeBall, spikeVelocity, stepBall, volleyAction, type Ball, type BallAction, type BallField, type BallKind, type Point } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -363,11 +363,12 @@ export default function JourneyWorld(props: Props) {
         const action = volley?.ball === ball ? volley : null;
         const contactTime = action?.action === "Hit" ? 0.11 : 0.34;
         if (action && !action.released && action.action !== "Hit") {
-          state.grounded = false;
           const lift = smooth(action.elapsed / contactTime);
-          state.x = action.start.x + (action.contact.x - action.start.x) * lift;
-          state.z = action.start.z + (action.contact.z - action.start.z) * lift;
-          state.y = action.start.y + (action.contact.y - action.start.y) * lift;
+          liftBall(state, {
+            x: action.start.x + (action.contact.x - action.start.x) * lift,
+            z: action.start.z + (action.contact.z - action.start.z) * lift,
+            y: action.start.y + (action.contact.y - action.start.y) * lift,
+          }, field);
         } else if (!(state.grounded && !state.vx && !state.vz && !state.kickDelay)) stepBall(state, field, dt);
         if (action && !action.released && action.elapsed >= contactTime) {
           action.released = true;

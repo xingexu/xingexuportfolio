@@ -27,6 +27,17 @@ function panel(g: Grid, x: number, y: number, z: number, w: number, h: number, p
   }
 }
 
+function reliefPanel(g: Grid, x: number, y: number, z: number, w: number, h: number, paint: Painter, rise: (color: Color) => number) {
+  panel(g, x, y, z, w, h, paint);
+  for (let i = x; i < x + w; i++) for (let j = y; j < y + h; j++) {
+    const color = g.get(i, j, z);
+    if (color === undefined) continue;
+    const height = rise(color);
+    if (height > 0) g.box(i, j, z + 1, 1, 1, height, (_x, _y, layer) =>
+      layer === z + height ? color : shade(color, 0.81));
+  }
+}
+
 function frame(g: Grid, w: number, h: number, border: Color, paint: Painter, depth = 1) {
   const x = -Math.floor(w / 2);
   g.box(x, 0, -depth, w, h, depth, border);
@@ -161,10 +172,14 @@ function plane(g: Grid) {
     }
   }
   for (let y = 14; y <= 27; y++) {
-    const start = 18 + Math.round((y - 14) * 0.7);
-    g.box(0, y, start, 1, 1, 30 - start + 1, 0xc8102e);
+    const start = 17 + Math.round((y - 14) * 0.52);
+    g.box(-1, y, start, 3, 1, 32 - start, 0xc8102e);
   }
-  maple(g, 1, 16, 24, WHITE);
+  const tailMark = new Grid();
+  maple(tailMark, 22, 16, 0, WHITE);
+  tailMark.forEach((z, y, _z, color) => {
+    for (const x of [-1, 1]) if (g.has(x, y, z)) g.set(x, y, z, color);
+  });
   for (let s = 0; s <= 10; s++) g.box(s, 12, 24 + Math.round(s * 0.3), 1, 1, 6 - Math.round(s * 0.3), 0xdde2e8).box(-s, 12, 24 + Math.round(s * 0.3), 1, 1, 6 - Math.round(s * 0.3), 0xdde2e8);
   for (const [x, z] of [[0, -24], [-4, 4], [4, 4]]) g.box(x, 2, z, 1, 3, 1, METAL_DARK).box(x, 0, z - 1, 1, 2, 3, 0x1a1a1a);
 }
@@ -364,11 +379,11 @@ const MODELS: Record<string, (g: Grid) => void> = {
   },
   "welcome-sign": g => {
     g.box(-20, 0, -1, 2, 12, 2, METAL_DARK).box(18, 0, -1, 2, 12, 2, METAL_DARK);
-    g.box(-22, 12, -1, 44, 20, 1, 0xc8102e);
-    panel(g, -21, 13, 0, 42, 18, () => WHITE);
-    maple(g, -19, 18, 1, 0xc8102e);
-    g.text("WELCOME", -8, 23, 1, 0x1e1e1e);
-    g.text("TO CANADA", -8, 15, 1, 0xc8102e);
+    g.box(-27, 12, -1, 54, 20, 1, 0xc8102e);
+    panel(g, -26, 13, 0, 52, 18, () => WHITE);
+    maple(g, -24, 18, 1, 0xc8102e);
+    centeredText(g, "WELCOME", 23, 1, 0x1e1e1e, 5);
+    centeredText(g, "TO CANADA", 15, 1, 0xc8102e, 5);
   },
   cone: g => { g.box(-2, 0, -2, 4, 1, 4, 0xe8612c).box(-1, 1, -1, 2, 2, 2, 0xe8612c).box(-1, 3, -1, 2, 1, 2, WHITE).box(-1, 4, -1, 2, 1, 2, 0xe8612c); },
   "runway-light": g => { g.box(0, 0, 0, 1, 3, 1, METAL_DARK).box(-1, 3, -1, 3, 1, 3, 0x3c3c3c).set(0, 4, 0, 0x5aa9ff); },
@@ -424,20 +439,31 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.box(3, 7, 0, 2, 3, 1, 0xfbc02d).box(3, 10, 0, 2, 1, 1, 0xfde0a0).box(6, 7, 0, 2, 2, 1, 0x1976d2);
   },
   window: g => {
-    g.box(-8, 0, -1, 16, 13, 1, WHITE);
-    panel(g, -7, 1, 0, 14, 11, (i, j) => i === 7 || j === 5 ? WHITE : j < 3 ? 0xb9e2f7 : j > 8 ? 0x9fd28a : SKY);
-    g.box(-9, 0, 0, 18, 1, 2, WHITE);
+    const cloud = 0xe4f5fc, hill = 0x9cbf9c, lawn = 0x709a79;
+    g.box(-8, 0, -1, 16, 13, 1, 0xb1b4b5);
+    reliefPanel(g, -7, 1, -1, 14, 11, (i, j) => {
+      if (j >= 9 + Math.round(Math.cos(i * 0.4))) return lawn;
+      if (j >= 7 + Math.round(Math.sin(i * 0.63))) return hill;
+      if ((j === 2 && i >= 3 && i <= 6) || (j === 3 && i >= 2 && i <= 7)) return cloud;
+      return shade(SKY, 0.93 + j * 0.027);
+    }, color => color === lawn || color === hill || color === cloud ? 1 : 0);
+    printEdge(g, -8, 0, 16, 13, 0xe1dcd0);
+    g.box(-1, 1, 0, 1, 11, 2, 0xd4cfc4).box(-7, 6, 0, 14, 1, 2, 0xeee8dd);
+    g.box(-9, 0, 0, 18, 1, 3, 0xe5dcd0).box(-8, -1, 1, 16, 1, 1, 0xbab3a8);
+    g.set(-2, 6, 2, 0x85775f).set(0, 6, 2, 0x85775f);
   },
   "starwars-posters": g => {
+    const crater = 0x7a7f86, armour = 0x9aa0a6, trench = 0x5b6066, blue = 0x4fc3ff, red = 0xff4d4d;
     g.box(-12, 0, -1, 11, 15, 1, 0xeeeeee);
-    panel(g, -11, 1, 0, 9, 13, (i, j) => {
+    reliefPanel(g, -11, 1, 0, 9, 13, (i, j) => {
       const d = Math.hypot(i - 4, j - 5);
-      if (d < 3.6) return d > 2.6 && i < 6 && j < 4 ? 0x7a7f86 : (j === 5 ? 0x5b6066 : 0x9aa0a6);
+      if (d < 3.6) return d > 2.6 && i < 6 && j < 4 ? crater : j === 5 ? trench : armour;
       return hash3(i, j, 11) > 0.85 ? WHITE : 0x0b0d1a;
-    });
+    }, color => color === armour ? 2 : color === crater || color === trench ? 1 : 0);
     printEdge(g, -12, 0, 11, 15, 0xeeeeee);
     g.box(0, 0, -1, 11, 15, 1, 0xeeeeee);
-    panel(g, 1, 1, 0, 9, 13, (i, j) => (i + j === 9 && j > 1) ? 0x4fc3ff : (i === j && j > 1 && j < 11) ? 0xff4d4d : j > 10 ? 0x161616 : 0x0f1530);
+    reliefPanel(g, 1, 1, 0, 9, 13, (i, j) => i + j === 9 && j > 1 ? blue : i === j && j > 1 && j < 11 ? red : j > 10 ? 0x161616 : 0x0f1530,
+      color => color === blue || color === red ? 2 : 0);
     printEdge(g, 0, 0, 11, 15, 0xeeeeee);
     g.text("SW", 2, 10, 1, 0xf6d23c);
   },
@@ -522,10 +548,17 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.box(4, 9, -1, 3, 3, 3, 0xffffff).box(4, 9, 2, 1, 1, 1, 0xff0000);
   },
   "poster-starwars-big": g => {
-    frame(g, 19, 23, 0xdddddd, (i, j) => hash3(i, j, 5) > 0.88 ? WHITE : 0x05060c);
-    centeredText(g, "STAR", 14, 1, 0xf6d23c);
-    centeredText(g, "WARS", 8, 1, 0xf6d23c);
-    for (let i = 0; i < 9; i++) g.set(-4 + i, 3 + Math.floor(i / 3), 1, 0x4fc3ff);
+    const gold = 0xf6d23c, blue = 0x4fc3ff;
+    frame(g, 23, 23, 0xdddddd, (i, j) => hash3(i, j, 5) > 0.91 ? 0x8589ad : shade(0x11162d, 0.65 + 0.6 * hash3(i >> 1, j >> 1, 5)));
+    for (const [word, y] of [["STAR", 14], ["WARS", 8]] as const) {
+      centeredText(g, word, y, 1, shade(gold, 0.69));
+      centeredText(g, word, y, 2, gold);
+    }
+    for (let i = -6; i <= 6; i++) {
+      const y = 2 + Math.floor((i + 6) / 3);
+      g.set(i, y, 1, 0x29487a).set(i, y, 2, blue);
+      if (i >= -3 && i <= 3) g.set(i, y, 3, 0xd8faff);
+    }
   },
   "tv-console": g => {
     g.box(-11, 0, -3, 22, 7, 6, WOOD_DARK).box(-10, 1, 3, 9, 5, 1, WOOD).box(1, 1, 3, 9, 5, 1, WOOD);
@@ -551,14 +584,28 @@ const MODELS: Record<string, (g: Grid) => void> = {
   },
   macbook,
   "brawl-stand": g => {
-    g.box(-1, 0, -3, 2, 10, 2, BLACK).box(-5, 0, -4, 10, 1, 6, BLACK);
+    const gold = 0xffce1f, red = 0xff5470, blue = 0x41b9ff;
+    const skull = ["..######..", ".########.", "##..##..##", "##..##..##", "##########", ".###..###.", "..#.##.#.."];
+    g.box(-2, 0, -3, 4, 10, 2, 0x29242f).box(-5, 0, -4, 17, 1, 6, BLACK);
     g.box(-8, 10, -3, 16, 26, 2, 0x111111);
-    panel(g, -7, 11, -1, 14, 24, (i, j) => {
-      const skull = ["..######..", ".########.", "##..##..##", "##..##..##", "##########", ".###..###.", "..#.##.#.."];
-      if (j >= 3 && j < 10 && i >= 2 && i < 12) return skull[j - 3][i - 2] === "#" ? 0xffce1f : 0x2a0f45;
-      if (j >= 13 && j < 22) return (i + j) % 5 === 0 ? 0x8bd450 : j > 18 ? 0x5aa64a : (Math.abs(i - 4) < 2 && j > 14 && j < 18) ? 0xff5470 : (Math.abs(i - 10) < 2 && j > 15) ? 0x41b9ff : 0x6fc45a;
+    reliefPanel(g, -7, 11, -1, 14, 24, (i, j) => {
+      if (j >= 3 && j < 10 && i >= 2 && i < 12) return skull[j - 3][i - 2] === "#" ? gold : 0x2a0f45;
+      if (j >= 13 && j < 22) return j >= 19 ? 0x5aa64a : (Math.abs(i - 4) < 2 && j > 14 && j < 18) ? red : (Math.abs(i - 10) < 2 && j > 15) ? blue : (i + j) % 5 === 0 ? 0x8bd450 : 0x6fc45a;
       return 0x2a0f45;
-    });
+    }, color => color === gold ? 2 : color === red || color === blue ? 1 : 0);
+    printEdge(g, -8, 10, 16, 26, 0x492b64);
+    g.box(-5, 35, 0, 10, 1, 1, 0xa157d1);
+    const mask = 0x2876dc, shadow = 0x163f94, skin = 0xe69a6a;
+    for (const x of [5, 9]) {
+      g.box(x, 1, -2, 2, 2, 4, shadow);
+      g.box(x, 3, -2, 2, 2, 3, skin);
+    }
+    g.box(5, 5, -2, 6, 2, 3, 0xc92f59).box(7, 6, 1, 2, 1, 1, gold);
+    g.box(5, 7, -2, 6, 3, 4, skin).box(4, 8, -2, 1, 2, 3, skin).box(11, 8, -2, 1, 2, 3, skin);
+    g.box(3, 9, -2, 2, 2, 3, mask).box(11, 9, -2, 2, 2, 3, mask);
+    g.box(6, 10, -2, 4, 4, 4, mask).box(7, 14, -2, 2, 1, 3, 0x52aaff);
+    g.set(6, 12, 1, WHITE).set(9, 12, 1, WHITE).box(7, 10, 1, 2, 1, 1, skin);
+    g.set(7, 13, 1, gold).set(8, 13, 1, gold);
   },
   "projects-board": g => {
     frame(g, 35, 20, WOOD_DARK, (i, j) => hash3(i, j, 2) > 0.7 ? 0xb88a55 : 0xc89a64);

@@ -6,7 +6,7 @@ import { CHAPTERS, chapterAccent, type Placement } from "@/lib/journey/data";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { ageAt, buildCutawayShell, buildDoorLeaf, cameraOffsets, cutawaySides, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type RoomSide } from "@/lib/journey/world";
+import { ageAt, buildCutawayShell, buildDoorLeaf, bumpProp, cameraOffsets, cutawaySides, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type BumpProp, type RoomSide } from "@/lib/journey/world";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -101,8 +101,9 @@ export default function JourneyWorld(props: Props) {
 
     type ItemView = { material: MeshBasicMaterial; marker: Mesh; markerMaterial: MeshBasicMaterial; markerY: number };
     type PropView = { holder: Group; bounds: Box3; material: MeshBasicMaterial; glass?: MeshBasicMaterial };
+    type ReactiveView = { prop: PropView; state: BumpProp; pivot: number };
     type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, Group> };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, Group> };
     const rooms = new Map<number, RoomView>();
     function room(index: number): RoomView {
       const cached = rooms.get(index);
@@ -137,15 +138,23 @@ export default function JourneyWorld(props: Props) {
         const side = !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) : null;
         return side ? walls[side] : group;
       };
-      const props: PropView[] = [];
+      const props: PropView[] = [], reactive: ReactiveView[] = [];
       const addProp = (p: Placement) => {
         const material = baseMaterial.clone(), holder = place(p, material);
         const glass = modelHasGlass(p.model) ? glassMaterial.clone() : undefined;
         if (glass) (holder.children[1] as Mesh).material = glass;
         const bounds = new Box3().setFromObject(holder);
         if (!bounds.isEmpty()) bounds.expandByScalar(1);
-        props.push({ holder, bounds, material, glass });
+        const prop = { holder, bounds, material, glass };
+        props.push(prop);
         parentFor(p).add(holder);
+        if (p.bump) {
+          const size = modelFootprint(p.model), pivot = p.bump === "roll" ? size.height / 2 : 0;
+          holder.position.y += pivot;
+          for (const child of holder.children) child.position.y -= pivot;
+          const radius = Math.max(size.maxX - size.minX, size.maxZ - size.minZ) / 2;
+          reactive.push({ prop, pivot, state: { x: p.x, z: p.z, kind: p.bump, radius, vx: 0, vz: 0, fall: null, tilt: 0 } });
+        }
         return { holder, material };
       };
       for (const p of chapter.decor) addProp(p);
@@ -160,7 +169,7 @@ export default function JourneyWorld(props: Props) {
         parent.add(marker);
         items.set(item.id, { material, marker, markerMaterial, markerY });
       }
-      const view = { group, items, props, doors, pickables, walls };
+      const view = { group, items, props, reactive, doors, pickables, walls };
       rooms.set(index, view);
       return view;
     }
@@ -264,6 +273,25 @@ export default function JourneyWorld(props: Props) {
         const swing = door.open * Math.PI / 2 * (door.side === "front" ? 1 : -1);
         door.leaves[0].rotation.y = swing;
         door.leaves[1].rotation.y = -swing;
+      }
+    }
+
+    const rollAxis = new Vector3();
+    function updateBumps(dt: number) {
+      for (const { prop: { holder, bounds }, state, pivot } of room(chapter).reactive) {
+        const x = state.x, z = state.z, tilt = state.tilt;
+        if (!state.vx && !state.vz && (!state.fall || tilt === Math.PI / 2)) continue;
+        settleBump(chapter, state, dt, motion.matches);
+        if (state.fall && tilt !== state.tilt) {
+          const { x: dx, z: dz } = state.fall;
+          holder.setRotationFromAxisAngle(rollAxis.set(dz, 0, -dx), state.tilt);
+          holder.position.y = state.radius * (Math.abs(dx) + Math.abs(dz)) * Math.sin(state.tilt);
+        } else if (state.x !== x || state.z !== z) {
+          const dx = state.x - x, dz = state.z - z;
+          holder.position.set(state.x, pivot, state.z);
+          holder.rotateOnWorldAxis(rollAxis.set(dz, 0, -dx).normalize(), Math.hypot(dx, dz) / pivot);
+        }
+        bounds.setFromObject(holder).expandByScalar(1);
       }
     }
 
@@ -436,11 +464,12 @@ export default function JourneyWorld(props: Props) {
       if (event.pointerType === "mouse" && !drag?.moved) { pointerInside = true; setPointer(event); }
       if (!drag || drag.id !== event.pointerId) return;
       const dx = event.clientX - drag.x, dy = event.clientY - drag.y, distance = Math.hypot(dx, dy);
-      if (distance > 9) drag.moved = true;
+      const deadZone = event.pointerType === "touch" ? 12 : 9;
+      if (distance > deadZone) drag.moved = true;
       if (drag.moved && !transition && !intro && !live.current.blocked) {
         onPointerLeave();
         region.style.cursor = "grabbing";
-        const scale = Math.min(1, Math.max(0, (distance - 9) / 58)) / (distance || 1);
+        const scale = Math.min(1, Math.max(0, (distance - deadZone) / 48)) / (distance || 1);
         gesture.x = dx * scale; gesture.y = dy * scale;
       }
     }
@@ -522,10 +551,12 @@ export default function JourneyWorld(props: Props) {
         speedNow = Math.max(Math.hypot(player.vx, player.vz) / speed, Math.abs(turn) * 0.35);
         if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
         if (Math.hypot(player.vx, player.vz) > 0.02) {
-          const result = step(chapter, player, player.vx * dt, player.vz * dt, (height >= 29 ? 3.5 : 3) * AVATAR_SCALE);
-          const travelled = Math.hypot(result.x - player.x, result.z - player.z);
+          const radius = (height >= 29 ? 3.5 : 3) * AVATAR_SCALE;
+          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius);
+          const movement = { x: result.x - player.x, z: result.z - player.z };
           player.x = result.x; player.z = result.z;
-          player.phase += travelled * 0.45;
+          for (const { state } of room(chapter).reactive) bumpProp(state, result, movement, radius, dt);
+          player.phase += Math.hypot(movement.x, movement.z) * 0.45;
           if (result.exit === "next") {
             if (chapter < CHAPTERS.length - 1) startTransition(chapter + 1, "forward");
             else { player.z = interior(current).minZ + 5; player.vx = 0; player.vz = 0; held.clear(); live.current.onFinale(); }
@@ -570,6 +601,7 @@ export default function JourneyWorld(props: Props) {
       limbs.propeller.rotation.y += dt * (6 + speedNow * 18);
       updateCutaway();
       updateDoors(motion.matches ? 1 : 1 - Math.exp(-dt * 16));
+      if (!transition && !blockedNow) updateBumps(dt);
       fadeForeground(dt);
 
       // Nearby + hover highlights

@@ -36,7 +36,7 @@ The **Objects** menu lists every room and lets visitors inspect props or jump to
 
 Walk into a loose volleyball to kick it. In Bayview, press **R** or tap **Spike** once to toss, jump, and drive the Mikasa down so it bounces. Near the net, the spike aims across the court when the angle allows it. In Western, press **R** or tap **Set** for two overhead sets to yourself and a third set forward. **E** still inspects the original display balls.
 
-In the Western double, walk over to Richard’s bed and he’ll take a sip of milk. The CSA poster opens a captioned video; the Buldak bowl opens a silent clip. Both players sit at the top of their object dialogs. Assets are in `public/videos/journey/`.
+The Western double has two beds in a T, two standing desks separated by a half wall, and an open closet with a snack pantry. Walk over to Richard’s bed and he’ll take a sip of milk. The CSA poster opens a captioned video; the Buldak bowl opens a silent clip. Both players sit at the top of their object dialogs. Assets are in `public/videos/journey/`.
 
 For optional background music, set `NEXT_PUBLIC_JOURNEY_MUSIC_URL` before building to a browser-playable audio URL you have permission to publish. The player loops the track only after someone turns music on; without a URL it stays hidden.
 

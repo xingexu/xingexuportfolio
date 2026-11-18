@@ -4,7 +4,7 @@ import "./about.css";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "Walk through Xinge’s childhood with WASD: arrive in Canada, then visit the first home in Markham where chess began.",
+  description: "A 3D voxel walk through Xinge’s life from age 7 to 18: arriving in Canada, chess and Agar.io at 18 Holsworthy, coding in grade 5, piano and math contests, Bayview volleyball and FBLC, and CS + Ivey at Western.",
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About · Xinge Xu",

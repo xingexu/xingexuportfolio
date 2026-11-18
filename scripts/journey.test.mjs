@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import ts from 'typescript';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
 
 // Run the real TypeScript modules without adding a test-runner dependency.
 const cache = new Map();
@@ -14,7 +16,7 @@ function load(file) {
   const result = { exports: {} };
   cache.set(full, result.exports);
   const js = ts.transpileModule(fs.readFileSync(full, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-  const req = (id) => load(path.relative(root, id.startsWith('@/') ? path.resolve(root, 'src', id.slice(2) + '.ts') : path.resolve(path.dirname(full), id + '.ts')));
+  const req = (id) => id === 'three' ? require(id) : load(path.relative(root, id.startsWith('@/') ? path.resolve(root, 'src', id.slice(2) + '.ts') : path.resolve(path.dirname(full), id + '.ts')));
   new Function('require', 'module', 'exports', js)(req, result, result.exports);
   return result.exports;
 }
@@ -22,6 +24,8 @@ const { CHAPTERS, ALL_ITEMS } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
+const { Grid } = load('src/lib/journey/voxel.ts');
+const { gridGeometry } = load('src/lib/journey/mesh.ts');
 
 test('every item is written out, linked properly and has a model', () => {
   const ids = new Set();
@@ -65,16 +69,43 @@ test('all 32 chess pieces are present with six distinct silhouettes per side', (
   }
 });
 
-test('CEMC and MAA logos are printed into white paper, not floating in front of it', () => {
+test('CEMC and MAA logos are raised on white paper inside their frames', () => {
   for (const id of ['plaque-cemc', 'plaque-cemc-gold', 'plaque-maa']) {
     const grid = buildModel(id);
     let white = 0, ink = 0;
-    grid.forEach((_x, _y, z, color) => {
+    grid.forEach((x, y, z, color) => {
       if (z === 0 && color === 0xffffff) white++;
-      if (z === 0 && (color === 0x1a1a1a || color === 0x0b5cad)) ink++;
+      if (z === 1 && grid.get(x, y, 0) === 0xffffff && (color === 0x1a1a1a || color === 0x0b5cad)) ink++;
     });
     assert.ok(white > 800 && ink > 100, id);
   }
+});
+
+test('Bayview has three distinct math-award displays with appropriate links', () => {
+  const room = CHAPTERS.find(chapter => chapter.id === 'bayview');
+  const displays = ['waterloo', 'aime', 'maa'].map(id => room.items.find(item => item.id === id));
+  assert.deepEqual(displays.map(item => item.model), ['plaque-cemc', 'plaque-aime', 'plaque-maa']);
+  assert.equal(displays[0].links.length, 3);
+  assert.ok(displays[0].links.every(link => link.href.endsWith('FGHResults.pdf')));
+  assert.match(displays[1].description, /2024 and 2025/);
+  assert.match(displays[2].links[0].href, /^https:\/\/maa\.org\//);
+  for (const display of displays) {
+    const grid = buildModel(display.model);
+    let white = 0;
+    grid.forEach((_x, _y, z, color) => { if (z === 0 && color === 0xffffff) white++; });
+    assert.ok(white > 800, display.id);
+  }
+});
+
+test('touching voxel surfaces cast corner shadow without adding hidden faces', () => {
+  const floor = new Grid().set(0, 0, 0, 0xffffff);
+  const alone = gridGeometry(floor, [0, 0, 0], 0);
+  const joined = gridGeometry(floor.set(1, 0, 0, 0xffffff).set(1, 1, 0, 0xffffff), [0, 0, 0], 0);
+  const top = (geometry, vertex) => geometry.getAttribute('color').getX(vertex);
+  assert.equal(top(alone, 12), 1);
+  assert.ok(top(joined, 9) < top(joined, 8), 'the top corner beside the raised neighbor is shaded');
+  assert.equal(joined.index.count, 14 * 6);
+  alone.dispose(); joined.dispose();
 });
 
 test('every model uses an aligned voxel grid and fits its world footprint', () => {
@@ -119,6 +150,22 @@ test('the terminal facade can be cut away without losing the apron floor', () =>
   assert.ok(!W.cutawaySides(bounds, { x: 0, z: bounds.minZ + 1 }).has('front'));
 });
 
+test('door leaves fit the opening and open before you reach either threshold', () => {
+  for (const chapter of CHAPTERS) {
+    const bounds = W.interior(chapter), leaf = W.buildDoorLeaf(chapter).bounds();
+    assert.ok((leaf.maxX + 1) * W.DOOR_VOXEL_SIZE < W.DOOR_HALF);
+    assert.ok((leaf.maxY + 1) * W.DOOR_VOXEL_SIZE < W.DOOR_HEIGHT);
+    assert.ok(leaf.maxZ - leaf.minZ > 2, 'panels and handles protrude from the leaf');
+    for (const [z, inward] of [[bounds.minZ - 0.5, 1], [bounds.maxZ + 0.5, -1]]) {
+      assert.equal(W.doorwayOpening(z, { x: 0, z: z + inward * 22 }), 0);
+      const middle = W.doorwayOpening(z, { x: 0, z: z + inward * 14 });
+      assert.ok(middle > 0 && middle < 1);
+      assert.equal(W.doorwayOpening(z, { x: 0, z: z + inward * 7 }), 1);
+      assert.equal(W.doorwayOpening(z, { x: 20, z }), 0);
+    }
+  }
+});
+
 test('render pixels use half the old pitch at desktop and phone sizes', () => {
   for (const [w, h, pixel] of [[1920, 1080, 1.5], [1280, 720, 1], [400, 754, 0.5]]) {
     assert.equal(W.renderPixelSize(w, h), pixel);
@@ -153,6 +200,33 @@ test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading
     parts.armL.forEach((_x, _y, z, color) => { if (z === 2) cuffColors.add(color); });
     assert.ok(cuffColors.size > 3);
   }
+});
+
+test('the Western avatar has oversized clothes, mini boots and a textured crown without blush', () => {
+  const current = buildAvatar(18, 'western'), previous = buildAvatar(18, 'essentials');
+  const width = grid => grid.bounds().maxX - grid.bounds().minX + 1;
+  assert.ok(width(current.torso) >= width(previous.torso) + 6);
+  assert.ok(current.torso.bounds().minY < 0, 'hoodie drapes below the hip');
+  assert.ok(width(current.armL) > width(previous.armL));
+  for (const side of ['legL', 'legR']) {
+    const leg = current[side], bounds = leg.bounds();
+    assert.ok(width(leg) >= width(previous[side]) + 5);
+    assert.equal(bounds.minY * AVATAR_VOXEL_SIZE, -current.hip);
+    assert.ok(bounds.maxZ >= 8, 'boot toe extends forward of the pants');
+    assert.ok(leg.has(side === 'legL' ? -6 : 5, bounds.minY + 6, -5), 'ankle shaft rises above the toe box');
+  }
+  const heights = new Set(), strandColors = new Set();
+  current.head.forEach((x, y, _z, color) => {
+    assert.notEqual(color, 0xf3a9a0);
+    if (y >= 16) {
+      assert.ok(x > -8 && x < 7, 'extra hair volume stays on top');
+      heights.add(y);
+      strandColors.add(color);
+    }
+  });
+  assert.ok(heights.size >= 5 && strandColors.size >= 8);
+  assert.equal(current.head.get(-8, 9, 2), 0xf8e1d0, 'sides are trimmed above the ear');
+  assert.match(CHAPTERS.at(-1).outfitLabel, /UGGs/);
 });
 
 test('the Western dorm keeps small props and signs proportional to the furniture', () => {

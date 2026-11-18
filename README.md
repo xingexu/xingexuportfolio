@@ -25,7 +25,7 @@ npm run dev
 
 Then open `http://localhost:3000` and you're good to go.
 
-The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk forward through six rooms — arriving in Canada, 18 Holsworthy Crescent, grade 5, 10 Elm Avenue, Bayview Secondary, and my room in Ontario Hall at Western. Use **W/S** to move, **A/D** to turn, **E** to inspect the nearest object, and **Esc** to skip an intro or transition. Arrow keys also work. Drag the scene with a mouse or finger, or use the touch joystick. Click or tap an object to inspect it.
+The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk forward through six rooms — arriving in Canada, 18 Holsworthy Crescent, grade 5, 10 Elm Avenue, Bayview Secondary, and my room in Ontario Hall at Western. Use **W/S** or **↑/↓** to move, **A/D** or **←/→** to turn, **E** to inspect the nearest object, and **Esc** to skip an intro or transition. Doors open as you approach. Drag the scene with a mouse or finger, or use the touch joystick. Click or tap an object to inspect it.
 
 - `src/lib/journey/voxel.ts` is a sparse grid with a 3×5 voxel font for signs. `models.ts` draws the props, using a finer grid for details like the MacBook and trophy labels. `avatar.ts` builds the character and `world.ts` builds room shells and handles collisions, reach, spawns and age-by-position.
 - `src/lib/journey/data.ts` is the content: chapters, outfits, and every object’s text and links. Add or edit an object there; its position, model and links live in one entry.

@@ -160,13 +160,16 @@ const ROOMS: Chapter[] = [
       { id: "laptop", model: "macbook", x: 25, z: 6, y: 12, rot: 3, solid: false, label: "MacBook · competitive programming", title: "Competitive programming.",
         description: "Competitive programming took over my evenings: Canadian Computing Competition practice, LeetCode, and a lot of debugging.",
         links: [gh("leetcode", "My LeetCode solutions"), gh("CCC", "My CCC practice")] },
-      { id: "aime", model: "plaque-maa", x: 35, z: -25, y: 13, rot: 3, solid: false, label: "AIME · MAA", title: "The AIME.",
+      { id: "aime", model: "plaque-aime", x: 35, z: -28, y: 13, rot: 3, solid: false, label: "AIME qualifier · 2024 & 2025", title: "The AIME.",
         description: "Math contests kept going all the way to the AIME, the American Invitational Mathematics Examination, which I qualified for in 2024 and 2025.",
-        links: [{ href: "https://maa.org/student-programs/amc/", label: "About the AMC & AIME" }] },
+        links: [{ href: "https://maa.org/student-programs/amc/", label: "About the AIME" }] },
+      { id: "maa", model: "plaque-maa", x: 35, z: -15, y: 13, rot: 3, solid: false, label: "MAA · American Mathematics Competitions", title: "American Mathematics Competitions.",
+        description: "The Mathematical Association of America runs the AMC and AIME contests. I started with AMC 8 and later qualified for AIME in high school.",
+        links: [{ href: "https://maa.org/student-programs/amc/", label: "Visit the MAA contest program" }] },
       { id: "jane-street", model: "jane-street-tees", x: -35, z: -1, y: 12, rot: 1, solid: false, label: "Jane Street T-shirts", title: "Jane Street, 2024 & 2025.",
         description: "Qualifying for the AIME in 2024 and 2025 came with a Jane Street T-shirt each year, from the contest’s partner.",
         links: [{ href: "https://www.janestreet.com", label: "Jane Street" }] },
-      { id: "waterloo", model: "plaque-cemc", x: -35, z: -26, y: 12, rot: 1, solid: false, label: "Waterloo math contests · CEMC", title: "Waterloo math contests.",
+      { id: "waterloo", model: "plaque-cemc", x: -35, z: -26, y: 12, rot: 1, solid: false, label: "CEMC · Waterloo math contests", title: "Waterloo math contests.",
         description: "University of Waterloo math contests were part of every year of high school: the Fryer, Galois and Hypatia contests in 2022, 2023 and 2025.",
         links: [
           { href: "https://cemc.uwaterloo.ca/sites/default/files/documents/2022/2022FGHResults.pdf", label: "2022 FGH results" },
@@ -199,7 +202,7 @@ const ROOMS: Chapter[] = [
   {
     id: "western", stop: "University", number: "06", place: "Ontario Hall", location: "Western University · London, Ontario", heading: "Where I am now.",
     intro: "Eighteen, in my room in Ontario Hall at Western: Computer Science + Ivey, and three clubs.",
-    ageFrom: 18, ageTo: 18, outfit: "western", outfitLabel: "Aritzia black hoodie & sweatpants · black New Balance 9060s",
+    ageFrom: 18, ageTo: 18, outfit: "western", outfitLabel: "Oversized black Aritzia hoodie & sweatpants · black UGGs",
     width: 88, depth: 96, floor: "laminate", wall: 0x3f3c4e, trim: 0x554463, background: 0x0d0c16, doorLabel: "NEXT",
     items: [
       { id: "degree", model: "cs-ivey", x: 24, z: -45, y: 18, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey.",
@@ -238,7 +241,7 @@ const ROOMS: Chapter[] = [
       { id: "fan", model: "fan", x: 18, z: 17, y: 9, rot: 3, solid: false, label: "Table fan", title: "Keeping cool.",
         description: "Residence rooms get warm. The fan runs more often than not." },
       { id: "closet", model: "closet", x: -27, z: -39, label: "Closet", title: "All black everything.",
-        description: "A closet full of black: hoodies, sweatpants and the same black New Balances I’m wearing right now." },
+        description: "A closet full of black hoodies and sweatpants, with my volleyball shoes tucked inside." },
       { id: "pink-shoes", model: "pink-court-shoes", x: -25, z: -31, label: "Pink volleyball shoes", title: "Pink volleyball shoes.",
         description: "My pink court shoes, ready for the next volleyball game." },
       { id: "molten", model: "molten-volleyball", x: -32, z: -30, label: "Molten volleyball", title: "Molten volleyball.",
@@ -251,6 +254,8 @@ const ROOMS: Chapter[] = [
 ];
 
 export const CHAPTERS = ROOMS.map(chapter => chapter.outdoor || chapter.id === "western" ? chapter : expandRoom(chapter));
+const CHAPTER_ACCENTS = [0x89cced, 0xffcf79, 0x80ddc5, 0xfaac96, 0x91b8f3, 0xc4a2ff];
+export const chapterAccent = (index: number) => CHAPTER_ACCENTS[index] ?? CHAPTER_ACCENTS[0];
 export const ALL_ITEMS = CHAPTERS.flatMap((chapter, index) => chapter.items.map(item => ({ ...item, chapter: index })));
 export const itemById = (id: string) => ALL_ITEMS.find(item => item.id === id);
 export const ageLabel = (chapter: Chapter) => chapter.ageFrom === chapter.ageTo ? `${chapter.ageFrom}` : `${chapter.ageFrom}–${chapter.ageTo}`;

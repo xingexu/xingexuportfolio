@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { Box3, Color, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, PerspectiveCamera, Ray, Raycaster, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
-import { CHAPTERS, type Placement } from "@/lib/journey/data";
+import { CHAPTERS, chapterAccent, type Placement } from "@/lib/journey/data";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { ageAt, buildCutawayShell, cameraOffsets, cutawaySides, interior, nearbyItems, placementBox, renderPixelSize, roomSide, spawn, step, walkSpeed, AVATAR_SCALE, INTRO_END, type RoomSide } from "@/lib/journey/world";
+import { ageAt, buildCutawayShell, buildDoorLeaf, cameraOffsets, cutawaySides, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type RoomSide } from "@/lib/journey/world";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -69,7 +69,7 @@ export default function JourneyWorld(props: Props) {
     const glassMaterial = new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: GLASS_OPACITY, depthWrite: false });
     const occludedMaterial = new MeshBasicMaterial({ vertexColors: true, opacity: 0.22, transparent: true, depthWrite: false, depthFunc: GreaterDepth });
     const coverContext = cover.getContext("2d");
-    let coverImage: ImageData | undefined, coverThresholds = new Float32Array(0), lastCover = "";
+    let coverImage: ImageData | undefined, coverThresholds = new Float32Array(0), coverPattern = new Float32Array(0), lastCover = "";
     const geometries = new Map<string, BufferGeometry>();
     const owned: BufferGeometry[] = [];
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -101,7 +101,8 @@ export default function JourneyWorld(props: Props) {
 
     type ItemView = { material: MeshBasicMaterial; marker: Mesh; markerMaterial: MeshBasicMaterial; markerY: number };
     type PropView = { holder: Group; bounds: Box3; material: MeshBasicMaterial; glass?: MeshBasicMaterial };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; pickables: Object3D[]; walls: Record<RoomSide, Group> };
+    type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, Group> };
     const rooms = new Map<number, RoomView>();
     function room(index: number): RoomView {
       const cached = rooms.get(index);
@@ -120,6 +121,18 @@ export default function JourneyWorld(props: Props) {
         group.add(walls[side]);
         addShell(walls[side], shell.walls[side]);
       }
+      const leafGeometry = gridGeometry(buildDoorLeaf(chapter), [0, 0, 0], 0.02, DOOR_VOXEL_SIZE);
+      owned.push(leafGeometry);
+      const sides: DoorView["side"][] = chapter.outdoor ? ["front"] : ["front", "back"];
+      const doors = sides.map((side): DoorView => {
+        const z = side === "front" ? bounds.minZ - 0.5 : bounds.maxZ + 0.5;
+        const left = new Mesh(leafGeometry, baseMaterial), right = new Mesh(leafGeometry, baseMaterial);
+        left.position.set(-DOOR_HALF, 0, z);
+        right.position.set(DOOR_HALF, 0, z);
+        right.scale.x = -1;
+        walls[side].add(left, right);
+        return { z, side, leaves: [left, right], open: 0 };
+      });
       const parentFor = (p: Placement) => {
         const side = !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) : null;
         return side ? walls[side] : group;
@@ -147,7 +160,7 @@ export default function JourneyWorld(props: Props) {
         parent.add(marker);
         items.set(item.id, { material, marker, markerMaterial, markerY });
       }
-      const view = { group, items, props, pickables, walls };
+      const view = { group, items, props, doors, pickables, walls };
       rooms.set(index, view);
       return view;
     }
@@ -215,6 +228,7 @@ export default function JourneyWorld(props: Props) {
       setAvatar(player.age, CHAPTERS[index].outfit);
       nearby = null; hovered = null; tooltip.hidden = true;
       snapCamera();
+      updateDoors(1);
       const idle = (callback: () => void) => ("requestIdleCallback" in window ? window.requestIdleCallback(callback) : setTimeout(callback, 200));
       for (const neighbour of [index + 1, index - 1]) if (neighbour >= 0 && neighbour < CHAPTERS.length) idle(() => { if (!disposed) room(neighbour); });
     }
@@ -240,6 +254,17 @@ export default function JourneyWorld(props: Props) {
       const hidden = cutawaySides(interior(current), camera.position);
       const walls = room(chapter).walls;
       for (const side of Object.keys(walls) as RoomSide[]) walls[side].visible = !hidden.has(side);
+    }
+
+    function updateDoors(ease: number) {
+      for (const door of room(chapter).doors) {
+        const target = doorwayOpening(door.z, player);
+        door.open += (target - door.open) * ease;
+        if (Math.abs(target - door.open) < 0.001) door.open = target;
+        const swing = door.open * Math.PI / 2 * (door.side === "front" ? 1 : -1);
+        door.leaves[0].rotation.y = swing;
+        door.leaves[1].rotation.y = -swing;
+      }
     }
 
     const sightlines = [new Ray(), new Ray(), new Ray()];
@@ -280,8 +305,13 @@ export default function JourneyWorld(props: Props) {
       cover.style.width = `${cover.width * block}px`; cover.style.height = `${cover.height * block}px`;
       coverImage = coverContext?.createImageData(cover.width, cover.height);
       coverThresholds = new Float32Array(cover.width * cover.height);
+      coverPattern = new Float32Array(coverThresholds.length);
       for (let j = 0; j < cover.height; j++) for (let i = 0; i < cover.width; i++) {
-        coverThresholds[j * cover.width + i] = hash3(i, j, 41) * 0.18 + (i / cover.width + (cover.height - 1 - j) / cover.height) * 0.41;
+        const pixel = j * cover.width + i, diagonal = i / cover.width + (cover.height - 1 - j) / cover.height;
+        coverThresholds[pixel] = hash3(i, j, 41) * 0.17 + diagonal * 0.41;
+        const tile = hash3(i >> 2, j >> 2, 19);
+        const band = (i - j + cover.height) % 26 < 2 ? 0.09 : 0;
+        coverPattern[pixel] = band + tile * 0.045 + 0.105 * (1 - Math.min(1, Math.abs(i / cover.width - 0.48) * 2));
       }
       lastCover = "";
     }
@@ -294,10 +324,16 @@ export default function JourneyWorld(props: Props) {
       lastCover = key;
       cover.style.visibility = amount <= 0 ? "hidden" : "visible";
       if (amount <= 0) return;
+      const accent = chapterAccent(transition?.to ?? chapter);
+      const r = (accent >> 16) & 255, g = (accent >> 8) & 255, b = accent & 255;
+      const boundary = revealing ? 1 - amount : amount;
+      const animatedEdge = amount < 1;
       for (let i = 0; i < coverThresholds.length; i++) {
-        const threshold = coverThresholds[i], k = i * 4;
-        coverImage.data[k] = 11; coverImage.data[k + 1] = 11; coverImage.data[k + 2] = 14;
-        coverImage.data[k + 3] = (revealing ? threshold >= 1 - amount : threshold < amount) ? 255 : 0;
+        const threshold = coverThresholds[i], k = i * 4, delta = revealing ? threshold - boundary : boundary - threshold;
+        const edge = animatedEdge && delta >= 0 ? Math.max(0, 1 - delta * 32) * 0.7 : 0;
+        const tone = coverPattern[i] + edge;
+        coverImage.data[k] = 7 + r * tone; coverImage.data[k + 1] = 8 + g * tone; coverImage.data[k + 2] = 13 + b * tone;
+        coverImage.data[k + 3] = delta >= 0 ? 255 : 0;
       }
       coverContext.putImageData(coverImage, 0, 0);
     }
@@ -533,6 +569,7 @@ export default function JourneyWorld(props: Props) {
       body.position.y = Math.abs(Math.sin(player.phase)) * 0.7 * Math.min(1, speedNow * 1.4);
       limbs.propeller.rotation.y += dt * (6 + speedNow * 18);
       updateCutaway();
+      updateDoors(motion.matches ? 1 : 1 - Math.exp(-dt * 16));
       fadeForeground(dt);
 
       // Nearby + hover highlights

@@ -1,11 +1,11 @@
 import type { Box, Vec } from "./world";
 
 export type BallKind = "mikasa" | "molten";
-export type BallAction = "Set" | "Toss" | "Hit";
+export type BallAction = "Set" | "Spike";
 export type Point = Vec & { y: number };
 export type Ball = Point & {
   radius: number; vx: number; vy: number; vz: number;
-  grounded: boolean; tossed: boolean; kickDelay: number;
+  grounded: boolean; kickDelay: number;
 };
 export type BallBlock = Box & { bottom: number; top: number };
 export type CourtNet = BallBlock & { z: number; postTop: number };
@@ -13,12 +13,16 @@ export type BallField = Box & { ceiling: number; blocks: BallBlock[]; net?: Cour
 
 const GRAVITY = 86;
 const AIR_DRAG = 0.2;
-export const HIT_WINDUP = 0.11;
+export const SPIKE = { feed: 0.29, takeoff: 0.56, contact: 0.88, land: 1.20, end: 1.43, rise: 6.7 };
+export const SET = { first: 0.42, interval: 0.72, touches: 3, recovery: 0.25 };
+export const SET_CONTACTS = Array.from({ length: SET.touches }, (_, i) => SET.first + SET.interval * i);
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const travelTime = (t: number, drag: number) => -Math.expm1(-t * drag) / drag;
+const fallTime = (vy: number, drop: number) => (vy + Math.sqrt(vy * vy + 2 * GRAVITY * drop)) / GRAVITY;
+const eased = (t: number) => t * t * (3 - 2 * t);
 
 export function makeBall(x: number, base: number, z: number, radius: number): Ball {
-  return { x, y: base + radius, z, radius, vx: 0, vy: 0, vz: 0, grounded: true, tossed: false, kickDelay: 0 };
+  return { x, y: base + radius, z, radius, vx: 0, vy: 0, vz: 0, grounded: true, kickDelay: 0 };
 }
 
 function overlaps(box: Box, x: number, z: number, r: number) {
@@ -47,24 +51,105 @@ export function liftBall(ball: Ball, target: Point, field: BallField) {
 export function volleyAction(kind: BallKind, ball: Ball, player: Vec, height: number, field: BallField): BallAction | null {
   const { net } = field;
   const dx = ball.x - player.x, dz = ball.z - player.z;
-  if (Math.hypot(dx, dz) > (ball.tossed ? 9 : 8.5)) return null;
+  if (!ball.grounded || ball.y > height || Math.hypot(dx, dz) > 8.5) return null;
   if (net && (player.z - net.z) * (ball.z - net.z) < 0) {
     const crossing = player.x + dx * (net.z - player.z) / dz;
     if (crossing >= net.minX && crossing <= net.maxX) return null;
   }
-  if (ball.tossed && kind === "mikasa") {
-    const contact = { ...ball };
-    stepBall(contact, field, HIT_WINDUP);
-    return contact.tossed && contact.y >= height * 0.65 && contact.y <= height + 9 &&
-      Math.hypot(contact.x - player.x, contact.z - player.z) <= 9 ? "Hit" : null;
-  }
-  return ball.grounded && ball.y <= height ? kind === "molten" ? "Set" : "Toss" : null;
+  return kind === "molten" ? "Set" : "Spike";
 }
 
-export function launchBall(ball: Ball, velocity: Point, tossed = false) {
+export function launchBall(ball: Ball, velocity: Point) {
   ball.vx = velocity.x; ball.vy = velocity.y; ball.vz = velocity.z;
-  ball.grounded = false; ball.tossed = tossed;
+  ball.grounded = false;
   ball.kickDelay = 0.35;
+}
+
+export type VolleySequence = { action: BallAction; forward: Vec; start: Point; release: Point; strikeY: number; elapsed: number; contacts: number };
+
+export function startVolley(action: BallAction, ball: Ball, player: Vec, forward: Vec, shoulder: number, field: BallField): VolleySequence {
+  const r = ball.radius, isSet = action === "Set";
+  const reach = isSet ? 2.9 : 3.7;
+  const right = isSet ? 0 : 1.4;
+  const x = clamp(player.x + forward.x * reach + forward.z * right, field.minX + r, field.maxX - r);
+  let z = clamp(player.z + forward.z * reach - forward.x * right, field.minZ + r, field.maxZ - r);
+  const net = field.net;
+  if (net && x > net.minX - r && x < net.maxX + r) {
+    const side = Math.sign(player.z - net.z);
+    if ((z - net.z) * side < r + 2 && side) z = net.z + side * (r + 2);
+  }
+  return { action, forward, start: { x: ball.x, y: ball.y, z: ball.z },
+    release: { x, y: isSet ? Math.min(shoulder + 7.8, field.ceiling - r - 5.8) : shoulder - 1, z },
+    strikeY: Math.min(shoulder + 7.1 + SPIKE.rise, field.ceiling - r - 2), elapsed: 0, contacts: 0 };
+}
+
+export function advanceVolley(sequence: VolleySequence, ball: Ball, field: BallField, dt: number) {
+  const set = sequence.action === "Set", cues = set ? SET_CONTACTS : SPIKE_CONTACTS;
+  const end = sequence.elapsed + dt;
+  while (sequence.elapsed < end) {
+    const cue = cues[sequence.contacts] ?? Infinity;
+    const next = Math.min(end, cue);
+    // Only the pickup is guided. Once airborne, the ball uses the room's normal physics.
+    if (!sequence.contacts) {
+      const t = eased(next / cue), { start, release } = sequence;
+      liftBall(ball, { x: start.x + (release.x - start.x) * t, y: start.y + (release.y - start.y) * t, z: start.z + (release.z - start.z) * t }, field);
+    } else stepBall(ball, field, next - sequence.elapsed);
+    sequence.elapsed = next;
+    if (next !== cue) break;
+
+    sequence.contacts++;
+    const { forward } = sequence;
+    if (set) {
+      const drift = sequence.contacts === SET.touches ? 4 : 0;
+      launchBall(ball, { x: forward.x * drift, y: GRAVITY * SET.interval / 2, z: forward.z * drift });
+    } else if (cue === SPIKE.feed) {
+      const flight = SPIKE.contact - SPIKE.feed;
+      launchBall(ball, { x: 0, y: (sequence.strikeY - ball.y) / flight + GRAVITY * flight / 2, z: 0 });
+    } else launchBall(ball, spikeVelocity(ball, field, forward));
+  }
+  return end >= (set ? SET_CONTACTS[SET.touches - 1] + SET.recovery : SPIKE.end);
+}
+
+const SPIKE_CONTACTS = [SPIKE.feed, SPIKE.contact];
+type VolleyPose = { lift: number; legs: number; left: number; right: number; leftRoll: number; rightRoll: number; leftElbow: number; rightElbow: number; twist: number; head: number };
+type PoseFrame = [time: number, pose: Partial<VolleyPose>];
+const idle: VolleyPose = { lift: 0, legs: 0, left: 0, right: 0, leftRoll: 0, rightRoll: 0, leftElbow: 0, rightElbow: 0, twist: 0, head: 0 };
+const spikeFrames: PoseFrame[] = [
+  [0, idle],
+  [SPIKE.feed, { left: -1.4, right: -1.4, leftElbow: -0.45, rightElbow: -0.45, head: -0.21 }],
+  [SPIKE.takeoff - 0.09, { left: 0.65, right: 0.65, legs: 0.44, lift: -0.75, head: -0.23 }],
+  [SPIKE.takeoff + 0.11, { left: -2.63, right: -1.76, rightElbow: -2.05, legs: 0.43, twist: 0.36, head: -0.27 }],
+  [SPIKE.contact - 0.09, { left: -2.62, right: -1.9, rightElbow: -1.95, legs: 0.29, twist: 0.42, head: -0.24 }],
+  [SPIKE.contact, { left: -0.84, right: -2.63, rightElbow: -0.14, rightRoll: -0.28, legs: 0.18, twist: -0.08, head: -0.12 }],
+  [SPIKE.contact + 0.15, { left: -0.35, right: -0.65, rightRoll: -0.55, rightElbow: -0.22, legs: 0.24, twist: -0.39 }],
+  [SPIKE.land + 0.04, { left: -0.47, right: -0.47, legs: 0.52, lift: -0.8 }],
+  [SPIKE.end, idle],
+];
+
+export function volleyPose(action: BallAction, elapsed: number, reduced = false): VolleyPose {
+  if (action === "Spike") {
+    const current = spikeFrames.findIndex(([time]) => time > elapsed);
+    if (current < 1) return idle;
+    const [before, a] = spikeFrames[current - 1], [after, b] = spikeFrames[current];
+    const mix = reduced ? Number(elapsed >= (before + after) / 2) : eased((elapsed - before) / (after - before));
+    const pose = { ...idle };
+    for (const key of Object.keys(pose) as (keyof VolleyPose)[]) {
+      pose[key] = (a[key] ?? 0) * (1 - mix) + (b[key] ?? 0) * mix;
+    }
+    const air = (elapsed - SPIKE.takeoff) / (SPIKE.land - SPIKE.takeoff);
+    if (air > 0 && air < 1) pose.lift = SPIKE.rise * (reduced ? 1 : 4 * air * (1 - air));
+    else if (reduced) pose.lift = 0;
+    return pose;
+  }
+  const last = SET_CONTACTS[SET.touches - 1];
+  const fade = (t: number) => reduced ? Number(t >= 0.5) : eased(clamp(t, 0, 1));
+  const raised = fade(elapsed / (SET.first - 0.13)) * (1 - fade((elapsed - last - 0.08) / (SET.recovery - 0.08)));
+  const nearest = Math.min(...SET_CONTACTS.map(cue => Math.abs(elapsed - cue - 0.025)));
+  const extend = 1 - fade(nearest / 0.16);
+  return { ...idle, left: (-1.98 - 0.42 * extend) * raised, right: (-1.98 - 0.42 * extend) * raised,
+    leftElbow: (-0.94 + 0.6 * extend) * raised, rightElbow: (-0.94 + 0.6 * extend) * raised,
+    leftRoll: 0.29 * raised, rightRoll: -0.29 * raised, legs: 0.3 * (1 - extend) * raised,
+    lift: reduced ? 0 : -0.4 * (1 - extend) * raised, head: -0.28 * raised };
 }
 
 export function kickBall(ball: Ball, player: Vec, movement: Vec, playerRadius: number, dt: number) {
@@ -82,31 +167,29 @@ export function kickBall(ball: Ball, player: Vec, movement: Vec, playerRadius: n
 
 export function spikeVelocity(ball: Ball, field: BallField, forward: Vec): Point {
   const net = field.net, r = ball.radius;
-  const direct = { x: forward.x * 34, y: -4, z: forward.z * 34 };
+  const direct = { x: forward.x * 35, y: -12, z: forward.z * 35 };
   if (!net) return direct;
   const distance = Math.abs(net.z - ball.z);
   const crossingX = clamp(ball.x, net.minX + r + 1, net.maxX - r - 1);
-  if (distance < 2 || distance > 34 || Math.abs(ball.x - crossingX) > 16) return direct;
   const side = Math.sign(net.z - ball.z);
-  const landingZ = clamp(net.z + side * Math.max(11, distance * 0.83), field.minZ + r + 2, field.maxZ - r - 2);
   const edgeShot = ball.x < net.minX + r || ball.x > net.maxX - r;
   const clearance = (edgeShot ? net.postTop : net.top) + r + 0.45;
   const span = (net.maxZ - net.minZ) / 2 + r;
-  const maxPeak = field.ceiling - r - 0.4;
-  let peak = Math.max(ball.y, clearance + 2.5);
-  // Choose a speed that keeps the full ball above the net for the entire crossing.
-  for (; peak <= maxPeak; peak = Math.min(maxPeak, peak + 1)) {
-    const vy = Math.sqrt(2 * GRAVITY * (peak - ball.y));
-    const apexTime = vy / GRAVITY, clearTime = Math.sqrt(2 * (peak - clearance) / GRAVITY);
-    const earliest = apexTime - clearTime, latest = apexTime + clearTime;
-    const minSpeed = (distance + span) / travelTime(latest, AIR_DRAG);
-    const maxSpeed = earliest > 0 ? Math.max(0, distance - span) / travelTime(earliest, AIR_DRAG) : Infinity;
-    if (minSpeed <= maxSpeed) {
-      const duration = apexTime + Math.sqrt(2 * (peak - r) / GRAVITY);
-      const speed = clamp(Math.abs(landingZ - ball.z) / travelTime(duration, AIR_DRAG), minSpeed, maxSpeed);
-      return { x: (crossingX - ball.x) * speed / distance, y: vy, z: side * speed };
-    }
-    if (peak === maxPeak) break;
+  if (distance <= span || distance > 24 || Math.abs(ball.x - crossingX) > 16 || ball.y <= clearance) return direct;
+  const landingZ = clamp(net.z + side * Math.max(9, distance * 0.65), field.minZ + r + 2, field.maxZ - r - 2);
+  const farZ = side < 0 ? field.minZ + r + 1 : field.maxZ - r - 1;
+  const xSlope = (crossingX - ball.x) / distance;
+  if (forward.x * xSlope + forward.z * side < 0.25 * Math.hypot(1, xSlope)) return direct;
+  const xRoom = xSlope < 0 ? ball.x - field.minX - r : field.maxX - r - ball.x;
+  // Aim down from the jump, using a flatter angle only when the tape would catch it.
+  for (const vy of [-16, -10, -5]) {
+    const clearTravel = travelTime(fallTime(vy, ball.y - clearance), AIR_DRAG);
+    const floorTravel = travelTime(fallTime(vy, ball.y - r), AIR_DRAG);
+    const minimum = (distance + span) / clearTravel;
+    const maximum = Math.min(62, Math.abs(farZ - ball.z) / floorTravel, xRoom / Math.abs(xSlope) / floorTravel);
+    if (minimum > maximum) continue;
+    const speed = clamp(Math.abs(landingZ - ball.z) / floorTravel, minimum, maximum);
+    return { x: xSlope * speed, y: vy, z: side * speed };
   }
   return direct;
 }
@@ -126,7 +209,6 @@ export function stepBall(ball: Ball, field: BallField, dt: number) {
     }
     if (nextY <= floor) {
       ball.y = floor;
-      ball.tossed = false;
       if (ball.vy < -5) {
         ball.vy *= -0.52; ball.vx *= 0.84; ball.vz *= 0.84;
         ball.grounded = false;

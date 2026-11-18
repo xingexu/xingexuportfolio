@@ -138,7 +138,7 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={CHAPTERS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap the action button to set, toss, or hit. Walk into a volleyball to kick it. You can also drag to move, tap or click to inspect, or use Objects to browse without walking.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move, tap or click to inspect, or use Objects to browse without walking.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 

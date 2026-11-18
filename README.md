@@ -34,7 +34,7 @@ The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk for
 
 The **Objects** menu lists every room and lets visitors inspect props or jump to a room without walking. Use **Q** to tilt up and **F** to toggle between front and rear views, or tap the camera buttons.
 
-Walk into a loose volleyball to kick it. In Bayview, use **R** or tap **Toss**, then use **R** or tap **Hit** while the Mikasa is airborne. Near the court, the hit aims over the net. In Western, **R** or **Set** performs a two-handed overhead set. **E** still inspects the original display balls.
+Walk into a loose volleyball to kick it. In Bayview, press **R** or tap **Spike** once to toss, jump, and drive the Mikasa down so it bounces. Near the net, the spike aims across the court when the angle allows it. In Western, press **R** or tap **Set** for two overhead sets to yourself and a third set forward. **E** still inspects the original display balls.
 
 The CSA poster and Buldak noodles show captioned video players at the top of their object dialogs instead of rotating previews. Assets are in `public/videos/journey/`.
 

@@ -10,6 +10,7 @@ export type JourneyItem = Placement & {
   title: string;
   description: string;
   links?: JourneyLink[];
+  video?: { src: string; label: string; captions: string };
 };
 export type Outfit = "kid" | "starwars" | "essentials" | "western";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate";
@@ -42,12 +43,21 @@ export type Chapter = {
 const gh = (repo: string, label = `View ${repo} on GitHub`): JourneyLink => ({ href: `${LINKS.github}/${repo}`, label });
 const LINKEDIN: JourneyLink = { href: LINKS.linkedin, label: "See it on LinkedIn" };
 
-export const CHAPTERS: Chapter[] = [
+function expandRoom(chapter: Chapter): Chapter {
+  const spread = <T extends Placement>(p: T): T => ({
+    ...p,
+    x: p.x + (Math.abs(p.x) >= 20 ? Math.sign(p.x) * 10 : 0),
+    z: p.z + (Math.abs(p.z) >= 20 ? Math.sign(p.z) * 10 : 0),
+  });
+  return { ...chapter, width: chapter.width + 20, depth: chapter.depth + 20, items: chapter.items.map(spread), decor: chapter.decor.map(spread) };
+}
+
+const ROOMS: Chapter[] = [
   {
     id: "arrival", stop: "Canada", number: "01", place: "Arriving in Canada", location: "Canada", heading: "Seven years old. A new country.",
     intro: "Step off the plane and walk forward into the arrivals hall. Everything you can see glows when you get close; press E or tap it to look closer.",
     ageFrom: 7, ageTo: 7, outfit: "kid", outfitLabel: "Propeller cap · rainbow lollipop · shorts",
-    width: 96, depth: 84, floor: "tarmac", wall: 0xd8dde3, trim: 0x2f5f8a, background: 0x8ec9ef, outdoor: true, doorLabel: "ARRIVALS",
+    width: 120, depth: 96, floor: "tarmac", wall: 0xd8dde3, trim: 0x2f5f8a, background: 0x8ec9ef, outdoor: true, doorLabel: "ARRIVALS",
     items: [
       { id: "plane", model: "plane", x: -31, z: 2, label: "Plane", title: "Seven years old. A new country.",
         description: "I came to Canada when I was seven. This is where the walk begins: stepping off the plane in my propeller cap, lollipop in hand, with the rest of my life still ahead of me." },
@@ -62,6 +72,7 @@ export const CHAPTERS: Chapter[] = [
       { model: "cone", x: 10, z: 26 }, { model: "cone", x: 12, z: -26 }, { model: "cone", x: -10, z: -28 },
       { model: "runway-light", x: 40, z: 30 }, { model: "runway-light", x: 40, z: 10 }, { model: "runway-light", x: 40, z: -10 },
       { model: "runway-light", x: -44, z: 34 }, { model: "bench", x: 20, z: -34, solid: true },
+      { model: "service-cart", x: 49, z: 22, rot: 3 },
     ],
   },
   {
@@ -90,7 +101,7 @@ export const CHAPTERS: Chapter[] = [
       { id: "candy", model: "candy-jar", x: 24, z: 2, label: "Candy jar", title: "The sweet corner.",
         description: "A little stash of candy, right beside the computer." },
     ],
-    decor: [{ model: "rug-round", x: 0, z: 2, solid: false }, { model: "toy-box", x: 24, z: 26 }],
+    decor: [{ model: "rug-round", x: 0, z: 2, solid: false }, { model: "toy-box", x: 24, z: 26 }, { model: "dresser", x: -25, z: -25, rot: 1 }],
   },
   {
     id: "school", stop: "Primary school", number: "03", place: "Grade 5", location: "Elementary school", heading: "Getting into code.",
@@ -112,7 +123,7 @@ export const CHAPTERS: Chapter[] = [
       { id: "desks", model: "school-desks", x: -18, z: 0, label: "Classroom desks", title: "Back to school.",
         description: "Rows of desks, pencil cases and worksheets. Grade 5 was a big year." },
     ],
-    decor: [{ model: "bookshelf-class", x: -27, z: 24, rot: 1 }, { model: "clock", x: -24, z: -33, y: 28, solid: false }, { model: "globe-stand", x: -26, z: -20 }],
+    decor: [{ model: "bookshelf-class", x: -27, z: 24, rot: 1 }, { model: "clock", x: -24, z: -33, y: 28, solid: false }, { model: "globe-stand", x: -26, z: -20 }, { model: "classroom-cubbies", x: 27, z: -27 }],
   },
   {
     id: "elm", stop: "Middle school", number: "04", place: "10 Elm Avenue", location: "10 Elm Avenue", heading: "A new house. A new instrument.",
@@ -135,7 +146,7 @@ export const CHAPTERS: Chapter[] = [
       { id: "elm-poster", model: "poster-starwars-big", x: -29, z: 9, y: 12, rot: 1, solid: false, label: "Star Wars poster", title: "Still a Star Wars kid.",
         description: "Still a Star Wars kid. The hoodie proves it." },
     ],
-    decor: [{ model: "rug-square", x: 0, z: 6, solid: false }, { model: "basketball", x: 8, z: 24 }, { model: "beanbag", x: -14, z: 28 }],
+    decor: [{ model: "rug-square", x: 0, z: 6, solid: false }, { model: "basketball", x: 8, z: 24 }, { model: "beanbag", x: -14, z: 28 }, { model: "dresser", x: -26, z: 14, rot: 1 }],
   },
   {
     id: "bayview", stop: "Secondary school", number: "05", place: "Bayview Secondary School", location: "Richmond Hill, Ontario", heading: "High school.",
@@ -181,6 +192,7 @@ export const CHAPTERS: Chapter[] = [
     decor: [
       { model: "volleyball-net", x: -20, z: 7 }, { model: "lockers", x: 31, z: 26, rot: 3 }, { model: "ball-cart", x: 15, z: 30 },
       { model: "coding-desk", x: 24, z: 6, rot: 3 },
+      { model: "bench", x: -24, z: 34, rot: 2 },
       { model: "trophy-plinth", x: -21, z: -31 }, { model: "trophy-plinth", x: 21, z: -31 },
     ],
   },
@@ -188,46 +200,57 @@ export const CHAPTERS: Chapter[] = [
     id: "western", stop: "University", number: "06", place: "Ontario Hall", location: "Western University · London, Ontario", heading: "Where I am now.",
     intro: "Eighteen, in my room in Ontario Hall at Western: Computer Science + Ivey, and three clubs.",
     ageFrom: 18, ageTo: 18, outfit: "western", outfitLabel: "Aritzia black hoodie & sweatpants · black New Balance 9060s",
-    width: 64, depth: 72, floor: "laminate", wall: 0xe9e6e0, trim: 0x4f2683, background: 0x0e1014, doorLabel: "NEXT",
+    width: 88, depth: 96, floor: "laminate", wall: 0x3f3c4e, trim: 0x554463, background: 0x0d0c16, doorLabel: "NEXT",
     items: [
-      { id: "degree", model: "western-pennant", x: 20, z: -33, y: 19, solid: false, label: "Western pennant · CS + Ivey", title: "Computer Science + Ivey.",
+      { id: "degree", model: "cs-ivey", x: 24, z: -45, y: 18, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey.",
         description: "I’m pursuing a dual degree at Western: Computer Science, plus the Ivey Business School’s HBA through Advanced Entry Opportunity (AEO) status.",
         links: [{ href: "https://www.csd.uwo.ca", label: "Western Computer Science" }, { href: "https://www.ivey.uwo.ca/hba/", label: "Ivey HBA" }] },
-      { id: "csa", model: "poster-csa", x: -29, z: -20, y: 12, rot: 1, solid: false, label: "CSA poster", title: "Chinese Students’ Association.",
+      { id: "mustangs", model: "go-mustangs", x: 41, z: 9, y: 14, rot: 3, solid: false, label: "Go Mustangs poster", title: "Go Mustangs.",
+        description: "A Western Mustangs poster above the bed.", links: [{ href: "https://westernmustangs.ca/", label: "Western Mustangs" }] },
+      { id: "csa", model: "poster-csa", x: -41, z: -13, y: 14, rot: 1, solid: false, label: "CSA poster", title: "Chinese Students’ Association.",
         description: "Productions Executive with the Chinese Students’ Association (CSA) at Western.",
+        video: { src: "/videos/journey/csa.mp4", label: "CSA at Western", captions: "/videos/journey/csa.en.vtt" },
         links: [{ href: "https://csawestern.com/links", label: "CSA Western" }, { href: "https://www.instagram.com/csawestern/", label: "@csawestern" }] },
-      { id: "wds", model: "poster-wds", x: -29, z: 1, y: 11, rot: 1, solid: false, label: "Western Developers Society poster", title: "Western Developers Society.",
+      { id: "wds", model: "poster-wds", x: -41, z: 2, y: 14, rot: 1, solid: false, label: "Western Developers Society poster", title: "Western Developers Society.",
         description: "Director of Internals at the Western Developers Society.",
         links: [{ href: "https://www.westerndevsociety.ca/", label: "Western Developers Society" }, { href: "https://linktr.ee/westerndevsociety", label: "WDS Linktree" }] },
-      { id: "wfn", model: "poster-wfn", x: -29, z: 22, y: 12, rot: 1, solid: false, label: "Western Founders Network poster", title: "Western Founders Network.",
+      { id: "wfn", model: "poster-wfn", x: -41, z: 17, y: 14, rot: 1, solid: false, label: "Western Founders Network poster", title: "Western Founders Network.",
         description: "Director for the Projects portfolio at Western Founders Network.",
         links: [{ href: "https://linktr.ee/westernfoundersnetwork", label: "Western Founders Network" }, { href: "https://www.instagram.com/westernfoundersnetwork/", label: "@westernfoundersnetwork" }] },
-      { id: "ohall-bed", model: "bed-western", x: 22, z: 21, label: "Bed", title: "My room in O-Hall.",
+      { id: "ohall-bed", model: "bed-western", x: 32, z: 26, label: "Blue and beige bed", title: "My room in O-Hall.",
         description: "My first-year room in Ontario Hall (O-Hall) at Western." },
-      { id: "jellycat", model: "jellycat-frog", x: 22, z: 10, y: 7, solid: false, label: "Jellycat frog", title: "The frog.",
+      { id: "jellycat", model: "jellycat-frog", x: 32, z: 17, y: 7, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog.",
         description: "My Jellycat frog, permanent resident of the bed." },
-      { id: "standing-desk", model: "standing-desk", x: 25, z: -8, rot: 3, label: "Stand-up desk", title: "Stand-up desk.",
+      { id: "standing-desk", model: "standing-desk", x: 34, z: -12, rot: 3, label: "Stand-up desk", title: "Stand-up desk.",
         description: "A stand-up desk for long coding sessions and club work." },
-      { id: "monitor", model: "monitor", x: 27, z: -8, y: 18, rot: 3, solid: false, label: "Monitor", title: "Always something compiling.",
+      { id: "monitor", model: "monitor", x: 36, z: -12, y: 18, rot: 3, solid: false, label: "Monitor", title: "Always something compiling.",
         description: "Usually showing code, a pull request, or whatever I’m building next.",
         links: [{ href: LINKS.github, label: "See what I’m building" }] },
-      { id: "desk-lamp", model: "desk-lamp", x: 27, z: -17, y: 18, rot: 3, solid: false, label: "Desk lamp", title: "Late-night lighting.",
+      { id: "desk-lamp", model: "desk-lamp", x: 35, z: -21, y: 18, rot: 3, solid: false, label: "Desk lamp", title: "Late-night lighting.",
         description: "Late-night light for late-night commits." },
-      { id: "mini-fridge", model: "mini-fridge", x: 20, z: -30, label: "Mini fridge", title: "Dorm essentials.",
+      { id: "buldak", model: "buldak-bowl", x: 32, z: -3, y: 18, rot: 3, solid: false, label: "Buldak noodles", title: "Buldak at 5 a.m.",
+        description: "A bowl of Buldak noodles from our 5 a.m. taste test.",
+        video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m.", captions: "/videos/journey/buldak.en.vtt" } },
+      { id: "mini-fridge", model: "mini-fridge", x: 24, z: -38, label: "Mini fridge", title: "Dorm essentials.",
         description: "Snacks and drinks, within arm’s reach of the desk." },
-      { id: "fragrances", model: "fragrances", x: 20, z: -30, y: 13, solid: false, label: "Fragrances", title: "The collection.",
+      { id: "fragrances", model: "fragrances", x: 24, z: -38, y: 13, solid: false, label: "Fragrances", title: "The collection.",
         description: "A small lineup of fragrances on top of the mini fridge." },
-      { id: "fan", model: "fan", x: -24, z: 31, label: "Fan", title: "Keeping cool.",
+      { id: "fan", model: "fan", x: 18, z: 17, y: 9, rot: 3, solid: false, label: "Table fan", title: "Keeping cool.",
         description: "Residence rooms get warm. The fan runs more often than not." },
-      { id: "closet", model: "closet", x: -17, z: -27, label: "Closet", title: "All black everything.",
+      { id: "closet", model: "closet", x: -27, z: -39, label: "Closet", title: "All black everything.",
         description: "A closet full of black: hoodies, sweatpants and the same black New Balances I’m wearing right now." },
-      { id: "laundry", model: "laundry-basket", x: -27, z: -10, label: "Laundry basket", title: "Residence life.",
+      { id: "pink-shoes", model: "pink-court-shoes", x: -25, z: -31, label: "Pink volleyball shoes", title: "Pink volleyball shoes.",
+        description: "My pink court shoes, ready for the next volleyball game." },
+      { id: "molten", model: "molten-volleyball", x: -32, z: -30, label: "Molten volleyball", title: "Molten volleyball.",
+        description: "A Molten volleyball next to my court shoes." },
+      { id: "laundry", model: "laundry-basket", x: -36, z: -22, label: "Laundry basket", title: "Residence life.",
         description: "A laundry basket tucked near the closet." },
     ],
-    decor: [{ model: "rug-western", x: 0, z: 8, solid: false }],
+    decor: [{ model: "rug-western", x: 2, z: 10, solid: false }, { model: "nightstand", x: 18, z: 17, rot: 3 }],
   },
 ];
 
+export const CHAPTERS = ROOMS.map(chapter => chapter.outdoor || chapter.id === "western" ? chapter : expandRoom(chapter));
 export const ALL_ITEMS = CHAPTERS.flatMap((chapter, index) => chapter.items.map(item => ({ ...item, chapter: index })));
 export const itemById = (id: string) => ALL_ITEMS.find(item => item.id === id);
 export const ageLabel = (chapter: Chapter) => chapter.ageFrom === chapter.ageTo ? `${chapter.ageFrom}` : `${chapter.ageFrom}–${chapter.ageTo}`;

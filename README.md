@@ -29,8 +29,12 @@ The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk for
 
 - `src/lib/journey/voxel.ts` is a sparse grid with a 3×5 voxel font for signs. `models.ts` draws the props, using a finer grid for details like the MacBook and trophy labels. `avatar.ts` builds the character and `world.ts` builds room shells and handles collisions, reach, spawns and age-by-position.
 - `src/lib/journey/data.ts` is the content: chapters, outfits, and every object’s text and links. Add or edit an object there; its position, model and links live in one entry.
-- `src/components/JourneyWorld.tsx` renders with three.js at a low internal resolution scaled by a whole number, so every screen pixel block is the same size. It owns input, the follow camera, the skippable intro, and the pixel-dissolve chapter transitions.
+- `src/components/JourneyWorld.tsx` renders with three.js at a uniform pixel pitch chosen for the current viewport. It owns input, the follow camera, the skippable intro, and the pixel-dissolve chapter transitions.
 - `src/components/About.tsx` is the HUD, object dialogs (with a rotating voxel close-up from `ObjectPreview.tsx`), the finale, and a no-JavaScript list. Browsers without WebGL also get a readable list.
+
+The **Objects** menu lists every room and lets visitors inspect props or jump to a room without walking.
+
+The CSA poster and Buldak noodles play captioned clips from `public/videos/journey/` inside their object dialogs.
 
 For optional background music, set `NEXT_PUBLIC_JOURNEY_MUSIC_URL` before building to a browser-playable audio URL you have permission to publish. The player loops the track only after someone turns music on; without a URL it stays hidden.
 

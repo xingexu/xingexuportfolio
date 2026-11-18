@@ -37,6 +37,17 @@ test('every item is written out, linked properly and has a model', () => {
   for (const chapter of CHAPTERS) for (const p of chapter.decor) assert.ok(MODEL_IDS.includes(p.model), p.model);
 });
 
+test('the CSA poster and Buldak bowl have the right playable video and captions', () => {
+  for (const [id, filename] of [['csa', 'csa'], ['buldak', 'buldak']]) {
+    const { video } = ALL_ITEMS.find(item => item.id === id);
+    assert.equal(video.src, `/videos/journey/${filename}.mp4`);
+    assert.ok(video.label);
+    const mp4 = fs.readFileSync(path.join(root, 'public', video.src));
+    assert.equal(mp4.toString('ascii', 4, 8), 'ftyp');
+    assert.match(fs.readFileSync(path.join(root, 'public', video.captions), 'utf8'), /^WEBVTT\n/);
+  }
+});
+
 test('every model uses an aligned voxel grid and fits its world footprint', () => {
   for (const id of MODEL_IDS) {
     const grid = buildModel(id);
@@ -72,10 +83,28 @@ test('indoor cutaways leave the floor and cut only camera-side walls', () => {
 
 test('the terminal facade can be cut away without losing the apron floor', () => {
   const bounds = W.interior(CHAPTERS[0]), { fixed, walls } = W.buildCutawayShell(0);
-  assert.ok(walls.front.has(-12, 12, -42));
-  assert.ok(fixed.has(-12, -1, -42));
+  const facadeZ = -CHAPTERS[0].depth / 2;
+  assert.ok(walls.front.has(-12, 12, facadeZ));
+  assert.ok(fixed.has(-12, -1, facadeZ));
   assert.ok(W.cutawaySides(bounds, { x: 0, z: bounds.minZ - 1 }).has('front'));
   assert.ok(!W.cutawaySides(bounds, { x: 0, z: bounds.minZ + 1 }).has('front'));
+});
+
+test('render pixels use half the old pitch at desktop and phone sizes', () => {
+  for (const [w, h, pixel] of [[1920, 1080, 1.5], [1280, 720, 1], [400, 754, 0.5]]) {
+    assert.equal(W.renderPixelSize(w, h), pixel);
+  }
+});
+
+test('the Western dorm keeps small props and signs proportional to the furniture', () => {
+  const room = CHAPTERS.at(-1);
+  const footprint = id => modelFootprint(room.items.find(item => item.id === id).model);
+  assert.ok(room.width >= 84 && room.depth >= 92);
+  assert.ok(footprint('buldak').height < 3);
+  assert.ok(footprint('fan').height < 9);
+  assert.ok(footprint('molten').height < 4);
+  assert.ok(footprint('degree').height < footprint('mustangs').height);
+  for (const id of ['csa', 'wds', 'wfn', 'mustangs']) assert.ok(footprint(id).height < W.AVATAR_SCALE * avatarHeight(18));
 });
 
 test('the story runs from age 7 to 18 with the requested outfits', () => {

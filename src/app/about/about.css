@@ -52,7 +52,7 @@
 .journey-preview { margin: 0 0 20px; border: 1px solid #2c2c30; background: #19191d; overflow: hidden; display: flex; justify-content: center; }
 .journey-preview canvas { display: block; flex: none; image-rendering: pixelated; image-rendering: crisp-edges; }
 .journey-copy { color: #c4c4c4; font-size: 15px; line-height: 1.85; text-wrap: pretty; }
-.journey-video { display: block; width: 100%; max-height: 54svh; margin-top: 16px; background: #09090c; }
+.journey-video { display: block; width: 100%; max-height: 54svh; margin-top: 16px; background: #09090c; object-fit: contain; }
 .journey-room-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; font-size: 13px; }
 .journey-room-picker select, .journey-room-picker button, .journey-object-list button { min-height: 44px; padding: 7px 10px; border: 1px solid #4a4a4f; background: #1a1a20; color: #eee; font-size: 13px; cursor: pointer; }
 .journey-room-picker select { margin-left: 6px; color-scheme: dark; }

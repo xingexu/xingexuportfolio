@@ -17,7 +17,6 @@ const FINAL_LINKS: JourneyLink[] = [
   { href: LINKS.email, label: "Email me" },
 ];
 const MUSIC_URL = process.env.NEXT_PUBLIC_JOURNEY_MUSIC_URL;
-const BULDAK_VIDEO_URL = process.env.NEXT_PUBLIC_JOURNEY_BULDAK_VIDEO_URL;
 
 function StoryLink({ link }: { link: JourneyLink }) {
   return link.href.startsWith("/")
@@ -200,7 +199,10 @@ export default function About() {
             <h2 id="journey-dialog-title">{item.title}</h2>
             <ObjectPreview model={item.model} label={item.label} />
             <p className="journey-copy">{item.description}</p>
-            {item.id === "buldak" && BULDAK_VIDEO_URL && <video className="journey-video" src={BULDAK_VIDEO_URL} controls playsInline preload="metadata" aria-label="Buldak at 5 a.m." />}
+            {item.video && <video key={item.video.src} className="journey-video" src={item.video.src} controls playsInline preload="metadata" aria-label={item.video.label}>
+              <track kind="captions" src={item.video.captions} srcLang="en" label="English" />
+              <a href={item.video.src}>Watch {item.video.label}</a>
+            </video>}
             {item.links && <div className="journey-links">{item.links.map(link => <StoryLink key={link.href} link={link} />)}</div>}
             {chapterItems.length > 1 && <nav className="journey-item-nav" aria-label={`More from ${home.place}`}>
               <button type="button" onClick={() => openItem(chapterItems[(itemIndex + chapterItems.length - 1) % chapterItems.length].id)} aria-label="Previous object">←</button>
@@ -223,7 +225,10 @@ export default function About() {
           {CHAPTERS.map(entry => (
             <section key={entry.id}>
               <h3>{entry.place} · age {ageLabel(entry)}</h3>
-              <ul>{entry.items.map(entryItem => <li key={entryItem.id}><strong>{entryItem.label}:</strong> {entryItem.description} {entryItem.links?.map(link => <a key={link.href} href={link.href}> {link.label}</a>)}</li>)}</ul>
+              <ul>{entry.items.map(entryItem => <li key={entryItem.id}>
+                <strong>{entryItem.label}:</strong> {entryItem.description} {entryItem.links?.map(link => <a key={link.href} href={link.href}> {link.label}</a>)}
+                {entryItem.video && <a href={entryItem.video.src}> Watch {entryItem.video.label}</a>}
+              </li>)}</ul>
             </section>
           ))}
         </div>

@@ -34,7 +34,9 @@ The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk for
 
 The **Objects** menu lists every room and lets visitors inspect props or jump to a room without walking.
 
-For optional background music, set `NEXT_PUBLIC_JOURNEY_MUSIC_URL` before building to a browser-playable audio URL you have permission to publish. The player loops the track only after someone turns music on; without a URL it stays hidden. Set `NEXT_PUBLIC_JOURNEY_BULDAK_VIDEO_URL` to a publishable MP4 URL to show the video inside the Buldak noodles story.
+The CSA poster and Buldak noodles play captioned clips from `public/videos/journey/` inside their object dialogs.
+
+For optional background music, set `NEXT_PUBLIC_JOURNEY_MUSIC_URL` before building to a browser-playable audio URL you have permission to publish. The player loops the track only after someone turns music on; without a URL it stays hidden.
 
 Run `npm run test:world` to check that every object has real text and valid links, every model builds, ages run 7 → 18 with the right outfits, every object can be reached on foot, each door leads on (and back), and walls hold the player.
 

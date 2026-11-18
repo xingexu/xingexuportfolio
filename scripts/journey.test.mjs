@@ -37,6 +37,17 @@ test('every item is written out, linked properly and has a model', () => {
   for (const chapter of CHAPTERS) for (const p of chapter.decor) assert.ok(MODEL_IDS.includes(p.model), p.model);
 });
 
+test('the CSA poster and Buldak bowl have the right playable video and captions', () => {
+  for (const [id, filename] of [['csa', 'csa'], ['buldak', 'buldak']]) {
+    const { video } = ALL_ITEMS.find(item => item.id === id);
+    assert.equal(video.src, `/videos/journey/${filename}.mp4`);
+    assert.ok(video.label);
+    const mp4 = fs.readFileSync(path.join(root, 'public', video.src));
+    assert.equal(mp4.toString('ascii', 4, 8), 'ftyp');
+    assert.match(fs.readFileSync(path.join(root, 'public', video.captions), 'utf8'), /^WEBVTT\n/);
+  }
+});
+
 test('every model uses an aligned voxel grid and fits its world footprint', () => {
   for (const id of MODEL_IDS) {
     const grid = buildModel(id);

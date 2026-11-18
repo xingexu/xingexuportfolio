@@ -322,11 +322,11 @@ test('lifting a Molten beside a tall closet does not pull it inside', () => {
   const room = CHAPTERS[index], field = W.buildBallField(index);
   const { x, z } = room.items.find(item => item.id === 'closet');
   const closet = field.blocks.find(p => p.minX < x && p.maxX > x && p.minZ < z && p.maxZ > z);
-  const ball = V.makeBall(room.items.find(item => item.id === 'molten').x, 0, closet.maxZ + 2, 1.875);
-  V.liftBall(ball, { x: ball.x, y: 23, z: closet.maxZ - 1 }, field);
+  const ball = V.makeBall(closet.maxX + 2, 0, z, 1.875);
+  V.liftBall(ball, { x: closet.maxX - 1, y: 23, z: ball.z }, field);
   assert.ok(Math.abs(ball.y - 23) < 1e-6);
-  assert.ok(ball.z >= closet.maxZ + ball.radius);
-  V.launchBall(ball, { x: 0, y: 27, z: -3.5 });
+  assert.ok(ball.x >= closet.maxX + ball.radius);
+  V.launchBall(ball, { x: -3.5, y: 27, z: 0 });
   for (let i = 0; i < 360; i++) V.stepBall(ball, field, 1 / 120);
   assert.ok(ball.grounded && (ball.y === ball.radius || ball.y >= closet.top + ball.radius));
 });
@@ -432,7 +432,7 @@ test('front and tilt camera modes keep the full avatar inside the vertical field
 
 test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading', () => {
   assert.equal(AVATAR_VOXEL_SIZE, 0.5);
-  for (const outfit of ['starwars', 'essentials', 'western']) {
+  for (const outfit of ['starwars', 'essentials']) {
     const parts = buildAvatar(18, outfit);
     assert.equal(parts.height, 34);
     assert.ok(parts.head.bounds().minZ < -10);
@@ -443,7 +443,7 @@ test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading
   }
 });
 
-test('the Western avatar keeps tapered clothes, UGGs and a low, textured fringe', () => {
+test('the Western avatar has regular-fit clothes, smaller facial proportions and UGGs', () => {
   const current = buildAvatar(18, 'western');
   const width = grid => grid.bounds().maxX - grid.bounds().minX + 1;
   const spanAt = (grid, layer) => {
@@ -451,29 +451,33 @@ test('the Western avatar keeps tapered clothes, UGGs and a low, textured fringe'
     grid.forEach((x, y, z) => { if (y === layer) { xs.push(x); zs.push(z); } });
     return [Math.max(...xs) - Math.min(...xs) + 1, Math.max(...zs) - Math.min(...zs) + 1];
   };
-  assert.ok(width(current.torso) <= 16 && width(current.armL) <= 6);
-  assert.ok(spanAt(current.torso, 3)[0] < spanAt(current.torso, 16)[0], 'waist tapers in from the chest');
-  assert.ok(current.torso.bounds().minY < 0, 'hoodie drapes below the hip');
+  assert.ok(width(current.torso) <= 14 && width(current.armL) <= 5);
+  assert.deepEqual(spanAt(current.torso, 3), [12, 6], 'the waist is fitted');
+  assert.equal(current.torso.bounds().minY, 0, 'the hoodie ends at the hip');
+  assert.equal(current.armL.bounds().maxZ - current.armL.bounds().minZ + 1, 4, 'the sleeves have no extra bulk');
+  assert.ok(width(current.head) <= 14 && current.head.bounds().maxY <= 15);
+  assert.equal(current.height, avatarHeight(18));
   for (const side of ['legL', 'legR']) {
     const leg = current[side], bounds = leg.bounds();
-    assert.ok(width(leg) <= 9);
+    assert.ok(width(leg) <= 7);
+    assert.deepEqual(spanAt(leg, bounds.minY + 9), [6, 6]);
+    assert.deepEqual(spanAt(leg, -9), [6, 6], 'straight cut from calf to thigh');
     assert.equal(bounds.minY * AVATAR_VOXEL_SIZE, -current.hip);
-    assert.equal(bounds.maxZ, 7, 'boot toe extends forward of the pants');
-    assert.ok(leg.has(side === 'legL' ? -4 : 3, bounds.minY + 6, -4), 'ankle shaft rises above the toe box');
+    assert.equal(bounds.maxZ, 6, 'boot toe extends forward of the pants');
+    assert.ok(leg.has(side === 'legL' ? -4 : 3, bounds.minY + 6, -3), 'ankle shaft rises above the toe box');
   }
   const heights = new Set(), strandColors = new Set();
-  current.head.forEach((x, y, _z, color) => {
+  current.head.forEach((_x, y, _z, color) => {
     assert.notEqual(color, 0xf3a9a0);
-    if (y >= 16) {
+    if (y >= 11) {
       heights.add(y);
       strandColors.add(color);
     }
   });
   assert.ok(heights.size >= 4 && strandColors.size >= 8);
-  assert.ok(spanAt(current.head, 17).every(span => span >= 14), 'texture covers the full crown');
-  assert.ok(current.head.bounds().maxY <= 20, 'the crown stays low');
-  assert.ok(current.head.has(1, 12, 8) && !current.head.has(-7, 12, 8), 'fringe leaves the temples uncovered');
-  assert.equal(current.head.get(-8, 9, 2), 0xf8e1d0, 'sides are trimmed above the ear');
+  assert.ok(spanAt(current.head, 12).every(span => span >= 10), 'texture covers the crown');
+  const fringe = current.head.get(1, 9, 6);
+  assert.ok(fringe !== undefined && fringe < 0x302a26 && !current.head.has(-7, 9, 6), 'the fringe leaves the temples uncovered');
   assert.match(CHAPTERS.at(-1).outfitLabel, /UGGs/);
 });
 
@@ -525,7 +529,7 @@ test('the Western dorm keeps small props and signs proportional to the furniture
   for (const id of ['csa', 'wds', 'wfn', 'mustangs']) assert.ok(footprint(id).height < W.AVATAR_SCALE * avatarHeight(18));
 });
 
-test('the larger Western dorm fits two beds in a T without overlapping', () => {
+test('the beds keep their T alignment but are far apart on opposite sides of the divider', () => {
   const room = CHAPTERS.at(-1);
   assert.ok(room.width >= 120 && room.depth >= 120);
   const [bar, stem] = ['ohall-bed', 'richards-bed'].map(id => room.items.find(item => item.id === id));
@@ -533,10 +537,12 @@ test('the larger Western dorm fits two beds in a T without overlapping', () => {
   const a = W.placementBox(bar), b = W.placementBox(stem);
   assert.equal((a.minX + a.maxX) / 2, (b.minX + b.maxX) / 2);
   assert.ok(a.minX < b.minX && a.maxX > b.maxX, 'the crossbar extends past both sides of the stem');
-  assert.ok(a.minZ >= b.maxZ && a.minZ - b.maxZ <= 2, 'the foot of the stem sits against the crossbar');
+  const divider = room.decor.find(prop => prop.model === 'desk-divider');
+  assert.ok(a.minZ > divider.z && b.maxZ < divider.z);
+  assert.ok(a.minZ - b.maxZ >= 40, 'a broad gap separates the beds');
 });
 
-test('the two wide standing desks face out from the half wall and have clear approaches', () => {
+test('the standing desks are directly opposite, with both monitors facing their beds', () => {
   const index = CHAPTERS.length - 1, room = CHAPTERS[index];
   const [mine, richards] = room.items.filter(item => item.model.startsWith('standing-desk'));
   const divider = room.decor.find(prop => prop.model === 'desk-divider');
@@ -546,20 +552,37 @@ test('the two wide standing desks face out from the half wall and have clear app
   assert.equal(mine.z - divider.z, divider.z - richards.z);
   assert.equal(mine.rot ?? 0, 0);
   assert.equal(richards.rot, 2);
+  const monitors = [room.items.find(item => item.id === 'monitor'), room.decor.find(prop => prop.model === 'monitor')];
+  assert.equal(monitors[0].z - divider.z, divider.z - monitors[1].z);
   assert.ok(wallHeight >= W.WALL_HEIGHT / 2 && wallHeight <= W.WALL_HEIGHT / 2 + 1);
   assert.ok(W.blocked(index, divider.x, divider.z, 3.5));
   const cells = reachable(index, W.spawn(index, 'forward'));
-  for (const desk of [mine, richards]) {
+  for (const [i, desk] of [mine, richards].entries()) {
     const footprint = modelFootprint(desk.model), rect = W.placementBox(desk);
     assert.ok(footprint.maxX - footprint.minX >= 30 && footprint.maxZ - footprint.minZ >= 12);
     assert.ok(wall.minX <= rect.minX && wall.maxX >= rect.maxX);
     const south = desk.z > divider.z, gap = south ? rect.minZ - wall.maxZ : wall.minZ - rect.maxZ;
     assert.ok(gap >= 0 && gap <= 2, 'the desk backs sit against the divider');
     assert.ok(cells.some(p => p.x === desk.x && p.z === (south ? rect.maxZ + 5 : rect.minZ - 5)), 'the front of the desk is walkable');
+    const monitor = W.placementBox(monitors[i]);
+    assert.equal(monitors[i].rot ?? 0, desk.rot ?? 0);
+    assert.ok(monitor.minX >= rect.minX && monitor.maxX <= rect.maxX && monitor.minZ >= rect.minZ && monitor.maxZ <= rect.maxZ);
   }
   for (const x of [wall.minX - 4, wall.maxX + 4]) {
     assert.ok(!W.blocked(index, x, divider.z, 3.5), 'the divider leaves passage at both ends');
   }
+});
+
+test('each desk is by its own bed, with the fridge and closet next to the player’s bed', () => {
+  const room = CHAPTERS.at(-1);
+  const itemBox = id => W.placementBox(room.items.find(item => item.id === id));
+  const mine = itemBox('ohall-bed'), richards = itemBox('richards-bed');
+  const deskGap = mine.minZ - itemBox('standing-desk').maxZ;
+  const richardsGap = itemBox('richards-desk').minZ - richards.maxZ;
+  for (const gap of [deskGap, richardsGap]) assert.ok(gap >= 8 && gap <= 12, 'room to walk between each bed and desk');
+  const fridge = itemBox('mini-fridge'), closet = itemBox('closet');
+  for (const prop of [fridge, closet]) assert.ok(prop.minZ < mine.maxZ && prop.maxZ > mine.minZ && prop.minZ > 0);
+  for (const gap of [fridge.minX - mine.maxX, mine.minX - closet.maxX]) assert.ok(gap >= 7 && gap <= 15);
 });
 
 test('the tall Western closet has hanging clothes and four stocked pantry tiers', () => {

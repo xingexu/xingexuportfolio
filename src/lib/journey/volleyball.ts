@@ -12,6 +12,7 @@ export type CourtNet = BallBlock & { z: number };
 export type BallField = Box & { ceiling: number; blocks: BallBlock[]; net?: CourtNet };
 
 const GRAVITY = 86;
+export const HIT_WINDUP = 0.11;
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 export function makeBall(x: number, base: number, z: number, radius: number): Ball {
@@ -41,14 +42,20 @@ export function liftBall(ball: Ball, target: Point, field: BallField) {
   ball.grounded = false;
 }
 
-export function volleyAction(kind: BallKind, ball: Ball, player: Vec, height: number, net?: CourtNet): BallAction | null {
+export function volleyAction(kind: BallKind, ball: Ball, player: Vec, height: number, field: BallField): BallAction | null {
+  const { net } = field;
   const dx = ball.x - player.x, dz = ball.z - player.z;
   if (Math.hypot(dx, dz) > (ball.tossed ? 9 : 8.5)) return null;
   if (net && (player.z - net.z) * (ball.z - net.z) < 0) {
     const crossing = player.x + dx * (net.z - player.z) / dz;
     if (crossing >= net.minX && crossing <= net.maxX) return null;
   }
-  if (ball.tossed && kind === "mikasa" && ball.y <= height + 9) return "Hit";
+  if (ball.tossed && kind === "mikasa") {
+    const contact = { ...ball };
+    stepBall(contact, field, HIT_WINDUP);
+    return contact.tossed && contact.y >= height * 0.65 && contact.y <= height + 9 &&
+      Math.hypot(contact.x - player.x, contact.z - player.z) <= 9 ? "Hit" : null;
+  }
   return ball.grounded && ball.y <= height ? kind === "molten" ? "Set" : "Toss" : null;
 }
 

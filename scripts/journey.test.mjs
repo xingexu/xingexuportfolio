@@ -172,21 +172,31 @@ test('cones and basketball keep their existing bump reactions', () => {
 });
 
 test('both volleyball styles respond to proximity, a toss or set, and a walking kick', () => {
+  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview'));
   for (const kind of ['mikasa', 'molten']) {
     const b = V.makeBall(0, 0, 0, 1.75), player = { x: -3, z: 0 };
-    assert.equal(V.volleyAction(kind, b, { x: 30, z: 0 }, 22), null);
-    assert.equal(V.volleyAction(kind, b, player, 22), kind === 'mikasa' ? 'Toss' : 'Set');
+    assert.equal(V.volleyAction(kind, b, { x: 30, z: 0 }, 22, field), null);
+    assert.equal(V.volleyAction(kind, b, player, 22, field), kind === 'mikasa' ? 'Toss' : 'Set');
     assert.equal(V.kickBall(b, player, { x: -0.3, z: 0 }, 2, 0.016), false);
     assert.equal(V.kickBall(b, player, { x: 0.3, z: 0 }, 2, 0.016), true);
     assert.ok(b.vx > 0 && b.vy > 0, 'a kick sends the ball forward and a little upward');
     assert.equal(V.kickBall(b, player, { x: 0.3, z: 0 }, 2, 0.016), false);
+    b.y = 17;
     V.launchBall(b, { x: 0, y: 40, z: 0 }, kind === 'mikasa');
-    assert.equal(V.volleyAction(kind, b, player, 22), kind === 'mikasa' ? 'Hit' : null);
-    const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview'));
+    assert.equal(V.volleyAction(kind, b, player, 22, field), kind === 'mikasa' ? 'Hit' : null);
     for (let i = 0; i < 480; i++) V.stepBall(b, field, 1 / 120);
     assert.equal(b.y, b.radius);
     assert.ok(b.grounded && !b.tossed);
   }
+});
+
+test('Hit is offered only if the ball is reachable through the windup', () => {
+  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview')), player = { x: 1, z: 4 };
+  const b = V.makeBall(1, 15, 0, 1.75);
+  V.launchBall(b, { x: 0, y: -36, z: 0 }, true);
+  assert.equal(V.volleyAction('mikasa', b, player, 22, field), null, 'the ball falls below arm height before impact');
+  b.y = 22;
+  assert.equal(V.volleyAction('mikasa', b, player, 22, field), 'Hit');
 });
 
 test('Mikasa hits clear the tape from both sides while low airborne balls bounce back', () => {
@@ -437,7 +447,7 @@ test('spawn points are open and every object can be reached on foot', () => {
     const field = W.buildBallField(index);
     for (const placement of [...chapter.items, ...chapter.decor].filter(p => p.ball)) {
       const ball = V.makeBall(placement.x, placement.y ?? 0, placement.z, modelFootprint(placement.model).height / 2);
-      assert.ok(cells.some(c => V.volleyAction(placement.ball, ball, c, avatarHeight(chapter.ageFrom) * W.AVATAR_SCALE, field.net)), `${placement.model} at ${placement.x},${placement.z} is playable`);
+      assert.ok(cells.some(c => V.volleyAction(placement.ball, ball, c, avatarHeight(chapter.ageFrom) * W.AVATAR_SCALE, field)), `${placement.model} at ${placement.x},${placement.z} is playable`);
     }
   });
 });

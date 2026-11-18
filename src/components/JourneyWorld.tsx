@@ -7,7 +7,7 @@ import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, mode
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, bumpProp, cameraOffsets, cutawaySides, doorwayOpening, interior, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, INTRO_END, type BumpProp, type RoomSide } from "@/lib/journey/world";
-import { kickBall, launchBall, liftBall, makeBall, spikeVelocity, stepBall, volleyAction, type Ball, type BallAction, type BallField, type BallKind, type Point } from "@/lib/journey/volleyball";
+import { HIT_WINDUP, kickBall, launchBall, liftBall, makeBall, spikeVelocity, stepBall, volleyAction, type Ball, type BallAction, type BallField, type BallKind, type Point } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -313,9 +313,9 @@ export default function JourneyWorld(props: Props) {
     function nextVolley() {
       const activeRoom = room(chapter), height = (parts?.height ?? 20) * AVATAR_SCALE;
       let best: { ball: BallView; action: BallAction; score: number } | undefined;
-      if (volley && (!volley.released || volley.elapsed < 0.16 + (volley.action === "Hit" ? 0.11 : 0.34))) return;
+      if (!activeRoom.field || (volley && (!volley.released || volley.elapsed < 0.16 + (volley.action === "Hit" ? HIT_WINDUP : 0.34)))) return;
       for (const ball of activeRoom.balls) {
-        const action = volleyAction(ball.kind, ball.state, player, height, activeRoom.field?.net);
+        const action = volleyAction(ball.kind, ball.state, player, height, activeRoom.field);
         if (!action) continue;
         const score = Math.hypot(ball.state.x - player.x, ball.state.z - player.z) - (action === "Hit" ? 10 : 0);
         if (!best || score < best.score) best = { ball, action, score };
@@ -361,7 +361,8 @@ export default function JourneyWorld(props: Props) {
         const { state, prop: { holder, bounds } } = ball;
         const x = state.x, y = state.y, z = state.z;
         const action = volley?.ball === ball ? volley : null;
-        const contactTime = action?.action === "Hit" ? 0.11 : 0.34;
+        const contactTime = action?.action === "Hit" ? HIT_WINDUP : 0.34;
+        const remainder = action?.action === "Hit" && !action.released ? Math.max(0, action.elapsed - contactTime) : 0;
         if (action && !action.released && action.action !== "Hit") {
           const lift = smooth(action.elapsed / contactTime);
           liftBall(state, {
@@ -369,12 +370,13 @@ export default function JourneyWorld(props: Props) {
             z: action.start.z + (action.contact.z - action.start.z) * lift,
             y: action.start.y + (action.contact.y - action.start.y) * lift,
           }, field);
-        } else if (!(state.grounded && !state.vx && !state.vz && !state.kickDelay)) stepBall(state, field, dt);
+        } else if (!(state.grounded && !state.vx && !state.vz && !state.kickDelay)) stepBall(state, field, dt - remainder);
         if (action && !action.released && action.elapsed >= contactTime) {
           action.released = true;
           const forward = { x: Math.sin(player.yaw), z: Math.cos(player.yaw) };
           if (action.action === "Hit") {
             if (state.tossed) launchBall(state, spikeVelocity(state, field, forward));
+            stepBall(state, field, remainder);
           } else {
             const set = action.action === "Set";
             launchBall(state, { x: forward.x * (set ? 3.5 : 0.6), y: set ? 27 : 40, z: forward.z * (set ? 3.5 : 0.6) }, !set);
@@ -707,7 +709,7 @@ export default function JourneyWorld(props: Props) {
       limbs.armL.rotation.z = limbs.armR.rotation.z = limbs.head.rotation.x = 0;
       if (volley) {
         const { action, elapsed } = volley;
-        const contact = action === "Hit" ? 0.11 : 0.34;
+        const contact = action === "Hit" ? HIT_WINDUP : 0.34;
         const weight = motion.matches ? Number(elapsed < contact + 0.12) : smooth(elapsed / contact) * (1 - smooth((elapsed - contact) / 0.26));
         const dip = !motion.matches && action !== "Hit" ? Math.sin(Math.PI * Math.min(1, elapsed / contact)) : 0;
         limbs.armL.rotation.x += (action === "Hit" ? -0.85 : action === "Set" ? -2.46 : -1.53) * weight;

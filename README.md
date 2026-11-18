@@ -25,12 +25,14 @@ npm run dev
 
 Then open `http://localhost:3000` and you're good to go.
 
-The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk forward through six rooms — arriving in Canada, 18 Holsworthy Crescent, grade 5, 10 Elm Avenue, Bayview Secondary, and my room in Ontario Hall at Western. Use **WASD or the arrow keys** to walk, **E** to look at the nearest thing, **M** for the journey index and **Esc** to skip the intro or a chapter transition. On phones there is an on-screen joystick, and swiping anywhere on the scene walks too; tapping an object opens it. **Skip the walk** opens an index of every chapter and object, so nothing requires playing.
+The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk forward through six rooms — arriving in Canada, 18 Holsworthy Crescent, grade 5, 10 Elm Avenue, Bayview Secondary, and my room in Ontario Hall at Western. Use **W/S** to move, **A/D** to turn, **E** to inspect the nearest object, and **Esc** to skip an intro or transition. Arrow keys also work. Drag the scene with a mouse or finger, or use the touch joystick. Click or tap an object to inspect it.
 
-- Everything is voxels of one size. `src/lib/journey/voxel.ts` is a sparse grid with a 3×5 voxel font for signs; `models.ts` draws every prop, `avatar.ts` builds the character (height and outfit change with age), and `world.ts` builds room shells and handles collisions, reach, spawns and age-by-position.
+- `src/lib/journey/voxel.ts` is a sparse grid with a 3×5 voxel font for signs. `models.ts` draws the props, using a finer grid for details like the MacBook and trophy labels. `avatar.ts` builds the character and `world.ts` builds room shells and handles collisions, reach, spawns and age-by-position.
 - `src/lib/journey/data.ts` is the content: chapters, outfits, and every object’s text and links. Add or edit an object there; its position, model and links live in one entry.
 - `src/components/JourneyWorld.tsx` renders with three.js at a low internal resolution scaled by a whole number, so every screen pixel block is the same size. It owns input, the follow camera, the skippable intro, and the pixel-dissolve chapter transitions.
-- `src/components/About.tsx` is the HUD, object dialogs (with a rotating voxel close-up from `ObjectPreview.tsx`), the journey index, the finale, and a no-JavaScript list of everything.
+- `src/components/About.tsx` is the HUD, object dialogs (with a rotating voxel close-up from `ObjectPreview.tsx`), the finale, and a no-JavaScript list. Browsers without WebGL also get a readable list.
+
+For optional background music, set `NEXT_PUBLIC_JOURNEY_MUSIC_URL` before building to a browser-playable audio URL you have permission to publish. The player loops the track only after someone turns music on; without a URL it stays hidden.
 
 Run `npm run test:world` to check that every object has real text and valid links, every model builds, ages run 7 → 18 with the right outfits, every object can be reached on foot, each door leads on (and back), and walls hold the player.
 

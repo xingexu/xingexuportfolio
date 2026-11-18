@@ -97,9 +97,11 @@ function bed(g: Grid, quilt: Color, accent: Color, frameColor: Color, pillow: Co
   g.box(-8, 0, -14, w, 4, len, frameColor);
   g.box(-8, 4, -14, w, 2, len, 0xf4f1ea);
   g.box(-8, 0, -15, w, 13, 2, frameColor).box(-8, 13, -15, w, 1, 2, shade(frameColor, 1.15));
-  g.box(-6, 6, -12, 12, 2, 5, pillow);
-  g.box(-8, 6, -6, w, 1, 20, (x, _y, z) => pattern(x, z) ? accent : quilt);
-  g.box(-9, 2, -6, 1, 5, 20, quilt).box(8, 2, -6, 1, 5, 20, quilt).box(-8, 2, 14, w, 5, 1, quilt);
+  for (const x of [-7, 1]) g.box(x, 6, -12, 6, 2, 5, shade(pillow, 0.85)).box(x + 1, 8, -11, 4, 1, 3, pillow);
+  g.box(-8, 6, -6, w, 1, 20, (x, _y, z) => pattern(x, z) ? accent : shade(quilt, (x + 8) % 4 === 0 || (z + 6) % 4 === 0 ? 0.9 : 1.04));
+  g.box(-8, 7, -7, w, 1, 2, shade(accent, 0.9));
+  for (const x of [-9, 8]) g.box(x, 3, -6, 1, 4, 20, (_x, y, z) => shade(quilt, y === 3 ? 0.72 : 0.85 + 0.16 * Math.abs(Math.sin(z * 1.2))));
+  g.box(-8, 3, 14, w, 4, 1, quilt);
   g.box(-8, 0, 13, 1, 2, 1, frameColor);
 }
 
@@ -210,6 +212,46 @@ function tee(g: Grid, x: number, color: Color, year: string) {
   g.text("JS", x + 3, 5, 1, 0xf2f2f2);
   g.text(year, x + 3, 0, 1, 0x9fb8e8);
   g.box(x + 6, 12, 0, 1, 2, 1, METAL).box(x + 2, 12, 0, 9, 1, 1, METAL);
+}
+
+const GLASS = 0x9dd8e4;
+const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first"]);
+export const modelVoxelSize = (id: string) => DETAIL_VOXELS.has(id) ? 0.25 : 1;
+export const modelHasGlass = (id: string) => id.startsWith("glass-trophy-");
+export const isGlass = (color: Color) => color === GLASS;
+export const GLASS_OPACITY = 0.34;
+
+function glassTrophy(g: Grid, place: string, metal: Color) {
+  g.box(-27, 0, -9, 54, 2, 18, 0x15161b);
+  g.box(-25, 2, -8, 50, 9, 16, 0x252a31);
+  g.box(-23, 5, 8, 46, 7, 1, metal).box(-21, 6, 9, 42, 5, 1, 0x22262a);
+  centeredText(g, place, 6, 10, 0xffedc7);
+  g.box(-13, 10, -4, 26, 3, 8, metal);
+  for (let y = 13; y < 51; y++) {
+    const bevel = Math.max(0, 8 - Math.min(y - 13, 50 - y));
+    for (let x = -18 + bevel; x <= 18 - bevel; x++) {
+      const edge = Math.abs(x) >= 17 - bevel || y <= 14 || y >= 49;
+      if (edge) g.box(x, y, -2, 1, 1, 4, y > 45 || x < -13 ? 0xe3fafe : 0x63aebe);
+      else g.set(x, y, 0, GLASS);
+    }
+  }
+  centeredText(g, "FBLA", 29, 1, 0xd8f4f7);
+  for (let i = 0; i < 8; i++) g.set(-13 + i, 41 - i, 1, 0xd8f4f7);
+}
+
+function macbook(g: Grid) {
+  const silver = 0xb5bfca, steel = 0x798694;
+  g.box(-19, 0, -12, 38, 2, 24, steel).box(-18, 1, -12, 36, 1, 23, silver);
+  g.box(-16, 2, -9, 32, 1, 11, 0x20232a);
+  for (let x = -15; x < 16; x += 3) for (let z = -8; z <= 1; z += 3) g.set(x, 2, z, 0x59626f);
+  g.box(-7, 2, 4, 14, 1, 6, 0x919da8).box(-6, 2, 5, 12, 1, 4, silver);
+  g.box(-19, 2, -13, 38, 3, 2, BLACK);
+  g.box(-19, 5, -14, 38, 24, 2, silver).box(-18, 6, -12, 36, 22, 1, BLACK);
+  panel(g, -16, 8, -11, 32, 18, code(9));
+  g.box(-2, 25, -11, 4, 1, 1, BLACK);
+  centeredText(g, "MACBOOK", 1, 12, 0xedf2f6);
+  const mark = [".....##.", "....##..", ".###....", "#######.", "######..", "######..", ".######.", "..####.."];
+  mark.forEach((row, i) => [...row].forEach((c, x) => { if (c === "#") g.set(x - 4, 21 - i, -15, 0xe8edf4); }));
 }
 
 const MODELS: Record<string, (g: Grid) => void> = {
@@ -392,13 +434,12 @@ const MODELS: Record<string, (g: Grid) => void> = {
     for (const x of [-13, 12]) g.box(x, 0, -1, 1, 22, 1, METAL).box(x - 1, 0, -2, 3, 1, 3, METAL_DARK);
     for (let x = -12; x < 12; x++) for (let y = 12; y < 20; y++) if ((x + y) % 2 === 0 || y === 19) g.set(x, y, -1, y === 19 ? WHITE : 0x1a1a1a);
   },
-  "laptop-table": g => {
+  "coding-desk": g => {
     table(g, 18, 10, 12, 0xd7d2c8, METAL_DARK, -9, -5);
-    g.box(-4, 12, -1, 8, 1, 5, 0xa9adb3).box(-4, 13, -2, 8, 6, 1, 0xa9adb3);
-    panel(g, -3, 13, -1, 6, 5, code(9));
     g.box(5, 12, 0, 2, 3, 2, 0xf2f2f2).box(-8, 12, -3, 3, 1, 4, 0xf6c343);
     chair(g, -2, 7, 0x2c2f36, METAL_DARK, 7, -1);
   },
+  macbook,
   "brawl-stand": g => {
     g.box(-1, 0, -3, 2, 10, 2, BLACK).box(-5, 0, -4, 10, 1, 6, BLACK);
     g.box(-8, 10, -3, 16, 26, 2, 0x111111);
@@ -424,8 +465,13 @@ const MODELS: Record<string, (g: Grid) => void> = {
     LOGOS.fbla.rows.slice(0, 10).forEach((row, r) => [...row.slice(4, 18)].forEach((c, i) => { if (c === "#") g.set(-7 + i, 19 - r, 1, WHITE); }));
     centeredText(g, "FBLC", 2, 1, GOLD);
   },
-  "plaque-fbla-bronze": g => plaque(g, LOGOS.fbla, [5, 18], 10, "FBLA", 0xc07a3c),
-  "plaque-fbla-gold": g => plaque(g, LOGOS.fbla, [5, 18], 10, "FBLA", 0xf2c230),
+  "glass-trophy-third": g => glassTrophy(g, "Third Place", 0xb6845e),
+  "glass-trophy-first": g => glassTrophy(g, "First Place", 0xd6b355),
+  "trophy-plinth": g => {
+    g.box(-8, 0, -3, 16, 1, 6, WOOD_DARK).box(-7, 1, -3, 14, 7, 6, 0x63584d);
+    g.box(-8, 8, -4, 16, 1, 8, 0x41372e).box(-6, 3, 3, 12, 4, 1, 0x494038);
+    g.box(-4, 6, 4, 3, 1, 1, METAL).box(2, 6, 4, 3, 1, 1, METAL);
+  },
   "plaque-cemc": g => plaque(g, LOGOS.cemc, [0, 17], 15, "CEMC", 0x3e2c6e),
   "plaque-cemc-gold": g => plaque(g, LOGOS.cemc, [0, 17], 15, "CEMC", GOLD),
   "plaque-maa": g => plaque(g, LOGOS.maa, [0, 13], 11, "MAA", 0x0b5cad),
@@ -508,7 +554,12 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.box(-13, 0, 4, 1, 30, 7, 0xe9e6df).box(12, 0, 4, 1, 30, 7, 0xe9e6df);
   },
   "laundry-basket": g => { g.box(-4, 0, -3, 8, 7, 6, (x, y, z) => (x + y + z) % 2 ? 0xc9b48f : 0xb39d76).box(-3, 6, -2, 6, 2, 4, 0x1a1a1a); },
-  "rug-western": g => g.box(-12, 0, -9, 24, 1, 18, (x, _y, z) => Math.abs(x + 0.5) > 10 || Math.abs(z + 0.5) > 7 ? 0x3a3a40 : 0x8e8a86),
+  "rug-western": g => g.box(-12, 0, -9, 24, 1, 18, (x, _y, z) => {
+    const a = Math.abs(x + 0.5), b = Math.abs(z + 0.5);
+    if (a > 10 || b > 7) return 0x342849;
+    if (a > 9 || b > 6 || ((x + z) % 5 === 0 && (x - z) % 5 === 0)) return 0xbca9c8;
+    return (x + z) % 2 ? 0x878098 : 0x9389a5;
+  }),
 };
 
 export const MODEL_IDS = Object.keys(MODELS);
@@ -530,6 +581,6 @@ export type Footprint = { minX: number; maxX: number; minZ: number; maxZ: number
 /** The model's x/z extent relative to its placement origin (exclusive max). */
 export function modelFootprint(id: string): Footprint {
   const b = buildModel(id).bounds();
-  const w = b.maxX - b.minX + 1, d = b.maxZ - b.minZ + 1;
-  return { minX: -Math.floor(w / 2), maxX: w - Math.floor(w / 2), minZ: -Math.floor(d / 2), maxZ: d - Math.floor(d / 2), height: b.maxY + 1 };
+  const w = b.maxX - b.minX + 1, d = b.maxZ - b.minZ + 1, s = modelVoxelSize(id);
+  return { minX: -Math.floor(w / 2) * s, maxX: (w - Math.floor(w / 2)) * s, minZ: -Math.floor(d / 2) * s, maxZ: (d - Math.floor(d / 2)) * s, height: (b.maxY + 1) * s };
 }

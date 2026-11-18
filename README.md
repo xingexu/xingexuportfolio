@@ -32,9 +32,9 @@ The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk for
 - `src/components/JourneyWorld.tsx` renders with three.js at a uniform pixel pitch chosen for the current viewport. It owns input, the follow camera, the skippable intro, and the pixel-dissolve chapter transitions.
 - `src/components/About.tsx` is the HUD, object dialogs (with a rotating voxel close-up from `ObjectPreview.tsx`), the finale, and a no-JavaScript list. Browsers without WebGL also get a readable list.
 
-The **Objects** menu lists every room and lets visitors inspect props or jump to a room without walking.
+The **Objects** menu lists every room and lets visitors inspect props or jump to a room without walking. Use **Q** to tilt up and **F** to toggle between front and rear views, or tap the camera buttons.
 
-The CSA poster and Buldak noodles play captioned clips from `public/videos/journey/` inside their object dialogs.
+The CSA poster and Buldak noodles show captioned video players at the top of their object dialogs instead of rotating previews. Assets are in `public/videos/journey/`.
 
 For optional background music, set `NEXT_PUBLIC_JOURNEY_MUSIC_URL` before building to a browser-playable audio URL you have permission to publish. The player loops the track only after someone turns music on; without a URL it stays hidden.
 

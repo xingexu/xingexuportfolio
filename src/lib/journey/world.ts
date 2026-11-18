@@ -9,6 +9,19 @@ export const WALL = 2, WALL_HEIGHT = 38, DOOR_HALF = 7, DOOR_HEIGHT = 28, ENTRAN
 export const AVATAR_SCALE = 0.68;
 export const renderPixelSize = (width: number, height: number) => Math.max(1, Math.ceil(Math.sqrt(width * height / 420_000))) / 2;
 
+export function cameraOffsets(height: number, aspect: number, front: number, tilt: number) {
+  const portrait = Math.max(0, 1 - aspect);
+  const level = 44 + 10 * portrait - 15 * front;
+  const look = height * (0.43 + 0.17 * front);
+  return {
+    orbit: Math.PI * front,
+    distance: 40 + 18 * portrait + 16 * tilt,
+    rise: level + (10 + 4 * portrait - level) * tilt,
+    lookHeight: look + (height * 0.28 + 9 - look) * tilt,
+    lead: 10 * (1 - front) * (1 - tilt),
+  };
+}
+
 /** Walkable interior. Indoor rooms are closed on all four sides; the arrival apron is open behind you. */
 export function interior(chapter: Chapter): Box {
   return { minX: -chapter.width / 2 + WALL, maxX: chapter.width / 2 - WALL, minZ: -chapter.depth / 2 + WALL, maxZ: chapter.depth / 2 - (chapter.outdoor ? 0 : WALL) };
@@ -193,7 +206,17 @@ function addWindow(grid: Grid, bounds: Box, chapter: Chapter, spec: (typeof WIND
     paint(x, y, 0, c);
     if (frame) paint(x, y, 1, shade(c, 1.12));
   }
-  for (let x = -1; x <= width; x++) for (let depth = 0; depth < 3; depth++) paint(x, -1, depth, shade(chapter.trim, 1.14));
+  for (let x = -1; x <= width; x++) for (let depth = 0; depth < 3; depth++) {
+    paint(x, -1, depth, shade(chapter.trim, depth === 2 ? 1.22 : 1.14));
+    paint(x, height, depth, shade(chapter.trim, depth === 2 ? 0.81 : 0.93));
+  }
+  if (chapter.floor === "wood" || chapter.floor === "carpet" || chapter.id === "western") {
+    for (let x = 0; x < width; x++) {
+      paint(x, height - 2, 2, shade(chapter.trim, 1.08));
+      paint(x, height - 4, 2, shade(chapter.trim, 0.94));
+    }
+    for (let y = height - 8; y < height - 2; y++) paint(width - 2, y, 2, shade(chapter.trim, 1.26));
+  }
 }
 
 function addInteriorTrim(g: Grid, room: Box, chapter: Chapter) {
@@ -212,7 +235,11 @@ function addInteriorTrim(g: Grid, room: Box, chapter: Chapter) {
       paint(at, 11, 0, shade(chapter.trim, 1.1));
       for (let y = 3; y < 10; y++) if (bay < 2 || y === 3 || y === 9) paint(at, y, 0, shade(chapter.trim, bay === 0 ? 0.91 : 0.71));
       paint(at, WALL_HEIGHT - 2, 0, shade(chapter.trim, 0.85));
+      paint(at, WALL_HEIGHT - 2, 1, shade(chapter.trim, 0.93));
       paint(at, WALL_HEIGHT - 1, 1, shade(chapter.trim, 0.72));
+      if (acrossX && Math.abs(at - start - (end - start) * 0.8) < 6) {
+        for (let y = 28; y < 33; y++) paint(at, y, 1, y % 2 ? shade(chapter.trim, 0.65) : shade(chapter.trim, 0.91));
+      }
       if (chapter.floor === "gym" || chapter.floor === "tile") {
         const fixture = (at - start + 8) % 24;
         if (fixture < 9) {
@@ -264,6 +291,7 @@ export function buildRoomShell(index: number): Grid {
       g.set(x, y, z0 + 1, pane ? 0xd8dde3 : -1);
     }
     g.box(x0, WALL_HEIGHT + 1, z0 - 2, W, 2, 6, 0x687983);
+    g.box(x0, WALL_HEIGHT, z0 + 3, W, 1, 1, x => (x - x0) % 12 < 9 ? 0xece4cc : 0x687983);
     for (let x = x0 + 8; x < W / 2; x += 14) {
       if (Math.abs(x) < DOOR_HALF + 3) continue;
       g.box(x, 0, z0 + 1, 2, WALL_HEIGHT + 1, 2, 0x7a91a3);

@@ -38,14 +38,17 @@ export default function ObjectPreview({ model, label }: { model: string; label: 
     const scene = new Scene();
     scene.add(mesh);
     if (pane) scene.add(pane);
-    const radius = Math.hypot(b.maxX - b.minX + 1, b.maxY - b.minY + 1, b.maxZ - b.minZ + 1) * s / 2;
-    const elevation = 0.38, distance = radius * 1.04 / Math.sin(camera.fov * Math.PI / 360);
-    let frame = 0, angle = 0.5, previous = performance.now();
+    const chess = model === "chess-table", print = model.startsWith("plaque-") || model.startsWith("poster-");
+    const radius = chess ? 8.5 : Math.hypot(b.maxX - b.minX + 1, b.maxY - b.minY + 1, b.maxZ - b.minZ + 1) * s / 2;
+    const targetY = chess ? 9 + center[1] : 0;
+    const elevation = chess ? 0.7 : print ? 0.06 : 0.38, distance = radius * 1.04 / Math.sin(camera.fov * Math.PI / 360);
+    let frame = 0, angle = print ? 0 : 0.5, previous = performance.now();
     function draw(now: number) {
       if (!motion.matches) angle += Math.min(0.05, (now - previous) / 1000) * 0.6;
       previous = now;
-      camera.position.set(Math.sin(angle) * distance * Math.cos(elevation), distance * Math.sin(elevation), Math.cos(angle) * distance * Math.cos(elevation));
-      camera.lookAt(0, 0, 0);
+      const azimuth = print ? 0.16 * Math.sin(angle) : angle;
+      camera.position.set(Math.sin(azimuth) * distance * Math.cos(elevation), targetY + distance * Math.sin(elevation), Math.cos(azimuth) * distance * Math.cos(elevation));
+      camera.lookAt(0, targetY, 0);
       renderer.render(scene, camera);
       if (!motion.matches) frame = requestAnimationFrame(draw);
     }

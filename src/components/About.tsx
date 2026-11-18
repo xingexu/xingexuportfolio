@@ -138,7 +138,7 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={CHAPTERS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. You can also drag to move, tap or click to inspect, or use Objects to browse without walking.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap the action button to set, toss, or hit. Walk into a volleyball to kick it. You can also drag to move, tap or click to inspect, or use Objects to browse without walking.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
@@ -162,13 +162,18 @@ export default function About() {
           <span><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> Turn</span>
           <span><kbd>E</kbd> Inspect</span>
         </aside>
-        {!moved && !near && <p className="journey-touch-note">Drag anywhere in the scene or use the joystick. Tap an object to inspect it.</p>}
+        {!moved && !near && !status.volley && <p className="journey-touch-note">Drag anywhere in the scene or use the joystick. Tap an object to inspect it.</p>}
       </>}
 
-      {near && !opened && !transition && (
-        <button type="button" className="journey-prompt" onClick={() => openItem(near.id)}>
-          <kbd>E</kbd><span>{near.label}</span>
-        </button>
+      {!intro && !opened && !transition && (near || status.volley) && (
+        <div className="journey-prompts">
+          {near && <button type="button" className="journey-prompt" onClick={() => openItem(near.id)} aria-keyshortcuts="E">
+            <kbd aria-hidden="true">E</kbd><span>{near.label}</span>
+          </button>}
+          {status.volley && <button type="button" className="journey-prompt journey-volley" onClick={() => controls.current?.volley()} aria-keyshortcuts="R">
+            <kbd aria-hidden="true">R</kbd><span>{status.volley}</span>
+          </button>}
+        </div>
       )}
 
       {(intro || transition) && (

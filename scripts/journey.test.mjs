@@ -24,6 +24,7 @@ const { CHAPTERS, ALL_ITEMS } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
+const V = load('src/lib/journey/volleyball.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 
@@ -148,7 +149,7 @@ test('the plane tail marks and welcome lettering stay attached to their backing'
   assert.ok(brawl.has(5, 0, 1));
 });
 
-test('only designated props react and their motion settles inside the room', () => {
+test('cones and basketball keep their existing bump reactions', () => {
   const reactions = CHAPTERS.flatMap(chapter => [...chapter.items, ...chapter.decor].filter(p => p.bump));
   assert.deepEqual(reactions.map(p => p.model), ['cone', 'cone', 'cone', 'basketball']);
   const makeProp = kind => ({ kind, x: 0, z: 0, radius: 1.75, vx: 0, vz: 0, fall: null, tilt: 0 });
@@ -168,6 +169,64 @@ test('only designated props react and their motion settles inside the room', () 
   for (let i = 0; i < 150; i++) W.settleBump(3, ball, 0.016, false);
   assert.equal(ball.vz, 0);
   assert.ok(ball.z >= W.interior(CHAPTERS[3]).minZ + ball.radius);
+});
+
+test('both volleyball styles respond to proximity, a toss or set, and a walking kick', () => {
+  for (const kind of ['mikasa', 'molten']) {
+    const b = V.makeBall(0, 0, 0, 1.75), player = { x: -3, z: 0 };
+    assert.equal(V.volleyAction(kind, b, { x: 30, z: 0 }, 22), null);
+    assert.equal(V.volleyAction(kind, b, player, 22), kind === 'mikasa' ? 'Toss' : 'Set');
+    assert.equal(V.kickBall(b, player, { x: -0.3, z: 0 }, 2, 0.016), false);
+    assert.equal(V.kickBall(b, player, { x: 0.3, z: 0 }, 2, 0.016), true);
+    assert.ok(b.vx > 0 && b.vy > 0, 'a kick sends the ball forward and a little upward');
+    assert.equal(V.kickBall(b, player, { x: 0.3, z: 0 }, 2, 0.016), false);
+    V.launchBall(b, { x: 0, y: 40, z: 0 }, kind === 'mikasa');
+    assert.equal(V.volleyAction(kind, b, player, 22), kind === 'mikasa' ? 'Hit' : null);
+    const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview'));
+    for (let i = 0; i < 480; i++) V.stepBall(b, field, 1 / 120);
+    assert.equal(b.y, b.radius);
+    assert.ok(b.grounded && !b.tossed);
+  }
+});
+
+test('Mikasa hits clear the tape from both sides while low airborne balls bounce back', () => {
+  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview')), { net } = field;
+  const x = (net.minX + net.maxX) / 2;
+  for (const side of [-1, 1]) {
+    for (const height of [17, 22, 27]) {
+      const b = V.makeBall(x + 3, height - 1.75, net.z + side * 12, 1.75);
+      V.launchBall(b, V.spikeVelocity(b, field, { x: 0, z: -side }));
+      const samples = [];
+      for (let i = 0; i < 140; i++) {
+        V.stepBall(b, field, 1 / 120);
+        if (Math.abs(b.z - net.z) <= b.radius + 0.5) samples.push(b.y - b.radius);
+      }
+      assert.ok(samples.length > 0 && Math.min(...samples) >= net.top, 'the entire ball clears the tape');
+      assert.ok((b.z - net.z) * side < -4, 'shot lands on the other side');
+    }
+  }
+  const low = V.makeBall(x, 14, net.z + 4, 1.75);
+  V.launchBall(low, { x: 0, y: 0, z: -34 });
+  for (let i = 0; i < 15; i++) V.stepBall(low, field, 1 / 120);
+  assert.ok(low.vz > 0 && low.z > net.z, 'hitting the mesh reverses motion');
+});
+
+test('volleyballs bounce off the floor and walls, then settle', () => {
+  const field = W.buildBallField(CHAPTERS.findIndex(c => c.id === 'bayview'));
+  const b = V.makeBall(0, 0, field.minZ + 2, 1.75);
+  V.launchBall(b, { x: 0, y: 10, z: -25 });
+  V.stepBall(b, field, 0.03);
+  assert.ok(b.vz > 0);
+  let bounced = false;
+  for (let i = 0; i < 600; i++) {
+    const previous = b.vy;
+    V.stepBall(b, field, 1 / 120);
+    bounced ||= previous < -5 && b.vy > 0;
+    assert.ok(b.y >= b.radius && b.y <= field.ceiling - b.radius);
+    assert.ok(b.z >= field.minZ + b.radius && b.z <= field.maxZ - b.radius);
+  }
+  assert.ok(bounced && b.grounded);
+  assert.equal(b.vz, 0);
 });
 
 test('every model uses an aligned voxel grid and fits its world footprint', () => {
@@ -264,29 +323,36 @@ test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading
   }
 });
 
-test('the Western avatar has oversized clothes, mini boots and a textured crown without blush', () => {
-  const current = buildAvatar(18, 'western'), previous = buildAvatar(18, 'essentials');
+test('the Western avatar has a tapered silhouette, UGGs and full rounded hair without blush', () => {
+  const current = buildAvatar(18, 'western');
   const width = grid => grid.bounds().maxX - grid.bounds().minX + 1;
-  assert.ok(width(current.torso) >= width(previous.torso) + 6);
+  const spanAt = (grid, layer) => {
+    const xs = [], zs = [];
+    grid.forEach((x, y, z) => { if (y === layer) { xs.push(x); zs.push(z); } });
+    return [Math.max(...xs) - Math.min(...xs) + 1, Math.max(...zs) - Math.min(...zs) + 1];
+  };
+  assert.ok(width(current.torso) <= 16 && width(current.armL) <= 6);
+  assert.ok(spanAt(current.torso, 3)[0] < spanAt(current.torso, 16)[0], 'waist tapers in from the chest');
   assert.ok(current.torso.bounds().minY < 0, 'hoodie drapes below the hip');
-  assert.ok(width(current.armL) > width(previous.armL));
   for (const side of ['legL', 'legR']) {
     const leg = current[side], bounds = leg.bounds();
-    assert.ok(width(leg) >= width(previous[side]) + 5);
+    assert.ok(width(leg) <= 9);
     assert.equal(bounds.minY * AVATAR_VOXEL_SIZE, -current.hip);
-    assert.ok(bounds.maxZ >= 8, 'boot toe extends forward of the pants');
-    assert.ok(leg.has(side === 'legL' ? -6 : 5, bounds.minY + 6, -5), 'ankle shaft rises above the toe box');
+    assert.equal(bounds.maxZ, 7, 'boot toe extends forward of the pants');
+    assert.ok(leg.has(side === 'legL' ? -4 : 3, bounds.minY + 6, -4), 'ankle shaft rises above the toe box');
   }
   const heights = new Set(), strandColors = new Set();
   current.head.forEach((x, y, _z, color) => {
     assert.notEqual(color, 0xf3a9a0);
     if (y >= 16) {
-      assert.ok(x > -8 && x < 7, 'extra hair volume stays on top');
       heights.add(y);
       strandColors.add(color);
     }
   });
   assert.ok(heights.size >= 5 && strandColors.size >= 8);
+  assert.ok(spanAt(current.head, 17).every(span => span >= 16), 'full hair spreads front to back and side to side');
+  assert.ok(spanAt(current.head, 19).every(span => span >= 11), 'the crown has volume across its width and depth');
+  assert.ok(current.head.bounds().maxY <= 21, 'the hair stays low and rounded');
   assert.equal(current.head.get(-8, 9, 2), 0xf8e1d0, 'sides are trimmed above the ear');
   assert.match(CHAPTERS.at(-1).outfitLabel, /UGGs/);
 });
@@ -355,6 +421,11 @@ test('spawn points are open and every object can be reached on foot', () => {
     const cells = reachable(index, { x: Math.round(s.x), z: Math.round(s.z) }, chapter.ageFrom >= 14 ? 3.5 : 3);
     for (const item of chapter.items) {
       assert.ok(cells.some(c => W.nearbyItems(index, c).some(near => near.id === item.id)), `${item.id} is reachable`);
+    }
+    const field = W.buildBallField(index);
+    for (const placement of [...chapter.items, ...chapter.decor].filter(p => p.ball)) {
+      const ball = V.makeBall(placement.x, placement.y ?? 0, placement.z, modelFootprint(placement.model).height / 2);
+      assert.ok(cells.some(c => V.volleyAction(placement.ball, ball, c, avatarHeight(chapter.ageFrom) * W.AVATAR_SCALE, field.net)), `${placement.model} at ${placement.x},${placement.z} is playable`);
     }
   });
 });

@@ -10,7 +10,7 @@
     "test:world": "node --test scripts/journey.test.mjs"
   },
   "dependencies": {
-    "next": "16.2.10",
+    "next": "16.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "three": "^0.170.0"

@@ -31,6 +31,14 @@ function frame(g: Grid, w: number, h: number, border: Color, paint: Painter, dep
   const x = -Math.floor(w / 2);
   g.box(x, 0, -depth, w, h, depth, border);
   panel(g, x + 1, 1, 0, w - 2, h - 2, paint);
+  printEdge(g, x, 0, w, h, border);
+}
+
+function printEdge(g: Grid, x: number, y: number, w: number, h: number, border: Color) {
+  g.box(x, y, 0, w, 1, 2, shade(border, 0.76));
+  g.box(x, y + h - 1, 0, w, 1, 2, shade(border, 1.24));
+  g.box(x, y + 1, 0, 1, h - 2, 2, shade(border, 1.12));
+  g.box(x + w - 1, y + 1, 0, 1, h - 2, 2, shade(border, 0.9));
 }
 
 function centeredText(g: Grid, text: string, y: number, z: number, color: Color, cx = 0, scale = 1) {
@@ -185,17 +193,29 @@ function plaque(g: Grid, logo: PixelLogo, border: Color, word?: string) {
   const left = -Math.floor(w / 2), bottom = word ? 16 : Math.floor((h - logo.rows.length) / 2);
   g.box(left, 0, -2, w, h, 3, border);
   g.box(left + 2, 2, 0, w - 4, h - 4, 1, logo.paper);
-  for (let x = left; x < left + w; x++) for (let y = 0; y < h; y++) {
-    if (x === left || x === left + w - 1 || y === 0 || y === h - 1) {
-      g.set(x, y, 1, shade(border, y === h - 1 || x === left ? 1.23 : 0.78));
-    }
-  }
+  printEdge(g, left, 0, w, h, border);
   logo.rows.forEach((row, r) => [...row].forEach((c, i) => {
-    if (c === "#") g.box(-Math.floor(logoW / 2) + i * scale, bottom + (logo.rows.length - 1 - r) * scale, 0, scale, scale, 1, logo.ink);
+    if (c === "#") g.box(-Math.floor(logoW / 2) + i * scale, bottom + (logo.rows.length - 1 - r) * scale, 1, scale, scale, 1, logo.ink);
   }));
-  if (word) centeredText(g, word, 4, 0, logo.ink, 0, 2);
+  if (word) centeredText(g, word, 4, 1, logo.ink, 0, 2);
   else g.box(left + 9, 6, 0, w - 18, 1, 1, 0xc0cddf);
 }
+
+const AIME_SEAL: PixelLogo = {
+  ink: 0x795022, paper: 0xffffff,
+  rows: [
+    ".......#.......",
+    "......###......",
+    "..#..#####..#..",
+    ".##...###...##.",
+    ".#.#...#...#.#.",
+    ".##.........##.",
+    "..##.......##..",
+    "...##.....##...",
+    "....###.###....",
+    "......###......",
+  ],
+};
 
 type Pen = (x: number, y: number, color: Color) => void;
 
@@ -206,8 +226,9 @@ function badge(g: Grid, radius: number, bg: Color, ring: Color, ink: (pen: Pen) 
     if (q > (r + 0.5) ** 2) continue;
     const paper = q <= (r - 1.6) ** 2;
     g.box(x, y + r, -2, 1, 1, 2, ring).set(x, y + r, 0, paper ? bg : shade(ring, y > 0 ? 1.07 : 0.82));
+    if (!paper) g.set(x, y + r, 1, shade(ring, y > 0 ? 1.18 : 0.78));
   }
-  ink((x, y, color) => g.set(x, y + r, 0, color));
+  ink((x, y, color) => { if (g.has(x, y + r, 0)) g.set(x, y + r, 1, color); });
 }
 
 function line(pen: Pen, x0: number, y0: number, x1: number, y1: number, color: Color) {
@@ -414,8 +435,10 @@ const MODELS: Record<string, (g: Grid) => void> = {
       if (d < 3.6) return d > 2.6 && i < 6 && j < 4 ? 0x7a7f86 : (j === 5 ? 0x5b6066 : 0x9aa0a6);
       return hash3(i, j, 11) > 0.85 ? WHITE : 0x0b0d1a;
     });
+    printEdge(g, -12, 0, 11, 15, 0xeeeeee);
     g.box(0, 0, -1, 11, 15, 1, 0xeeeeee);
     panel(g, 1, 1, 0, 9, 13, (i, j) => (i + j === 9 && j > 1) ? 0x4fc3ff : (i === j && j > 1 && j < 11) ? 0xff4d4d : j > 10 ? 0x161616 : 0x0f1530);
+    printEdge(g, 0, 0, 11, 15, 0xeeeeee);
     g.text("SW", 2, 10, 1, 0xf6d23c);
   },
   "candy-jar": g => {
@@ -548,7 +571,8 @@ const MODELS: Record<string, (g: Grid) => void> = {
   },
   "fblc-banner": g => {
     g.box(-12, 21, -1, 24, 1, 1, METAL_DARK);
-    panel(g, -11, 0, 0, 22, 21, () => 0x232744);
+    panel(g, -11, 0, 0, 22, 21, (x, y) => shade(0x232744, 0.89 + 0.2 * hash3(x, Math.floor(y / 4), 13)));
+    for (const x of [-11, -6, 5, 10]) g.box(x, 0, 1, 1, 21, 1, shade(0x232744, x % 2 ? 1.2 : 0.78));
     LOGOS.fbla.rows.slice(0, 10).forEach((row, r) => [...row.slice(4, 18)].forEach((c, i) => { if (c === "#") g.set(-7 + i, 19 - r, 1, WHITE); }));
     centeredText(g, "FBLC", 2, 1, GOLD);
   },
@@ -562,6 +586,7 @@ const MODELS: Record<string, (g: Grid) => void> = {
   "plaque-cemc": g => plaque(g, LOGOS.cemc, 0x3e2c6e, "CEMC"),
   "plaque-cemc-gold": g => plaque(g, LOGOS.cemc, GOLD, "CEMC"),
   "plaque-maa": g => plaque(g, LOGOS.maa, 0x0b5cad),
+  "plaque-aime": g => plaque(g, AIME_SEAL, 0xb47c31, "AIME"),
   "jane-street-tees": g => { g.box(-15, 14, 0, 30, 1, 1, METAL_DARK); tee(g, -14, 0x1d2b4f, "24"); tee(g, 1, 0x1d2b4f, "25"); },
   lockers: g => {
     for (let i = 0; i < 4; i++) {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { CHAPTERS, ageLabel, itemById, type JourneyLink } from "@/lib/journey/data";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { CHAPTERS, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
 import { LINKS } from "@/app/data";
 import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
 import ObjectPreview from "./ObjectPreview";
@@ -138,27 +138,32 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={CHAPTERS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S move. A and D turn. Q tilts up and F switches between front and rear camera views. Press E to inspect an object, or drag to move and tap or click to inspect. Use Objects to browse without walking.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. You can also drag to move, tap or click to inspect, or use Objects to browse without walking.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
       {intro && <div className="journey-intro" role="status"><Typed text="Welcome to Canada." delay={300} /></div>}
 
       {target && transition && (
-        <button type="button" className="journey-card" onClick={() => controls.current?.skip()} key={transition.to} aria-label={`${target.stop}. Tap to skip.`}>
-          <strong><Typed text={target.stop} delay={450} /></strong>
-          {target.stopNote && <span><Typed text={target.stopNote} delay={450 + target.stop.length * 45 + 150} speed={30} /></span>}
-        </button>
-      )}
-
-      {!moved && !near && !intro && !transition && !opened && (
-        <div className="journey-tutorial">
-          <div className="journey-wasd" aria-hidden="true"><kbd>W</kbd><span><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></div>
-          <kbd aria-hidden="true">E</kbd>
-          <p><Typed text="Walk · turn · look" speed={35} /></p>
-          <p className="journey-tutorial-touch"><Typed text="Drag or use the joystick · tap to look" speed={28} /></p>
+        <div className="journey-card" key={transition.to} style={{ "--journey-accent": `#${chapterAccent(transition.to).toString(16).padStart(6, "0")}` } as CSSProperties}>
+          <button type="button" className="journey-pass" onClick={() => controls.current?.skip()} aria-label={`${target.stop}, chapter ${transition.to + 1} of ${CHAPTERS.length}. Skip transition.`}>
+            <span className="journey-route" aria-hidden="true">{CHAPTERS.map((room, i) =>
+              <span key={room.id} data-progress={i === transition.to ? "current" : i < transition.to ? "passed" : "upcoming"} />)}</span>
+            <span className="journey-pass-index" aria-hidden="true">CHAPTER {target.number} / {String(CHAPTERS.length).padStart(2, "0")}</span>
+            <strong><Typed text={target.stop} delay={420} /></strong>
+            {target.stopNote && <span className="journey-pass-note"><Typed text={target.stopNote} delay={550 + target.stop.length * 45} speed={30} /></span>}
+          </button>
         </div>
       )}
+
+      {!intro && !transition && !opened && <>
+        <aside className="journey-keys" aria-label="Keyboard shortcuts">
+          <span><kbd>W</kbd><kbd>S</kbd><kbd>↑</kbd><kbd>↓</kbd> Walk</span>
+          <span><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> Turn</span>
+          <span><kbd>E</kbd> Inspect</span>
+        </aside>
+        {!moved && !near && <p className="journey-touch-note">Drag or use the joystick · tap to inspect</p>}
+      </>}
 
       {near && !opened && !transition && (
         <button type="button" className="journey-prompt" onClick={() => openItem(near.id)}>
@@ -167,13 +172,13 @@ export default function About() {
       )}
 
       {(intro || transition) && (
-        <button type="button" className="journey-skip" onClick={() => controls.current?.skip()}>Skip <span aria-hidden="true">▸▸</span></button>
+        <button type="button" className="journey-skip" onClick={() => controls.current?.skip()} aria-keyshortcuts="Escape">Skip <kbd aria-hidden="true">Esc</kbd></button>
       )}
 
       {!intro && !transition && <Joystick controls={controls} />}
       {!intro && !transition && <div className="journey-tools" role="group" aria-label="Camera and objects">
         <button type="button" onClick={() => controls.current?.toggleCamera("tilt")} aria-pressed={camera.tilt} aria-keyshortcuts="Q">Tilt up <kbd aria-hidden="true">Q</kbd></button>
-        <button type="button" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
+        <button type="button" title="See yourself from the front (F)" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
         <button type="button" onClick={() => browse(status.chapter)} aria-haspopup="dialog">Objects</button>
       </div>}
       {MUSIC_URL && <JourneyMusic src={MUSIC_URL} />}

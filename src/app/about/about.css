@@ -39,6 +39,9 @@
 .journey-back { position: absolute; z-index: 7; right: 20px; bottom: max(20px, env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 1px solid #4a4a4a; background: #0b0b0ee8; color: #ddd; text-decoration: none; font-size: 12px; box-shadow: 3px 3px 0 #000; }
 .journey-back:hover, .journey-skip:hover { border-color: #fff; color: #fff; }
 .journey-music { position: absolute; z-index: 7; top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); min-height: 44px; padding: 0 12px; color: #eee; background: #0b0b0ee8; border: 1px solid #6b6b6b; font-size: 12px; cursor: pointer; }
+.journey-objects { position: absolute; z-index: 3; top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); min-height: 44px; padding: 0 12px; color: #eee; background: #0b0b0ee8; border: 1px solid #6b6b6b; font-size: 12px; cursor: pointer; }
+.journey-stage[data-failed] ~ .journey-objects { display: none; }
+.journey-objects:hover { border-color: #f2d24b; }
 .journey-joystick { display: none; }
 .journey-dialog { margin: auto; width: min(640px, calc(100vw - 24px)); max-height: min(88svh, 900px); overflow-y: auto; padding: 46px 38px 28px; color: #eee; background: #111114; border: 1px solid #555; box-shadow: 6px 6px 0 #000; overscroll-behavior: contain; user-select: text; -webkit-user-select: text; }
 .journey-dialog::backdrop { background: #000c; }
@@ -49,6 +52,14 @@
 .journey-preview { margin: 0 0 20px; border: 1px solid #2c2c30; background: #19191d; overflow: hidden; display: flex; justify-content: center; }
 .journey-preview canvas { display: block; flex: none; image-rendering: pixelated; image-rendering: crisp-edges; }
 .journey-copy { color: #c4c4c4; font-size: 15px; line-height: 1.85; text-wrap: pretty; }
+.journey-video { display: block; width: 100%; max-height: 54svh; margin-top: 16px; background: #09090c; }
+.journey-room-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; font-size: 13px; }
+.journey-room-picker select, .journey-room-picker button, .journey-object-list button { min-height: 44px; padding: 7px 10px; border: 1px solid #4a4a4f; background: #1a1a20; color: #eee; font-size: 13px; cursor: pointer; }
+.journey-room-picker select { margin-left: 6px; color-scheme: dark; }
+.journey-object-list { padding: 0; list-style: none; display: grid; gap: 7px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.journey-object-list button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; }
+.journey-object-list button span { color: #f2d24b; }
+.journey-object-list button:hover, .journey-room-picker button:hover { border-color: #f2d24b; }
 .journey-intro-copy { font-size: 12px; color: #aaa; margin-bottom: 18px; line-height: 1.7; }
 .journey-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 24px; }
 .journey-link { display: inline-flex; gap: 14px; align-items: center; border-bottom: 1px solid #777; padding-bottom: 6px; color: #eee; font-size: 12px; text-decoration: none; }

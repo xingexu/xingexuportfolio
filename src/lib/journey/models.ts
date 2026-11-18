@@ -215,8 +215,9 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 }
 
 const GLASS = 0x9dd8e4;
-const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first"]);
-export const modelVoxelSize = (id: string) => DETAIL_VOXELS.has(id) ? 0.25 : 1;
+const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey"]);
+const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog"]);
+export const modelVoxelSize = (id: string) => DETAIL_VOXELS.has(id) ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") || id.startsWith("plaque-") ? 0.5 : 1;
 export const modelHasGlass = (id: string) => id.startsWith("glass-trophy-");
 export const isGlass = (color: Color) => color === GLASS;
 export const GLASS_OPACITY = 0.34;
@@ -276,6 +277,27 @@ const MODELS: Record<string, (g: Grid) => void> = {
   cone: g => { g.box(-2, 0, -2, 4, 1, 4, 0xe8612c).box(-1, 1, -1, 2, 2, 2, 0xe8612c).box(-1, 3, -1, 2, 1, 2, WHITE).box(-1, 4, -1, 2, 1, 2, 0xe8612c); },
   "runway-light": g => { g.box(0, 0, 0, 1, 3, 1, METAL_DARK).box(-1, 3, -1, 3, 1, 3, 0x3c3c3c).set(0, 4, 0, 0x5aa9ff); },
   bench: g => { g.box(-8, 4, -2, 16, 1, 4, METAL).box(-8, 5, -2, 16, 5, 1, METAL); for (const x of [-7, 6]) g.box(x, 0, -2, 1, 4, 4, METAL_DARK); },
+  "service-cart": g => {
+    for (const x of [-5, 4]) for (const z of [-2, 2]) g.box(x, 0, z, 2, 2, 2, BLACK);
+    g.box(-6, 2, -3, 12, 2, 7, METAL_DARK).box(-5, 4, -3, 10, 5, 7, 0x445b68);
+    g.box(-5, 8, -3, 10, 1, 7, 0x7c929c).box(-5, 10, -2, 4, 2, 3, 0xd1a647).box(2, 4, 4, 2, 2, 1, 0xe09148);
+  },
+  dresser: g => {
+    g.box(-8, 1, -4, 16, 9, 7, 0x74635a).box(-9, 10, -5, 18, 1, 9, 0x988174);
+    for (const x of [-7, 6]) for (const z of [-3, 2]) g.box(x, 0, z, 1, 1, 1, WOOD_DARK);
+    for (const y of [1, 4, 7]) {
+      g.box(-7, y, 3, 14, 2, 1, shade(0x8e7969, 0.95 + y * 0.009)).box(-1, y + 1, 4, 2, 1, 1, METAL);
+    }
+    g.box(3, 11, -2, 3, 2, 2, 0x99613e).box(4, 13, -2, 1, 3, 2, 0x57754d).set(3, 14, -1, 0x769668);
+  },
+  "classroom-cubbies": g => {
+    shelfUnit(g, 17, 12, 6, [0, 5, 10], 0x7e6951);
+    for (const x of [-3, 3]) g.box(x, 1, -2, 1, 9, 4, 0x8f7c62);
+    for (const [i, x] of [-7, -1, 4].entries()) for (const y of [1, 6]) {
+      const color = [0x526e83, 0xae6e54, 0x7c8e60][(i + y) % 3];
+      g.box(x, y, -2, 3, 3, 4, color).set(x + 1, y + 1, 2, WHITE);
+    }
+  },
   "chess-table": g => {
     table(g, 12, 12, 8, WOOD_DARK, WOOD_DARK);
     g.box(-5, 8, -5, 10, 1, 10, 0x3b2616);
@@ -307,7 +329,7 @@ const MODELS: Record<string, (g: Grid) => void> = {
   },
   "bed-kid": g => bed(g, 0x5b8fd1, 0xf4d35e, 0xd9c3a0, WHITE, (x, z) => (x + z * 3) % 7 === 0),
   "bed-navy": g => bed(g, 0x2c3e66, 0x8fa3c7, WOOD_DARK, 0xe8eef6, (_x, z) => z % 5 === 0),
-  "bed-western": g => bed(g, 0x5a5f6a, 0x4f2683, 0x2f3238, 0x4f2683, (x) => x === -8 || x === 7),
+  "bed-western": g => bed(g, 0x395a86, 0xd9c29b, 0x333641, 0xe6d2ac, (x, z) => Math.abs(x + 0.5) > 6 || z > 8 && (z % 3 === 0 || z > 12)),
   "lego-shelf": g => {
     shelfUnit(g, 20, 14, 5, [6], WHITE);
     const bricks = [0xd32f2f, 0x1976d2, 0xfbc02d, 0x388e3c, 0xf57c00];
@@ -489,12 +511,12 @@ const MODELS: Record<string, (g: Grid) => void> = {
     for (const [x, z] of [[-6, -4], [5, -4], [-6, 3], [5, 3]]) g.set(x, 0, z, 0x1a1a1a);
     for (const [x, y, z] of [[-3, 4, -1], [2, 4, -1], [-1, 4, 2], [0, 8, 0]]) sphere(g, x, y, z, 2.4, (a, b) => (a + b) % 3 ? 0xf6d21c : 0x1f4fbf);
   },
-  "western-pennant": g => {
-    g.box(-10, 0, -1, 20, 19, 1, 0x4f2683);
-    panel(g, -9, 1, 0, 18, 17, (_i, j) => j === 0 || j === 16 ? 0x6a3fa0 : 0x4f2683);
-    centeredText(g, "CS", 13, 1, WHITE);
-    centeredText(g, "+", 7, 1, 0xd8c8f0);
-    centeredText(g, "IVEY", 1, 1, WHITE);
+  "cs-ivey": g => centeredText(g, "CS + IVEY", 0, 0, 0xe5dbff),
+  "go-mustangs": g => {
+    frame(g, 36, 24, 0x57417c, (x, y) => x < 2 || y < 2 ? 0x895cba : (x + y) % 15 < 3 ? 0x483167 : 0x382450);
+    centeredText(g, "WESTERN", 16, 1, 0xf7eee6);
+    centeredText(g, "GO", 9, 1, 0xd7beff);
+    centeredText(g, "MUSTANGS", 3, 1, 0xf7eee6);
   },
   "poster-csa": g => badge(g, 19, 0xc0473a, 0xe5e7eb, pen => {
     [[-1, 7, -6, -3], [-6, -3, 0, -3], [0, -3, 2, 1], [-1, 7, 2, 1], [2, 1, -2, -7], [4, 1, 2, -3], [2, -3, 6, -3], [6, -3, 4, 1]]
@@ -516,11 +538,37 @@ const MODELS: Record<string, (g: Grid) => void> = {
     });
   }),
   "jellycat-frog": g => {
-    g.box(-3, 0, -3, 6, 4, 5, 0x6fbf5a).box(-2, 0, 2, 4, 3, 1, 0xcfe8a8);
-    g.box(-3, 4, -2, 2, 2, 2, 0x6fbf5a).box(1, 4, -2, 2, 2, 2, 0x6fbf5a).set(-2, 5, 0, BLACK).set(2, 5, 0, BLACK).set(-3, 5, 0, WHITE).set(1, 5, 0, WHITE);
-    g.box(-1, 2, 2, 2, 1, 1, 0x3e7a32).set(-3, 1, 2, 0xf4a6b8).set(2, 1, 2, 0xf4a6b8);
-    g.box(-4, 0, -1, 1, 1, 3, 0x5aa648).box(3, 0, -1, 1, 1, 3, 0x5aa648);
+    sphere(g, 0, 4, 0, 4.6, (x, y, z) => shade(z > 2 && y < 0 ? 0xaec17c : 0x78a555, 0.9 + hash3(x, y, z) * 0.18));
+    for (const x of [-2, 2]) {
+      g.box(x - 1, 7, 1, 2, 2, 2, 0x81a85a).set(x, 8, 3, BLACK);
+      g.box(x - 1, 0, 2, 2, 1, 3, 0x648b4e);
+    }
+    g.box(-1, 4, 4, 3, 1, 1, 0x506f3e).set(-2, 5, 4, 0x506f3e).set(2, 5, 4, 0x506f3e);
   },
+  "buldak-bowl": g => {
+    for (let y = 0; y < 8; y++) {
+      const r = 6 + y * 0.48;
+      disc(g, 0, y, 0, r, (x, z) => Math.hypot(x, z) > r - 1.4 ? y >= 6 ? 0xe6ddd0 : 0x24212b : y === 0 ? 0x3c2e37 : null);
+    }
+    disc(g, 0, 5, 0, 8.25, (x, z) => (x + Math.round(2 * Math.sin(z * 0.9))) % 3 === 0 ? 0xffac47 : 0xbc4a26);
+    for (const [x, z] of [[2, -3], [-2, 4], [4, 2], [-4, -3], [0, 1]]) g.set(x, 6, z, 0x78a948);
+    for (const z of [-3, -1]) for (let x = -10; x <= 9; x++) g.set(x, 7 + Math.floor((x + 10) / 10), z + Math.floor(x / 5), 0xc18854);
+  },
+  "pink-court-shoes": g => {
+    for (const [x, z] of [[-6, -2], [1, 0]]) {
+      for (let i = 0; i < 12; i++) {
+        const inset = i === 0 || i === 11 ? 1 : 0;
+        g.box(x + inset, 0, z + i, 5 - inset * 2, 2, 1, 0xf6e6ee);
+        g.box(x + inset, 2, z + i, 5 - inset * 2, i < 4 ? 4 : i < 7 ? 3 : 2, 1, i < 3 ? 0xd0588f : 0xec88b6);
+      }
+      g.box(x + 1, 5, z + 1, 3, 1, 3, 0x78295d);
+      for (let i = 0; i < 3; i++) g.box(x + 1, i === 0 ? 5 : 4, z + 4 + i * 2, 3, 1, 1, 0xffe2ed);
+    }
+  },
+  "molten-volleyball": g => sphere(g, 0, 7, 0, 7.6, (x, y, z) => {
+    const panel = ((Math.atan2(z, x) / Math.PI * 3 + y * 0.17 + 12) % 3 + 3) % 3;
+    return shade(panel % 1 < 0.12 ? 0xa8aab4 : [0xf5efe4, 0x277d59, 0xb8394f][Math.floor(panel)], 0.96 + hash3(x, y, z) * 0.08);
+  }),
   "standing-desk": g => {
     g.box(-11, 17, -5, 22, 1, 10, 0xd9c7a7);
     for (const x of [-9, 8]) g.box(x, 0, -1, 1, 17, 2, 0x2a2a2e).box(x - 1, 0, -4, 3, 1, 8, 0x2a2a2e);
@@ -536,22 +584,32 @@ const MODELS: Record<string, (g: Grid) => void> = {
     for (const [x, h, c, cap] of bottles) g.box(x, 0, -1, 2, h, 2, c).box(x, h, -1, 2, 1, 2, cap);
   },
   fan: g => {
-    disc(g, 0, 0, 0, 4, () => 0xe8e8e8); g.box(0, 1, 0, 1, 14, 1, 0xd0d0d0);
+    disc(g, 0, 0, 0, 4, () => 0x595f70); g.box(-1, 1, -1, 2, 5, 2, 0x727987);
     for (let x = -6; x <= 6; x++) for (let y = -6; y <= 6; y++) {
       const d = Math.hypot(x, y);
-      if (d <= 6.4) g.set(x, 20 + y, 1, d > 5.4 ? 0xf2f2f2 : d < 1.5 ? 0x9aa3ab : Math.abs(x) === Math.abs(y) || x === 0 || y === 0 ? 0xbcd7ea : -1);
+      if (d <= 6.4) {
+        if (d > 5.3) g.box(x, 9 + y, -1, 1, 1, 3, 0xb8bfcc);
+        else if ((Math.atan2(y, x) + d * 0.21 + 8) % 2.1 < 0.85) g.set(x, 9 + y, 0, 0x657790);
+        if (Math.abs(x) === Math.abs(y) || x === 0 || y === 0) g.set(x, 9 + y, 2, 0xa2adbd);
+      }
     }
-    g.box(-1, 19, -1, 3, 3, 2, 0xd0d0d0);
+    g.box(-1, 8, 2, 3, 3, 1, 0x565d68);
   },
   closet: g => {
-    g.box(-12, 0, -4, 24, 30, 1, 0xf3f1ec).box(-12, 0, -4, 1, 30, 8, 0xf3f1ec).box(11, 0, -4, 1, 30, 8, 0xf3f1ec).box(-12, 29, -4, 24, 1, 8, 0xf3f1ec).box(-12, 0, -4, 24, 1, 8, 0xe2ded6);
-    g.box(-11, 24, 0, 22, 1, 1, METAL);
-    for (let i = 0; i < 6; i++) {
-      const x = -10 + i * 3.5, c = i % 3 === 1 ? 0x2a2a2e : 0x161618;
-      g.box(Math.round(x), 11, -2, 3, 13, 4, c).box(Math.round(x) + 1, 23, 0, 1, 1, 1, METAL);
+    shelfUnit(g, 24, 30, 9, [0, 6, 25, 29], 0x514740);
+    g.box(-11, 23, -1, 22, 1, 1, METAL);
+    for (let i = 0; i < 10; i++) {
+      const x = -10 + i * 2, y = 9 + i % 4, c = [0x21212a, 0x31313b, 0x272b34, 0x191b24][i % 4];
+      g.box(x, y, -3, 2, 22 - y, 7 - i % 3, c).box(x, y + 3, 3 - i % 3, 1, 17 - y, 1, shade(c, 1.27));
+      g.set(x, 22, -1, METAL).set(x, 20, 3 - i % 3, 0x45424d);
     }
-    g.box(-10, 1, -2, 6, 3, 5, 0x161618).box(-3, 1, -1, 3, 2, 5, BLACK).box(1, 1, -1, 3, 2, 5, BLACK).box(-3, 1, 3, 3, 1, 1, 0x3a3a3e).box(1, 1, 3, 3, 1, 1, 0x3a3a3e);
-    g.box(-13, 0, 4, 1, 30, 7, 0xe9e6df).box(12, 0, 4, 1, 30, 7, 0xe9e6df);
+    for (const x of [-9, -3, 3]) for (let y = 1; y < 5; y++) g.box(x, y, -3, 5, 1, 6, y % 2 ? 0x33343f : 0x23242d);
+    for (const x of [-8, 0]) g.box(x, 26, -3, 7, 3, 6, 0x342f3d).box(x + 1, 27, 3, 4, 1, 1, 0x626072);
+  },
+  "nightstand": g => {
+    shelfUnit(g, 9, 9, 7, [0, 8], 0x574b42);
+    g.box(-3, 4, -2, 6, 3, 6, 0x6c5b4d).box(-1, 5, 4, 2, 1, 1, METAL);
+    g.box(-3, 1, -2, 5, 2, 4, 0x3d4c65).box(-3, 1, 2, 5, 1, 1, 0xa7a3a1);
   },
   "laundry-basket": g => { g.box(-4, 0, -3, 8, 7, 6, (x, y, z) => (x + y + z) % 2 ? 0xc9b48f : 0xb39d76).box(-3, 6, -2, 6, 2, 4, 0x1a1a1a); },
   "rug-western": g => g.box(-12, 0, -9, 24, 1, 18, (x, _y, z) => {
@@ -578,9 +636,14 @@ export function buildModel(id: string): Grid {
 }
 
 export type Footprint = { minX: number; maxX: number; minZ: number; maxZ: number; height: number };
+const footprints = new Map<string, Footprint>();
 /** The model's x/z extent relative to its placement origin (exclusive max). */
 export function modelFootprint(id: string): Footprint {
+  const cached = footprints.get(id);
+  if (cached) return cached;
   const b = buildModel(id).bounds();
   const w = b.maxX - b.minX + 1, d = b.maxZ - b.minZ + 1, s = modelVoxelSize(id);
-  return { minX: -Math.floor(w / 2) * s, maxX: (w - Math.floor(w / 2)) * s, minZ: -Math.floor(d / 2) * s, maxZ: (d - Math.floor(d / 2)) * s, height: (b.maxY + 1) * s };
+  const footprint = { minX: -Math.floor(w / 2) * s, maxX: (w - Math.floor(w / 2)) * s, minZ: -Math.floor(d / 2) * s, maxZ: (d - Math.floor(d / 2)) * s, height: (b.maxY + 1) * s };
+  footprints.set(id, footprint);
+  return footprint;
 }

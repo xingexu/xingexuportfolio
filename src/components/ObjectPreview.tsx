@@ -16,7 +16,7 @@ export default function ObjectPreview({ model, label }: { model: string; label: 
     renderer.outputColorSpace = LinearSRGBColorSpace;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     renderer.setPixelRatio(1);
-    const PIXEL = 2;
+    const PIXEL = 1;
     let width = 160, height = 100;
     const camera = new PerspectiveCamera(32, width / height, 0.5, 1000);
     const fit = () => {

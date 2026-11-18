@@ -1,7 +1,7 @@
 /**
  * A sparse voxel grid. Every model in the About journey (rooms, props, the
- * avatar, even sign lettering) is drawn into one of these, so every block in
- * the scene has exactly the same 1×1×1 dimensions.
+ * avatar, even sign lettering) is drawn into one of these. Each grid uses
+ * uniform cubic cells, with fine grids for small props and lettering.
  */
 export type Color = number;
 

@@ -6,7 +6,7 @@ import { CHAPTERS, type Placement } from "@/lib/journey/data";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { ageAt, buildCutawayShell, cutawaySides, interior, nearbyItems, placementBox, roomSide, spawn, step, walkSpeed, AVATAR_SCALE, INTRO_END, type RoomSide } from "@/lib/journey/world";
+import { ageAt, buildCutawayShell, cutawaySides, interior, nearbyItems, placementBox, renderPixelSize, roomSide, spawn, step, walkSpeed, AVATAR_SCALE, INTRO_END, type RoomSide } from "@/lib/journey/world";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -37,7 +37,7 @@ const COVER = 0.6, HOLD = 1.9, REVEAL = 0.6, INTRO = 6, TURN_SPEED = 2.6;
 const smooth = (t: number) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
 const stairHeight = (x: number) => x < -22 ? 8 : x < -6 ? 8 - Math.floor((x + 22) / 2) : 0;
 
-/** The whole voxel world, rendered at a low internal resolution and scaled by a whole number so every pixel is the same size. */
+/** The whole voxel world, rendered with a uniform screen pixel pitch. */
 export default function JourneyWorld(props: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -225,12 +225,12 @@ export default function JourneyWorld(props: Props) {
 
     function resize() {
       const w = Math.max(1, region.clientWidth), h = Math.max(1, region.clientHeight);
-      const scale = Math.max(1, Math.ceil(Math.sqrt(w * h / 420_000)));
+      const scale = renderPixelSize(w, h);
       const iw = Math.ceil(w / scale), ih = Math.ceil(h / scale);
       renderer.setSize(iw, ih, false);
       view.style.width = `${iw * scale}px`; view.style.height = `${ih * scale}px`;
       camera.aspect = iw / ih; camera.updateProjectionMatrix();
-      const block = Math.max(4, scale * 3);
+      const block = Math.max(2, scale * 3);
       cover.width = Math.ceil(w / block); cover.height = Math.ceil(h / block);
       cover.style.width = `${cover.width * block}px`; cover.style.height = `${cover.height * block}px`;
       coverImage = coverContext?.createImageData(cover.width, cover.height);

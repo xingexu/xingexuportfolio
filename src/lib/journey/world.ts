@@ -1,5 +1,6 @@
 import { CHAPTERS, type Chapter, type JourneyItem, type Placement } from "./data";
-import { modelFootprint } from "./models";
+import { modelFootprint, VOLLEYBALL_NET } from "./models";
+import type { BallField, CourtNet } from "./volleyball";
 import { Grid, hash3, shade, textWidth, type Color } from "./voxel";
 
 export type Box = { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -91,10 +92,28 @@ const CUSTOM_BLOCKS: Record<string, Box[]> = {
 export function chapterObstacles(index: number): Box[] {
   const chapter = CHAPTERS[index];
   return [...chapter.items, ...chapter.decor].flatMap(p => {
-    if (p.solid === false || p.bump) return [];
+    if (p.solid === false || p.bump || p.ball) return [];
     if ("id" in p && CUSTOM_BLOCKS[(p as JourneyItem).id]) return CUSTOM_BLOCKS[(p as JourneyItem).id];
     return [placementBox(p)];
   });
+}
+
+export function buildBallField(index: number): BallField {
+  const chapter = CHAPTERS[index];
+  let net: CourtNet | undefined;
+  const blocks = [...chapter.items, ...chapter.decor].flatMap(p => {
+    if (p.ball || p.bump || p.solid === false) return [];
+    const box = placementBox(p), bottom = p.y ?? 0;
+    if (p.model === "volleyball-net") {
+      const { halfWidth, bottom, top, postTop } = VOLLEYBALL_NET;
+      net = { minX: p.x - halfWidth, maxX: p.x + halfWidth, minZ: p.z, maxZ: p.z + 1, z: p.z + 0.5, bottom, top, postTop };
+      const posts = [p.x - halfWidth - 1, p.x + halfWidth].map(x =>
+        ({ minX: x, maxX: x + 1, minZ: p.z, maxZ: p.z + 1, bottom: 0, top: postTop }));
+      return [net, ...posts];
+    }
+    return [{ ...box, bottom, top: bottom + modelFootprint(p.model).height }];
+  });
+  return { ...interior(chapter), ceiling: WALL_HEIGHT, blocks, net };
 }
 
 const obstacleCache = new Map<number, Box[]>();
@@ -176,10 +195,11 @@ export function boxDistance(box: Box, p: Vec) {
  * Everything within reach, closest first. Things resting on furniture or hung
  * on walls reach a little further so what holds them never hides them.
  */
-export function nearbyItems(index: number, p: Vec, limit = 3, range = INTERACT_RANGE): JourneyItem[] {
+export function nearbyItems(index: number, p: Vec, limit = 3, range = INTERACT_RANGE, positions?: ReadonlyMap<string, Vec>): JourneyItem[] {
   return CHAPTERS[index].items
     .map(item => {
-      const boxes = CUSTOM_BLOCKS[item.id] ?? [placementBox(item)];
+      const moved = positions?.get(item.id);
+      const boxes = CUSTOM_BLOCKS[item.id] ?? [placementBox(moved ? { ...item, x: moved.x, z: moved.z } : item)];
       const distance = Math.min(...boxes.map(box => boxDistance(box, p)));
       return { item, distance, score: distance - (item.y ? 2.5 : 0), reach: range + (item.y ? 3 : 0) };
     })

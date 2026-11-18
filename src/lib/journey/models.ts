@@ -6,6 +6,7 @@ type Painter = (i: number, j: number) => Color | null;
 
 const WOOD = 0xa47148, WOOD_DARK = 0x6e4a2f, WHITE = 0xf2f0ea, BLACK = 0x18181c, METAL = 0x9aa3ab, METAL_DARK = 0x5c636b;
 const GOLD = 0xd9ad3c, SKY = 0x8ec9ef;
+export const VOLLEYBALL_NET = { halfWidth: 12, bottom: 12, top: 20, postTop: 22 };
 
 function table(g: Grid, w: number, d: number, h: number, top: Color, leg: Color, x = -Math.floor(w / 2), z = -Math.floor(d / 2)) {
   g.box(x, h - 1, z, w, 1, d, top);
@@ -574,8 +575,9 @@ const MODELS: Record<string, (g: Grid) => void> = {
     return band === 0 ? 0x1f4fbf : band === 1 ? 0xf6d21c : 0xf6d21c;
   }),
   "volleyball-net": g => {
-    for (const x of [-13, 12]) g.box(x, 0, -1, 1, 22, 1, METAL).box(x - 1, 0, -2, 3, 1, 3, METAL_DARK);
-    for (let x = -12; x < 12; x++) for (let y = 12; y < 20; y++) if ((x + y) % 2 === 0 || y === 19) g.set(x, y, -1, y === 19 ? WHITE : 0x1a1a1a);
+    const { halfWidth, bottom, top, postTop } = VOLLEYBALL_NET;
+    for (const x of [-halfWidth - 1, halfWidth]) g.box(x, 0, -1, 1, postTop, 1, METAL).box(x - 1, 0, -2, 3, 1, 3, METAL_DARK);
+    for (let x = -halfWidth; x < halfWidth; x++) for (let y = bottom; y < top; y++) if ((x + y) % 2 === 0 || y === top - 1) g.set(x, y, -1, y === top - 1 ? WHITE : 0x1a1a1a);
   },
   "coding-desk": g => {
     table(g, 18, 10, 12, 0xd7d2c8, METAL_DARK, -9, -5);
@@ -646,7 +648,8 @@ const MODELS: Record<string, (g: Grid) => void> = {
   "ball-cart": g => {
     g.box(-6, 1, -4, 12, 1, 8, METAL_DARK).box(-6, 2, -4, 1, 8, 8, METAL).box(5, 2, -4, 1, 8, 8, METAL);
     for (const [x, z] of [[-6, -4], [5, -4], [-6, 3], [5, 3]]) g.set(x, 0, z, 0x1a1a1a);
-    for (const [x, y, z] of [[-3, 4, -1], [2, 4, -1], [-1, 4, 2], [0, 8, 0]]) sphere(g, x, y, z, 2.4, (a, b) => (a + b) % 3 ? 0xf6d21c : 0x1f4fbf);
+    g.box(-6, 9, -4, 12, 1, 8, 0x454c55);
+    for (let x = -5; x <= 5; x += 2) g.box(x, 9, -3, 1, 1, 6, 0x5c636b);
   },
   "cs-ivey": g => centeredText(g, "CS + IVEY", 0, 0, 0xe5dbff),
   "go-mustangs": g => {

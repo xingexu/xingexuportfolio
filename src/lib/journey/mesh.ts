@@ -16,16 +16,17 @@ const FACES = [
  * Turns a voxel grid into one geometry, emitting only exposed faces. Lighting
  * is baked per face so every cube reads crisply at low resolution.
  */
-export function gridGeometry(grid: Grid, offset: [number, number, number] = [0, 0, 0], jitter = 0.035) {
+export function gridGeometry(grid: Grid, offset: [number, number, number] = [0, 0, 0], jitter = 0.035, voxelSize = 1, include?: (color: number) => boolean) {
   const positions: number[] = [], colors: number[] = [], indices: number[] = [];
   grid.forEach((x, y, z, color) => {
+    if (include && !include(color)) return;
     const r = ((color >> 16) & 255) / 255, g = ((color >> 8) & 255) / 255, b = (color & 255) / 255;
     const noise = 1 + (hash3(x, y, z) - 0.5) * jitter;
     for (const face of FACES) {
       if (grid.has(x + face.dir[0], y + face.dir[1], z + face.dir[2])) continue;
       const base = positions.length / 3, s = face.shade * noise;
       for (const c of face.corners) {
-        positions.push(x + c[0] + offset[0], y + c[1] + offset[1], z + c[2] + offset[2]);
+        positions.push((x + c[0]) * voxelSize + offset[0], (y + c[1]) * voxelSize + offset[1], (z + c[2]) * voxelSize + offset[2]);
         colors.push(r * s, g * s, b * s);
       }
       indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);

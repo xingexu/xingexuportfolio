@@ -16,6 +16,7 @@ const FINAL_LINKS: JourneyLink[] = [
   { href: LINKS.linkedin, label: "LinkedIn" },
   { href: LINKS.email, label: "Email me" },
 ];
+const MUSIC_URL = process.env.NEXT_PUBLIC_JOURNEY_MUSIC_URL;
 
 function StoryLink({ link }: { link: JourneyLink }) {
   return link.href.startsWith("/")
@@ -43,22 +44,53 @@ function Joystick({ controls }: { controls: React.RefObject<JourneyControls | nu
     if (active.current !== event.pointerId) return;
     const rect = event.currentTarget.getBoundingClientRect(), radius = rect.width / 2;
     let dx = event.clientX - (rect.left + radius), dy = event.clientY - (rect.top + radius);
-    const distance = Math.hypot(dx, dy), max = radius - 18;
+    const distance = Math.hypot(dx, dy), max = radius * 0.6;
     if (distance > max) { dx = dx / distance * max; dy = dy / distance * max; }
     if (knob.current) knob.current.style.transform = `translate(${Math.round(dx)}px, ${Math.round(dy)}px)`;
-    controls.current?.setStick(dx / max, dy / max);
+    const strength = Math.max(0, (Math.min(1, distance / max) - 0.12) / 0.88);
+    controls.current?.setStick(dx / (Math.min(distance, max) || 1) * strength, dy / (Math.min(distance, max) || 1) * strength);
   };
-  const end = () => {
+  const end = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (active.current !== event.pointerId) return;
     active.current = null;
     if (knob.current) knob.current.style.transform = "";
     controls.current?.setStick(0, 0);
   };
   return (
     <div className="journey-joystick" aria-hidden="true"
-      onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); active.current = event.pointerId; move(event); }}
+      onPointerDown={(event) => {
+        if (active.current !== null || event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        active.current = event.pointerId;
+        move(event);
+      }}
       onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}>
       <span ref={knob} />
     </div>
+  );
+}
+
+function JourneyMusic({ src }: { src: string }) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const toggle = async () => {
+    const track = audio.current;
+    if (!track) return;
+    if (!track.paused) { track.pause(); return; }
+    track.volume = 0.25;
+    setUnavailable(false);
+    try { await track.play(); } catch { if (audio.current === track && track.error) setUnavailable(true); }
+  };
+  return (
+    <>
+      <audio ref={audio} src={src} loop preload="none" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+        onError={() => { setPlaying(false); setUnavailable(true); }} />
+      <button className="journey-music" type="button" onClick={toggle} aria-pressed={playing} aria-label="Background music">
+        {unavailable ? "Music unavailable" : playing ? "Music on" : "Music off"}
+      </button>
+    </>
   );
 }
 
@@ -103,6 +135,7 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={CHAPTERS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
+      <p className="sr-only" id="journey-help">W and S move. A and D turn. Press E to inspect an object, or drag to move and tap or click to inspect.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} />
 
@@ -116,11 +149,11 @@ export default function About() {
       )}
 
       {!moved && !near && !intro && !transition && !opened && (
-        <div className="journey-tutorial" id="journey-help">
+        <div className="journey-tutorial">
           <div className="journey-wasd" aria-hidden="true"><kbd>W</kbd><span><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></div>
           <kbd aria-hidden="true">E</kbd>
           <p><Typed text="Walk · turn · look" speed={35} /></p>
-          <p className="journey-tutorial-touch"><Typed text="Drag to walk · tap to look" speed={35} /></p>
+          <p className="journey-tutorial-touch"><Typed text="Drag or use the joystick · tap to look" speed={28} /></p>
         </div>
       )}
 
@@ -134,7 +167,8 @@ export default function About() {
         <button type="button" className="journey-skip" onClick={() => controls.current?.skip()}>Skip <span aria-hidden="true">▸▸</span></button>
       )}
 
-      <Joystick controls={controls} />
+      {!intro && !transition && <Joystick controls={controls} />}
+      {MUSIC_URL && <JourneyMusic src={MUSIC_URL} />}
       <TransitionLink href="/" className="journey-back" aria-label="Go back to the home page"><span aria-hidden="true">←</span> Back</TransitionLink>
 
       <dialog ref={dialog} className="journey-dialog" aria-labelledby="journey-dialog-title"

@@ -19,7 +19,7 @@ function load(file) {
   return result.exports;
 }
 const { CHAPTERS, ALL_ITEMS } = load('src/lib/journey/data.ts');
-const { buildModel, MODEL_IDS } = load('src/lib/journey/models.ts');
+const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 
@@ -37,12 +37,45 @@ test('every item is written out, linked properly and has a model', () => {
   for (const chapter of CHAPTERS) for (const p of chapter.decor) assert.ok(MODEL_IDS.includes(p.model), p.model);
 });
 
-test('every model builds from voxels of one size', () => {
+test('every model uses an aligned voxel grid and fits its world footprint', () => {
   for (const id of MODEL_IDS) {
     const grid = buildModel(id);
     assert.ok(grid.size > 0, id);
     grid.forEach((x, y, z) => assert.ok(Number.isInteger(x) && Number.isInteger(y) && Number.isInteger(z), id));
+    const b = grid.bounds(), box = modelFootprint(id), size = modelVoxelSize(id);
+    assert.equal(box.maxX - box.minX, (b.maxX - b.minX + 1) * size, id);
+    assert.equal(box.maxZ - box.minZ, (b.maxZ - b.minZ + 1) * size, id);
+    assert.equal(box.height, (b.maxY + 1) * size, id);
   }
+});
+
+test('both FBLA trophies have transparent glass and an opaque base', () => {
+  for (const item of ALL_ITEMS.filter(i => i.id.startsWith('award-'))) {
+    const glass = new Set();
+    buildModel(item.model).forEach((_x, _y, _z, color) => glass.add(isGlass(color)));
+    assert.ok(modelHasGlass(item.model));
+    assert.deepEqual(glass, new Set([false, true]));
+  }
+});
+
+test('indoor cutaways leave the floor and cut only camera-side walls', () => {
+  for (const [index, chapter] of CHAPTERS.entries()) {
+    if (chapter.outdoor) continue;
+    const { fixed, walls } = W.buildCutawayShell(index), bounds = W.interior(chapter);
+    assert.ok(fixed.has(0, -1, 0), chapter.id);
+    assert.ok(Object.values(walls).every(wall => wall.size > 0), chapter.id);
+    assert.equal(fixed.size + Object.values(walls).reduce((sum, wall) => sum + wall.size, 0), W.buildRoomShell(index).size, chapter.id);
+    assert.deepEqual(W.cutawaySides(bounds, { x: bounds.minX - 1, z: bounds.maxZ + 1 }), new Set(['left', 'back']));
+    assert.deepEqual(W.cutawaySides(bounds, { x: 0, z: 0 }), new Set());
+  }
+});
+
+test('the terminal facade can be cut away without losing the apron floor', () => {
+  const bounds = W.interior(CHAPTERS[0]), { fixed, walls } = W.buildCutawayShell(0);
+  assert.ok(walls.front.has(-12, 12, -42));
+  assert.ok(fixed.has(-12, -1, -42));
+  assert.ok(W.cutawaySides(bounds, { x: 0, z: bounds.minZ - 1 }).has('front'));
+  assert.ok(!W.cutawaySides(bounds, { x: 0, z: bounds.minZ + 1 }).has('front'));
 });
 
 test('the story runs from age 7 to 18 with the requested outfits', () => {

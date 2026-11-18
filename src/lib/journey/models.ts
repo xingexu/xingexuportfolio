@@ -118,12 +118,6 @@ function books(g: Grid, x0: number, y: number, z: number, count: number, seed: n
   }
 }
 
-function poster(g: Grid, w: number, h: number, bg: Color, title: string, titleColor: Color, art: (g: Grid, x0: number) => void) {
-  frame(g, w, h, 0xf5f5f0, () => bg);
-  centeredText(g, title, h - 8, 1, titleColor);
-  art(g, -Math.floor(w / 2));
-}
-
 function maple(g: Grid, x: number, y: number, z: number, color: Color) {
   const leaf = ["....#....", "...###...", "#.#####.#", "#########", ".#######.", "..#####..", ".#######.", "....#....", "....#...."];
   leaf.forEach((row, r) => [...row].forEach((c, i) => { if (c === "#") g.set(x + i, y + 8 - r, z, color); }));
@@ -191,6 +185,23 @@ function plaque(g: Grid, logo: PixelLogo, cols: [number, number], rowCount: numb
   const x0 = -Math.floor(lw / 2);
   rows.forEach((row, r) => [...row].forEach((c, i) => { if (c === "#") g.set(x0 + i, h - 3 - r, 1, logo.ink); }));
   centeredText(g, word, 2, 1, logo.ink);
+}
+
+type Pen = (x: number, y: number, color: Color) => void;
+
+function badge(g: Grid, d: number, bg: Color, ring: Color, ink: (pen: Pen) => void) {
+  const r = (d - 1) / 2;
+  for (let x = -r; x <= r; x++) for (let y = -r; y <= r; y++) {
+    const q = x * x + y * y;
+    if (q > (r + 0.5) ** 2) continue;
+    g.set(x, y + r + 1, -1, ring).set(x, y + r + 1, 0, q <= (r - 0.6) ** 2 ? bg : ring);
+  }
+  ink((x, y, color) => g.set(x, y + r + 1, 1, color));
+}
+
+function line(pen: Pen, x0: number, y0: number, x1: number, y1: number, color: Color) {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+  for (let i = 0; i <= n; i++) pen(Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), color);
 }
 
 function tee(g: Grid, x: number, color: Color, year: string) {
@@ -439,9 +450,25 @@ const MODELS: Record<string, (g: Grid) => void> = {
     centeredText(g, "+", 7, 1, 0xd8c8f0);
     centeredText(g, "IVEY", 1, 1, WHITE);
   },
-  "poster-csa": g => poster(g, 15, 20, 0xb3202a, "CSA", 0xf6d23c, (p, x0) => { p.box(x0 + 5, 3, 1, 5, 5, 1, 0xf6d23c).box(x0 + 6, 8, 1, 3, 1, 1, 0x7a1219).box(x0 + 7, 2, 1, 1, 1, 1, 0xf6d23c); }),
-  "poster-wds": g => poster(g, 15, 20, 0x14161c, "WDS", 0x4ade80, (p, x0) => { p.text("<>", x0 + 4, 4, 1, 0x60a5fa); }),
-  "poster-wfn": g => poster(g, 15, 20, 0x1e3a8a, "WFN", WHITE, (p, x0) => { p.box(x0 + 6, 3, 1, 3, 6, 1, 0xe5e7eb).set(x0 + 7, 9, 1, 0xe5e7eb).set(x0 + 7, 6, 1, 0x60a5fa).box(x0 + 5, 3, 1, 1, 2, 1, 0xf97316).box(x0 + 9, 3, 1, 1, 2, 1, 0xf97316).set(x0 + 7, 2, 1, 0xfbbf24); }),
+  "poster-csa": g => badge(g, 19, 0xc0473a, 0xe5e7eb, pen => {
+    [[-1, 7, -6, -3], [-6, -3, 0, -3], [0, -3, 2, 1], [-1, 7, 2, 1], [2, 1, -2, -7], [4, 1, 2, -3], [2, -3, 6, -3], [6, -3, 4, 1]]
+      .forEach(([x0, y0, x1, y1]) => line(pen, x0, y0, x1, y1, 0xfafafa));
+  }),
+  "poster-wds": g => badge(g, 21, 0xfafafa, 0xd1d5db, pen => {
+    const navy = 0x1b2a4e, t = new Grid();
+    t.text("WDS", -6, -2, 0, navy);
+    t.forEach((x, y, _z, color) => pen(x, y, color));
+    line(pen, -9, 0, -8, 1, navy); line(pen, -9, 0, -8, -1, navy); line(pen, 9, 0, 8, 1, navy); line(pen, 9, 0, 8, -1, navy);
+    line(pen, -3, -3, -1, 3, navy);
+  }),
+  "poster-wfn": g => badge(g, 19, 0x262626, 0x3f3f46, pen => {
+    let x = -7;
+    ["W", "F", "N"].forEach((char, i) => {
+      const t = new Grid(), w = t.text(char, x, -2, 0, [0xc86aa6, 0xd98c96, 0xe3ad7e][i]);
+      t.forEach((px, py, _z, color) => pen(px, py, color));
+      x += w + 1;
+    });
+  }),
   "jellycat-frog": g => {
     g.box(-3, 0, -3, 6, 4, 5, 0x6fbf5a).box(-2, 0, 2, 4, 3, 1, 0xcfe8a8);
     g.box(-3, 4, -2, 2, 2, 2, 0x6fbf5a).box(1, 4, -2, 2, 2, 2, 0x6fbf5a).set(-2, 5, 0, BLACK).set(2, 5, 0, BLACK).set(-3, 5, 0, WHITE).set(1, 5, 0, WHITE);

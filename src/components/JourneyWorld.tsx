@@ -150,7 +150,7 @@ export default function JourneyWorld(props: Props) {
 
     // State
     let chapter = 0, transition: (TransitionInfo & { t: number; switched: boolean }) | null = null;
-    const player = { x: INTRO_END.x, z: INTRO_END.z, y: 0, yaw: Math.PI, vx: 0, vz: 0, phase: 0, moving: 0, age: 7 };
+    const player = { x: INTRO_END.x, z: INTRO_END.z, y: 0, yaw: Math.PI, vx: 0, vz: 0, spin: 0, phase: 0, moving: 0, age: 7 };
     let intro: { t: number } | null = motion.matches ? null : { t: 0 };
     const held = new Set<string>();
     const stick = { x: 0, y: 0 };
@@ -227,7 +227,7 @@ export default function JourneyWorld(props: Props) {
       if (amount <= 0) return;
       const image = ctx.createImageData(cover.width, cover.height);
       for (let j = 0; j < cover.height; j++) for (let i = 0; i < cover.width; i++) {
-        const threshold = hash3(i, j, 41) * 0.18 + ((i / cover.width) + (j / cover.height)) / 2 * 0.82;
+        const threshold = hash3(i, j, 41) * 0.18 + ((i / cover.width) + ((cover.height - 1 - j) / cover.height)) / 2 * 0.82;
         const k = (j * cover.width + i) * 4;
         const covered = revealing ? threshold >= 1 - amount : threshold < amount * 1.0001;
         if (covered) { image.data[k] = 11; image.data[k + 1] = 11; image.data[k + 2] = 14; image.data[k + 3] = 255; }
@@ -384,13 +384,14 @@ export default function JourneyWorld(props: Props) {
         let move = (held.has("up") ? 1 : 0) - (held.has("down") ? 1 : 0) - stick.y;
         if (transition || blockedNow) { turn = 0; move = 0; }
         turn = Math.max(-1, Math.min(1, turn)); move = Math.max(-1, Math.min(1, move));
-        player.yaw -= turn * TURN_SPEED * dt;
+        player.spin += (turn * TURN_SPEED - player.spin) * (1 - Math.exp(-dt * 10));
+        player.yaw -= player.spin * dt;
         const height = parts?.height ?? 20, speed = walkSpeed(height) * (move < 0 ? 0.65 : 1);
         if (Math.abs(move) > 0.05 || Math.abs(turn) > 0.05) { if (!moved) { moved = true; live.current.onMove(); } }
         if (Math.abs(move) > 0.05) {
           const blend = 1 - Math.exp(-dt * 14), fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
           player.vx += (fx * move * speed - player.vx) * blend; player.vz += (fz * move * speed - player.vz) * blend;
-        } else { player.vx = 0; player.vz = 0; }
+        } else { const stop = Math.exp(-dt * 18); player.vx *= stop; player.vz *= stop; }
         speedNow = Math.max(Math.hypot(player.vx, player.vz) / speed, Math.abs(turn) * 0.35);
         if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
         if (Math.hypot(player.vx, player.vz) > 0.02) {
@@ -406,8 +407,7 @@ export default function JourneyWorld(props: Props) {
           if (age !== player.age) { player.age = age; setAvatar(age, current.outfit); }
         }
         cameraGoal(goalPos, goalLook);
-        const follow = 1 - Math.exp(-dt * 9);
-        camPos.lerp(goalPos, follow); camLook.lerp(goalLook, follow);
+        camPos.lerp(goalPos, 1 - Math.exp(-dt * 7)); camLook.lerp(goalLook, 1 - Math.exp(-dt * 11));
         camera.position.copy(camPos); camera.lookAt(camLook);
       }
 
@@ -420,7 +420,7 @@ export default function JourneyWorld(props: Props) {
         }
         const t = transition.t;
         const total = COVER + HOLD + REVEAL;
-        drawCover(reduced ? 0 : t < COVER ? t / COVER : t < COVER + HOLD ? 1 : 1 - (t - COVER - HOLD) / REVEAL, t >= COVER + HOLD);
+        drawCover(reduced ? 0 : t < COVER ? smooth(t / COVER) : t < COVER + HOLD ? 1 : 1 - smooth((t - COVER - HOLD) / REVEAL), t >= COVER + HOLD);
         if (t >= total) finishTransition();
       }
 

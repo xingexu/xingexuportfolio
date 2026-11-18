@@ -196,7 +196,7 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
   }
 
   function waitForRoom() {
-    if (document.querySelector('.about-field[data-ready="true"]')) return Promise.resolve(true);
+    if (document.querySelector('.about-field[data-ready="true"], .journey-stage[data-ready="true"]')) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
       const done = (ready: boolean) => {
         clearTimeout(timeout);
@@ -220,13 +220,16 @@ export function createRoomTransition(canvas: HTMLCanvasElement) {
     const ready = await waitForRoom();
     if (current !== generation) return;
     if (!ready) { clear(); return; }
-    const field = document.querySelector<HTMLCanvasElement>(".about-field");
-    if (!field) { clear(); return; }
-    const bounds = field.getBoundingClientRect();
     const { width, height } = canvas;
-    const scale = bounds.width / field.width;
-    const cx = (bounds.left + (Number(field.dataset.screenX) + Number(field.dataset.screenWidth) / 2) * scale) / ROOM_CELL;
-    const cy = (bounds.top + (Number(field.dataset.screenY) + Number(field.dataset.screenHeight) / 2) * scale) / ROOM_CELL;
+    // Ink opens from the field's focal screen when it reports one, otherwise from the centre.
+    const field = document.querySelector<HTMLCanvasElement>(".about-field");
+    let cx = width / 2, cy = height / 2;
+    if (field?.dataset.screenX) {
+      const bounds = field.getBoundingClientRect();
+      const scale = bounds.width / field.width;
+      cx = (bounds.left + (Number(field.dataset.screenX) + Number(field.dataset.screenWidth) / 2) * scale) / ROOM_CELL;
+      cy = (bounds.top + (Number(field.dataset.screenY) + Number(field.dataset.screenHeight) / 2) * scale) / ROOM_CELL;
+    }
     const thresholds = inkSplotches(width, height, cx, cy);
     const mask = ctx.createImageData(width, height);
     const pixels = mask.data;

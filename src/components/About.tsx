@@ -1,50 +1,79 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import { LIFE_STORIES, type LifeChapter, type LifeStory } from "@/lib/life-stories";
-import { AIRPORT_PLACES, START, type Direction } from "@/lib/life-world";
-import { emptyAirportProgress, getAirportGuide, type AirportGuide } from "@/lib/airport-guide";
-import { HOME_START } from "@/lib/home-world";
-import { ROOM_OBJECTS, roomObjectById } from "@/lib/room-objects";
-import RoomObjectView from "./RoomObjectView";
-import LifeWorld, { type WorldControls } from "./LifeWorld";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { CHAPTERS, ageLabel, itemById, type JourneyItem, type JourneyLink } from "@/lib/journey/data";
+import { LINKS } from "@/app/data";
+import JourneyWorld, { type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
+import ObjectPreview from "./ObjectPreview";
 import { TransitionLink } from "./PageTransitions";
 
-const DIRECTIONS: { direction: Direction; symbol: string }[] = [
-  { direction: "up", symbol: "↑" }, { direction: "left", symbol: "←" },
-  { direction: "down", symbol: "↓" }, { direction: "right", symbol: "→" },
+type Opened = { kind: "item"; id: string } | { kind: "index" } | { kind: "finale" } | null;
+
+const FINAL_LINKS: JourneyLink[] = [
+  { href: "/projects", label: "Projects" },
+  { href: "/resume", label: "Resume" },
+  { href: LINKS.github, label: "GitHub" },
+  { href: LINKS.linkedin, label: "LinkedIn" },
+  { href: LINKS.email, label: "Email me" },
 ];
 
+function StoryLink({ link }: { link: JourneyLink }) {
+  return link.href.startsWith("/")
+    ? <TransitionLink href={link.href} className="journey-link">{link.label}<span aria-hidden="true">↗</span></TransitionLink>
+    : <a href={link.href} target="_blank" rel="noopener noreferrer" className="journey-link">{link.label}<span aria-hidden="true">↗</span><span className="sr-only"> (opens in a new tab)</span></a>;
+}
+
+function Joystick({ controls }: { controls: React.RefObject<JourneyControls | null> }) {
+  const knob = useRef<HTMLSpanElement>(null);
+  const origin = useRef<{ x: number; y: number; id: number } | null>(null);
+  const move = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!origin.current || origin.current.id !== event.pointerId) return;
+    const rect = event.currentTarget.getBoundingClientRect(), radius = rect.width / 2;
+    let dx = event.clientX - (rect.left + radius), dy = event.clientY - (rect.top + radius);
+    const distance = Math.hypot(dx, dy), max = radius - 18;
+    if (distance > max) { dx = dx / distance * max; dy = dy / distance * max; }
+    if (knob.current) knob.current.style.transform = `translate(${Math.round(dx)}px, ${Math.round(dy)}px)`;
+    controls.current?.setStick(dx / max, dy / max);
+  };
+  const end = () => {
+    origin.current = null;
+    if (knob.current) knob.current.style.transform = "";
+    controls.current?.setStick(0, 0);
+  };
+  return (
+    <div className="journey-joystick" aria-hidden="true"
+      onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); origin.current = { x: event.clientX, y: event.clientY, id: event.pointerId }; move(event); }}
+      onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}>
+      <span ref={knob} />
+    </div>
+  );
+}
+
 export default function About() {
-  const [nearby, setNearby] = useState<string | null>(null);
-  const [place, setPlace] = useState("apron");
-  const [opened, setOpened] = useState<string | "map" | null>(null);
-  const [visited, setVisited] = useState<Set<string>>(() => new Set());
-  const [paused, setPaused] = useState(false);
-  const [moved, setMoved] = useState(false);
-  const [chapter, setChapter] = useState<LifeChapter>("airport");
-  const [travelling, setTravelling] = useState<LifeChapter | null>(null);
-  const [guide, setGuide] = useState<AirportGuide>(() => getAirportGuide(START, emptyAirportProgress(), false));
-  const viewedObjects = ROOM_OBJECTS.filter(object => visited.has(object.id)).length;
-  const objectIndex = ROOM_OBJECTS.findIndex(object => object.id === opened);
-  const controls = useRef<WorldControls | null>(null);
+  const controls = useRef<JourneyControls | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
-  const atHome = chapter === "holsworthy", chapterNumber = atHome ? "02" : "01";
-  const homeNames: Record<string, string> = { "home-door": "My room · 18 Holsworthy", "home-lego": "LEGO sets & Star Wars", "home-computer": "One more game of agar.io", "home-chess": "Where I learned chess" };
-  const locationName = atHome ? homeNames[place] ?? "18 Holsworthy" : (AIRPORT_PLACES.find((area) => area.id === place) ?? AIRPORT_PLACES[0]).name;
-  const near = LIFE_STORIES.find((story) => story.id === nearby);
-  const story = LIFE_STORIES.find((item) => item.id === opened);
+  const [status, setStatus] = useState<JourneyStatus>({ chapter: 0, age: 7, nearby: [] });
+  const [opened, setOpened] = useState<Opened>(null);
+  const [visited, setVisited] = useState<Set<string>>(() => new Set());
+  const [transition, setTransition] = useState<TransitionInfo | null>(null);
+  const [intro, setIntro] = useState(false);
+  const [moved, setMoved] = useState(false);
+  const chapter = CHAPTERS[status.chapter];
+  const nearbyList = status.nearby.map(id => itemById(id)).filter((entry): entry is NonNullable<typeof entry> => !!entry);
+  const near = nearbyList[0] ?? null;
+  const found = chapter.items.filter(item => visited.has(item.id)).length;
+  const item = opened?.kind === "item" ? itemById(opened.id) : null;
 
-  const readStory = useCallback((id: string) => {
-    setOpened(id);
-    setVisited((previous) => previous.has(id) ? previous : new Set([...previous, id]));
+  const openItem = useCallback((id: string) => {
+    setOpened({ kind: "item", id });
+    setVisited(previous => previous.has(id) ? previous : new Set([...previous, id]));
   }, []);
-  const openMap = useCallback(() => setOpened("map"), []);
-  const updateLocation = useCallback((id: string, nearId: string | null) => { setPlace(id); setNearby(nearId); }, []);
-  const didMove = useCallback(() => setMoved(true), []);
-  const close = () => { setOpened(null); controls.current?.focus(); };
+  const openIndex = useCallback(() => setOpened({ kind: "index" }), []);
+  const close = useCallback(() => setOpened(null), []);
+  const onFinale = useCallback(() => setOpened({ kind: "finale" }), []);
+  const onMove = useCallback(() => setMoved(true), []);
+  const goTo = (index: number) => { setOpened(null); controls.current?.goTo(index); };
 
   useEffect(() => {
     const element = dialog.current;
@@ -59,122 +88,175 @@ export default function About() {
     }
   }, [opened]);
 
-  const directionButton = ({ direction, symbol }: typeof DIRECTIONS[number]) => (
-    <button key={direction} type="button" className={`world-direction world-direction-${direction}`} aria-label={`Walk ${direction}`}
-      onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); controls.current?.input(direction, true); }}
-      onPointerUp={() => controls.current?.input(direction, false)}
-      onPointerCancel={() => controls.current?.input(direction, false)}
-      onLostPointerCapture={() => controls.current?.input(direction, false)}
-      onKeyDown={(event) => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); controls.current?.input(direction, true); } }}
-      onKeyUp={(event) => { if (event.key === " " || event.key === "Enter") controls.current?.input(direction, false); }}
-      onBlur={() => controls.current?.input(direction, false)}>{symbol}</button>
-  );
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (opened || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.toLowerCase() === "m") { event.preventDefault(); openIndex(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [opened, openIndex]);
+
+  const skipping = intro || !!transition;
+  const next = CHAPTERS[status.chapter + 1];
+  const target = transition ? CHAPTERS[transition.to] : null;
+  const chapterItems = item ? CHAPTERS[(item as JourneyItem & { chapter: number }).chapter].items : [];
+  const itemIndex = item ? chapterItems.findIndex(entry => entry.id === item.id) : -1;
 
   return (
-    <section className="about-page world-page" aria-label="Xinge’s playable world" data-chapter={chapter} data-travelling={!!travelling}>
-      <h1 className="sr-only">ZINGER — a walk through my world</h1>
-      <LifeWorld controls={controls} blocked={opened !== null} paused={paused} visited={visited}
-        onLocation={updateLocation} onInteract={readStory} onMap={openMap} onMove={didMove} onGuide={setGuide} onChapter={setChapter} onTransition={setTravelling} />
-      <div className="world-topline">
-        <TransitionLink href="/" className="world-exit" aria-label="Return to home">↖</TransitionLink>
-        <div className="world-title"><span>ZINGER</span><p>age 6 · {atHome ? "Markham, Ontario" : "Canada"}</p></div>
-        <button type="button" className="world-index" onClick={openMap} aria-label={atHome ? "Chapter two — open room map" : "Chapter one — open airport map"}>
-          <span>{chapterNumber}</span><small>{atHome ? "MY ROOM" : "ARRIVAL"}</small>
-        </button>
-      </div>
-      <div className="world-location" aria-live="polite" aria-atomic="true">
-        <span>{chapterNumber} <i>—</i></span><h2>{locationName}</h2>
-      </div>
-      {!moved && <div className="world-welcome"><p><em>Welcome to Canada.</em></p></div>}
-      <div className="world-interact">
-        <div className="world-guide" id="world-next-step" role="status" aria-live="polite" aria-atomic="true">
-          <span className="world-guide-arrow" aria-hidden="true">{guide.arrow}</span>
-          <div><small>{atHome ? `ROOM · ${viewedObjects} / ${ROOM_OBJECTS.length} VIEWED` : `NEXT · ${guide.step} / ${guide.total ?? 5}`}</small><strong>{guide.title}</strong>
-            <p className="world-guide-desktop">{guide.hint}</p><p className="world-guide-touch">{guide.touchHint}</p></div>
-        </div>
-        {near && <button type="button" className="world-read-memory" onClick={() => readStory(near.id)}><kbd>E</kbd><span>{near.viewLabel ? `View ${near.viewLabel}` : visited.has(near.id) ? "Revisit memory" : "Read memory"}</span><span aria-hidden="true">↗</span></button>}
-        {guide.id.endsWith("complete") && !near && <TransitionLink href="/" className="world-guide-home">Return to portfolio <span aria-hidden="true">↖</span></TransitionLink>}
-      </div>
-      <div className="world-bottomline">
-        <div className="world-controls">
-          <p id="world-instructions" className="world-keyboard-help"><span className="world-keys"><kbd>W</kbd><span><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></span><span>move<br /><small>or arrow keys</small></span><span className="world-key-action"><kbd>E</kbd> explore <kbd>M</kbd> map</span></p>
-          <div className="world-touch" aria-label="Movement controls">{DIRECTIONS.map(directionButton)}</div>
-          <button type="button" className="world-pause" aria-label={paused ? "Resume ambient animation" : "Pause ambient animation"} aria-pressed={paused} onClick={() => { setPaused((p) => !p); controls.current?.focus(); }}>{paused ? "▷" : "Ⅱ"}</button>
-        </div>
-        <button type="button" className="world-map-toggle" onClick={openMap} aria-label={atHome ? "Open room map" : "Open airport map"}>
-          {atHome ? <HomeMap live guide={guide} /> : <AirportMap live guide={guide} />}
-          <span>{atHome ? "Room map" : "Airport map"} <span aria-hidden="true">↗</span></span>
-        </button>
-      </div>
-      <dialog ref={dialog} className="world-dialog" data-object={objectIndex >= 0} aria-labelledby="world-dialog-title" onCancel={(event) => { event.preventDefault(); close(); }} onClick={(event) => { if (event.target === event.currentTarget) { const r = event.currentTarget.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); } }}>
-        <button ref={closeButton} type="button" className="world-dialog-close" onClick={close} aria-label="Back to walking">×</button>
-        {opened === "map" ? <>
-          <p className="world-eyebrow">Chapter {chapterNumber} · Age six · {atHome ? "Markham, Ontario" : "Canada"}</p><h2 id="world-dialog-title">{atHome ? "18 Holsworthy." : "A whole new place."}</h2>
-          {atHome ? <HomeMap guide={guide} /> : <AirportMap guide={guide} />}
-          <p className="world-map-legend"><span>■ You are here</span><span>□ Next stop</span></p>
-          <p className="world-map-next"><strong>{guide.title}</strong> {guide.hint}</p>
-          <p className="world-dialog-intro">{atHome ? "You’re inside my room at 18 Holsworthy. Click or tap any object for a closer look, or walk up and press E. You can also choose any of the 8 objects below. The doorway leads back to the airport." : "Walk down the plane stairs, follow the yellow path right, then head up to the nearby terminal doors. They take you straight into my childhood room — no airport detour."}</p>
-          <div className={`world-story-list ${atHome ? "room-object-list" : ""}`}>{LIFE_STORIES.filter(item => (item.chapter ?? "airport") === chapter).map((item,index) => <button type="button" key={item.id} onClick={() => readStory(item.id)} aria-label={item.viewLabel ? `View ${item.viewLabel}` : undefined}><span>{atHome ? String(index+1).padStart(2,"0") : item.number}</span><span><strong>{item.viewLabel ?? item.place}</strong><small>{item.viewLabel ? (visited.has(item.id) ? "Viewed · view again" : "View object ↗") : item.title}</small></span><span aria-label={visited.has(item.id) ? "Viewed" : "Not viewed"}>{visited.has(item.id) ? "◆" : "◇"}</span></button>)}</div>
-        </> : story ? <StoryContent story={story} paused={paused} /> : <h2 id="world-dialog-title" className="sr-only">Stories</h2>}
-        {objectIndex >= 0 && <nav className="room-object-nav" aria-label="Room object browser">
-          <button type="button" onClick={() => readStory(ROOM_OBJECTS[(objectIndex+ROOM_OBJECTS.length-1)%ROOM_OBJECTS.length].id)} aria-label={`View previous object: ${ROOM_OBJECTS[(objectIndex+ROOM_OBJECTS.length-1)%ROOM_OBJECTS.length].label}`}>← Previous</button>
-          <span>{String(objectIndex+1).padStart(2,"0")} / {String(ROOM_OBJECTS.length).padStart(2,"0")}</span>
-          <button type="button" onClick={() => readStory(ROOM_OBJECTS[(objectIndex+1)%ROOM_OBJECTS.length].id)} aria-label={`View next object: ${ROOM_OBJECTS[(objectIndex+1)%ROOM_OBJECTS.length].label}`}>Next →</button>
-        </nav>}
+    <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={chapter.id}>
+      <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
+      <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
+        onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} />
 
-        {story && !story.objectId && <p className="world-memory-next">{guide.id.endsWith("complete") ? "Keep exploring my room, or return to the airport through the doorway." : `Next: ${guide.title}`}</p>}
-        {opened && <button type="button" className="world-continue" onClick={close}>Keep walking <span aria-hidden="true">→</span></button>}
+      <header className="journey-top">
+        <TransitionLink href="/" className="journey-exit" aria-label="Return to home">↖</TransitionLink>
+        <div className="journey-title">
+          <span>ZINGER</span>
+          <p aria-live="polite">Age {status.age} · {chapter.location}</p>
+        </div>
+        <nav className="journey-chapters" aria-label="Jump to a chapter">
+          {CHAPTERS.map((entry, index) => (
+            <button key={entry.id} type="button" aria-current={index === status.chapter ? "step" : undefined} onClick={() => goTo(index)}
+              aria-label={`Chapter ${entry.number}: ${entry.place}, age ${ageLabel(entry)}`} title={`${entry.place} · age ${ageLabel(entry)}`}>
+              <span>{entry.number}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="journey-actions">
+          <button type="button" className="journey-skip" onClick={() => skipping ? controls.current?.skip() : openIndex()}>
+            {intro ? "Skip intro" : transition ? "Skip" : "Skip the walk"} <span aria-hidden="true">▸▸</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="journey-chapter" aria-live="polite" aria-atomic="true">
+        <small>CHAPTER {chapter.number} <i>—</i> AGE {ageLabel(chapter)}</small>
+        <h2>{chapter.place}</h2>
+        <p>{chapter.outfitLabel}</p>
+      </div>
+
+      {intro && (
+        <div className="journey-intro" role="status">
+          <small>CHAPTER 01 · AGE 7</small>
+          <strong>Welcome to Canada.</strong>
+          <span>Skip anytime with <kbd>Esc</kbd> or the Skip intro button.</span>
+        </div>
+      )}
+
+      {target && transition && (
+        <button type="button" className="journey-card" onClick={() => controls.current?.skip()} key={transition.to}>
+          <small>CHAPTER {target.number} · AGE {ageLabel(target)}</small>
+          <strong>{target.place}</strong>
+          <span>{target.heading}</span>
+          <em>Now wearing: {target.outfitLabel}</em>
+          <span className="journey-card-skip">Tap or press Esc to skip</span>
+        </button>
+      )}
+
+      <div className="journey-prompt">
+        {near ? (
+          <div className="journey-prompt-group">
+            <button type="button" onClick={() => openItem(near.id)}>
+              <kbd>E</kbd><span>Look at <strong>{near.label}</strong></span><span aria-hidden="true">↗</span>
+            </button>
+            {nearbyList.slice(1).map(other => (
+              <button type="button" key={other.id} className="journey-prompt-more" onClick={() => openItem(other.id)}>
+                <span>{other.label}</span><span aria-hidden="true">↗</span>
+              </button>
+            ))}
+          </div>
+        ) : !skipping && (
+          <p className="journey-hint">
+            {!moved ? <>Walk forward <span aria-hidden="true">↑</span> · everything that sparkles can be opened</> : next ? <>Keep walking forward to <strong>{next.place}</strong></> : <>Walk through the last door to see what’s next</>}
+          </p>
+        )}
+      </div>
+
+      <footer className="journey-bottom">
+        <p id="journey-help" className="journey-keys">
+          <span className="journey-keycaps"><kbd>W</kbd><span><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span></span>
+          <span>walk<br /><small>or arrow keys</small></span>
+          <span className="journey-key-action"><kbd>E</kbd> look <kbd>M</kbd> index <kbd>Esc</kbd> skip</span>
+        </p>
+        <Joystick controls={controls} />
+        <button type="button" className="journey-found" onClick={openIndex}>
+          <strong>{found} / {chapter.items.length}</strong>
+          <span>found here · index <span aria-hidden="true">↗</span></span>
+        </button>
+      </footer>
+
+      <dialog ref={dialog} className="journey-dialog" aria-labelledby="journey-dialog-title"
+        onCancel={(event) => { event.preventDefault(); close(); }}
+        onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
+        <button ref={closeButton} type="button" className="journey-dialog-close" onClick={close} aria-label="Close and keep walking">×</button>
+        {item && (() => {
+          const home = CHAPTERS[(item as JourneyItem & { chapter: number }).chapter];
+          return <>
+            <p className="journey-eyebrow">Chapter {home.number} · {home.place} · Age {ageLabel(home)}</p>
+            <h2 id="journey-dialog-title">{item.title}</h2>
+            <ObjectPreview model={item.model} label={item.label} />
+            <p className="journey-copy">{item.description}</p>
+            {item.links && <div className="journey-links">{item.links.map(link => <StoryLink key={link.href} link={link} />)}</div>}
+            <nav className="journey-item-nav" aria-label={`More from ${home.place}`}>
+              <button type="button" onClick={() => openItem(chapterItems[(itemIndex + chapterItems.length - 1) % chapterItems.length].id)}>← Previous</button>
+              <span>{String(itemIndex + 1).padStart(2, "0")} / {String(chapterItems.length).padStart(2, "0")}</span>
+              <button type="button" onClick={() => openItem(chapterItems[(itemIndex + 1) % chapterItems.length].id)}>Next →</button>
+            </nav>
+          </>;
+        })()}
+        {opened?.kind === "index" && <>
+          <p className="journey-eyebrow">Skip the walk · everything at a glance</p>
+          <h2 id="journey-dialog-title">Age 7 to 18, in six rooms.</h2>
+          <p className="journey-intro-copy">Jump to any chapter, or open anything below. Nothing here needs the game.</p>
+          <ol className="journey-index">
+            {CHAPTERS.map((entry, index) => (
+              <li key={entry.id}>
+                <div className="journey-index-head">
+                  <span>{entry.number}</span>
+                  <div><strong>{entry.place}</strong><small>Age {ageLabel(entry)} · {entry.location}</small></div>
+                  <button type="button" onClick={() => goTo(index)}>{index === status.chapter ? "Here now" : "Go"} <span aria-hidden="true">→</span></button>
+                </div>
+                <p>{entry.intro}</p>
+                <ul>
+                  {entry.items.map(entryItem => (
+                    <li key={entryItem.id}>
+                      <button type="button" onClick={() => openItem(entryItem.id)}>
+                        <span aria-label={visited.has(entryItem.id) ? "Seen" : "Not seen yet"}>{visited.has(entryItem.id) ? "◆" : "◇"}</span>
+                        {entryItem.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+          <div className="journey-links">{FINAL_LINKS.map(link => <StoryLink key={link.href} link={link} />)}</div>
+        </>}
+        {opened?.kind === "finale" && <>
+          <p className="journey-eyebrow">Age 18 · today</p>
+          <h2 id="journey-dialog-title">That’s me, so far.</h2>
+          <p className="journey-copy">From stepping off a plane at seven to Computer Science and Ivey at Western. The next chapter is still being written. If you’re hiring software engineers, I’d love to talk.</p>
+          <div className="journey-links">{FINAL_LINKS.map(link => <StoryLink key={link.href} link={link} />)}</div>
+          <div className="journey-finale-actions">
+            <button type="button" onClick={() => goTo(0)}>Walk it again from age 7</button>
+            <button type="button" onClick={close}>Stay in O-Hall</button>
+          </div>
+        </>}
+        {opened && opened.kind !== "finale" && <button type="button" className="journey-continue" onClick={close}>Keep walking <span aria-hidden="true">→</span></button>}
       </dialog>
-      {travelling && <div className="world-chapter-transition" key={travelling} role="status"><small>CHAPTER {travelling === "holsworthy" ? "02" : "01"}</small><strong>{travelling === "holsworthy" ? "18 HOLSWORTHY" : "ARRIVING IN CANADA"}</strong><span>{travelling === "holsworthy" ? "My room · Markham, Ontario" : "Back where the walk began"}</span></div>}
-      <noscript><div className="world-nojs"><h2>Six years old. A new country.</h2><p>I came to Canada when I was six. Enable JavaScript to walk off the plane and explore the airport in this first chapter of my life.</p><TransitionLink href="/">Return home</TransitionLink></div></noscript>
+
+      <noscript>
+        <div className="journey-nojs">
+          <h2>Age 7 to 18, in six rooms.</h2>
+          {CHAPTERS.map(entry => (
+            <section key={entry.id}>
+              <h3>{entry.number} · {entry.place} · age {ageLabel(entry)}</h3>
+              <ul>{entry.items.map(entryItem => <li key={entryItem.id}><strong>{entryItem.label}:</strong> {entryItem.description} {entryItem.links?.map(link => <a key={link.href} href={link.href}> {link.label}</a>)}</li>)}</ul>
+            </section>
+          ))}
+        </div>
+      </noscript>
     </section>
   );
-}
-
-function HomeMap({ live = false, guide }: { live?: boolean; guide: AirportGuide }) {
-  return <svg viewBox="80 160 680 400" aria-hidden="true" className={live ? "world-minimap" : "world-airport-plan"}>
-    <rect x="80" y="160" width="680" height="400" fill="#29383e" />
-    <rect x="100" y="180" width="640" height="355" fill="#b78c62" stroke="#546e70" strokeWidth="10" />
-    <rect x="108" y="180" width="624" height="120" fill="#7d9b9b" />
-    <rect x="118" y="305" width="110" height="155" fill="#698e9b" /><rect x="124" y="315" width="98" height="29" fill="#ded3af" />
-    <rect x="237" y="453" width="39" height="31" fill="#c69a59" /><rect x="234" y="378" width="42" height="42" fill="#7a986d" />
-    <rect x="312" y="336" width="116" height="110" fill="#876241" />
-    {Array.from({length:64},(_,i)=><rect key={i} x={322+i%8*12} y={340+Math.floor(i/8)*12} width="12" height="12" fill={(i%8+Math.floor(i/8))%2 ? "#687b65" : "#e5d5ad"} />)}
-    <rect x="526" y="310" width="171" height="74" fill="#c1a477" /><rect x="553" y="279" width="116" height="65" fill="#d5dfcf" stroke="#263944" strokeWidth="5" />
-    <rect x="584" y="403" width="40" height="35" fill="#568184" /><rect x="444" y="520" width="44" height="24" fill="#d9c5a0" />
-    {guide.target && <rect x={guide.target.x-18} y={guide.target.y-18} width="36" height="36" fill="none" stroke="#f7d06b" strokeWidth="7" />}
-    <rect data-world-map-player="" x={HOME_START.x-15} y={HOME_START.y-15} width="30" height="30" fill="#d8794d" stroke="#233e51" strokeWidth="7" />
-    {!live && <><text x="190" y="490" textAnchor="middle">LEGO</text><text x="370" y="322" textAnchor="middle">CHESS</text><text x="610" y="462" textAnchor="middle">AGAR.IO</text></>}
-  </svg>;
-}
-
-function AirportMap({ live = false, guide }: { live?: boolean; guide: AirportGuide }) {
-  return <svg viewBox="0 0 1280 800" aria-hidden="true" className={live ? "world-minimap" : "world-airport-plan"}>
-    <rect width="1280" height="800" fill="#6d8995" />
-    <rect x="50" y="65" width="1180" height="320" fill="#d6dccb" stroke="#365b70" strokeWidth="14" />
-    <rect x="605" y="355" width="90" height="40" fill="#d6dccb" />
-    <rect x="175" y="145" width="320" height="95" rx="20" fill="#66838a" />
-    <path d="M700 140h155m-155 65h155m195-10h105" stroke="#487b8e" strokeWidth="25" />
-    <path d="M365 628H650V390" fill="none" stroke="#f4d47e" strokeWidth="14" />
-    <path d="M89 505L114 488H372L426 514L396 535H119Z M214 495L176 424H205L289 496 M230 524L166 593L202 601L296 528" fill="#ecedda" />
-    <rect x="311" y="536" width="38" height="65" fill="#ccd4ca" />
-    {guide.target && <rect x={guide.target.x - 25} y={guide.target.y - 25} width="50" height="50" fill="none" stroke="#f7d06b" strokeWidth="12" />}
-    <rect data-world-map-player="" x={START.x - 15} y={START.y - 15} width="30" height="30" fill="#d8794d" stroke="#233e51" strokeWidth="7" />
-    {!live && <>
-      <text x="335" y="290" textAnchor="middle">BAGGAGE</text><text x="960" y="300" textAnchor="middle">ARRIVALS</text><text x="290" y="675" textAnchor="middle">YOUR PLANE</text>
-    </>}
-  </svg>;
-}
-
-function StoryContent({ story, paused }: { story: LifeStory; paused: boolean }) {
-  const object = story.objectId ? roomObjectById(story.objectId) : null;
-  return <>
-    <p className="world-eyebrow">{object ? "OBJECT VIEW" : story.number} / {story.place}</p>
-    <h2 id="world-dialog-title">{story.title}</h2>
-    {object && <RoomObjectView object={object} paused={paused} />}
-    <p className="world-story-copy">{story.description}</p>
-    {story.photos.length > 0 && <div className="world-memory-photos">{story.photos.map((photo) => <figure key={photo.src}><Image src={photo.src} alt={photo.alt} width={900} height={600} sizes="(max-width: 640px) 85vw, 540px" /><figcaption>{photo.caption}</figcaption></figure>)}</div>}
-    {story.link && (story.link.href.startsWith("/") ? <TransitionLink href={story.link.href} className="world-story-link">{story.link.label}<span aria-hidden="true">↗</span></TransitionLink> : <a href={story.link.href} target="_blank" rel="noopener noreferrer" className="world-story-link">{story.link.label}<span aria-hidden="true">↗</span><span className="sr-only"> (opens in a new tab)</span></a>)}
-    {!object && <p className="world-story-end">A little piece of my world.</p>}
-  </>;
 }

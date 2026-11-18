@@ -1,4 +1,5 @@
 import { Grid, hash3, shade, textWidth, type Color } from "./voxel";
+import { LOGOS, type PixelLogo } from "./logos";
 
 /* Every prop is authored facing +z with y = 0 on the floor. */
 type Painter = (i: number, j: number) => Color | null;
@@ -117,21 +118,6 @@ function books(g: Grid, x0: number, y: number, z: number, count: number, seed: n
   }
 }
 
-function trophy(g: Grid, metal: Color, label: string, year: string) {
-  g.box(-8, 0, -4, 16, 12, 8, 0xeceae4).box(-8, 12, -4, 16, 1, 8, 0x2b2b2b);
-  panel(g, -7, 1, 4, 14, 10, () => 0x1e2a44);
-  centeredText(g, label, 6, 5, GOLD);
-  centeredText(g, year, 0, 5, 0xe8e8e8);
-  g.box(-3, 13, -2, 6, 2, 4, 0x3a2a1c).box(-1, 15, -1, 2, 3, 2, metal);
-  g.box(-3, 18, -3, 6, 1, 6, metal);
-  for (let y = 19; y < 24; y++) {
-    const r = y < 22 ? 3 : 4;
-    g.box(-r, y, -r, r * 2, 1, r * 2, (x, _y, z) => (Math.abs(x + 0.5) < r - 1 && Math.abs(z + 0.5) < r - 1 && y > 19) ? shade(metal, 0.7) : metal);
-  }
-  g.box(-6, 20, 0, 2, 1, 1, metal).box(-6, 21, 0, 1, 2, 1, metal).box(4, 20, 0, 2, 1, 1, metal).box(5, 21, 0, 1, 2, 1, metal);
-  g.set(-1, 21, 4, shade(metal, 1.3)).set(1, 22, 4, shade(metal, 1.3));
-}
-
 function poster(g: Grid, w: number, h: number, bg: Color, title: string, titleColor: Color, art: (g: Grid, x0: number) => void) {
   frame(g, w, h, 0xf5f5f0, () => bg);
   centeredText(g, title, h - 8, 1, titleColor);
@@ -194,6 +180,25 @@ function airstairs(g: Grid) {
 function suitcase(g: Grid, x: number, y: number, z: number, w: number, h: number, d: number, color: Color) {
   g.box(x, y, z, w, h, d, (i, j) => (i === x || i === x + w - 1) && j > y ? shade(color, 0.8) : color);
   g.box(x + Math.floor(w / 2) - 1, y + h, z + Math.floor(d / 2), 2, 1, 1, 0x222222);
+}
+
+
+/** A framed plaque showing a pixelized logo and its wordmark in the voxel font. */
+function plaque(g: Grid, logo: PixelLogo, cols: [number, number], rowCount: number, word: string, border: Color) {
+  const rows = logo.rows.slice(0, rowCount).map(row => row.slice(cols[0], cols[1]));
+  const lw = cols[1] - cols[0], w = Math.max(lw, textWidth(word)) + 4, h = rowCount + 10;
+  frame(g, w, h, border, () => logo.paper);
+  const x0 = -Math.floor(lw / 2);
+  rows.forEach((row, r) => [...row].forEach((c, i) => { if (c === "#") g.set(x0 + i, h - 3 - r, 1, logo.ink); }));
+  centeredText(g, word, 2, 1, logo.ink);
+}
+
+function tee(g: Grid, x: number, color: Color, year: string) {
+  g.box(x + 3, 0, 0, 7, 12, 1, color).box(x, 8, 0, 13, 4, 1, color).box(x, 6, 0, 3, 2, 1, color).box(x + 10, 6, 0, 3, 2, 1, color);
+  g.box(x + 5, 11, 0, 3, 1, 1, shade(color, 0.7));
+  g.text("JS", x + 3, 5, 1, 0xf2f2f2);
+  g.text(year, x + 3, 0, 1, 0x9fb8e8);
+  g.box(x + 6, 12, 0, 1, 2, 1, METAL).box(x + 2, 12, 0, 9, 1, 1, METAL);
 }
 
 const MODELS: Record<string, (g: Grid) => void> = {
@@ -295,14 +300,6 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.text("1+1=2", -9, 2, 1, 0xf6e27a);
     g.box(-10, 0, 0, 20, 1, 2, WOOD).set(-6, 1, 1, WHITE).set(2, 1, 1, 0xf6e27a);
   },
-  "certificate-beaver": g => {
-    frame(g, 21, 23, GOLD, () => 0xfbf6e6);
-    const beaver = ["..###..", ".#####.", "##.#.##", "#######", ".#####."];
-    beaver.forEach((row, r) => [...row].forEach((c, i) => { if (c === "#") g.set(-9 + i + 1, 19 - r, 1, 0x7b4a24); }));
-    g.text("BCC", 0, 15, 1, 0x7b4a24);
-    centeredText(g, "100%", 8, 1, 0xc0392b);
-    g.box(-2, 2, 1, 4, 4, 1, GOLD).box(-2, 1, 1, 1, 1, 1, 0xc0392b).box(1, 1, 1, 1, 1, 1, 0xc0392b);
-  },
   "pi-bench": g => {
     table(g, 22, 10, 10, 0x8b9096, METAL_DARK, -11, -5);
     for (const x of [-9, -3]) {
@@ -354,26 +351,6 @@ const MODELS: Record<string, (g: Grid) => void> = {
     for (const [x, z] of [[-12, 12], [10, 12], [-12, -12]]) g.box(x, 0, z, 2, 8, 2, BLACK).set(x, 0, z, GOLD);
     g.box(-1, 0, 14, 2, 7, 1, BLACK).box(-2, 0, 15, 4, 1, 1, GOLD);
     g.box(-6, 0, 20, 12, 5, 5, BLACK).box(-6, 5, 20, 12, 1, 5, 0x2a2a30);
-  },
-  "certificate-amc8": g => {
-    frame(g, 17, 21, 0x23477a, () => WHITE);
-    centeredText(g, "AMC", 13, 1, 0x23477a);
-    g.text("8", -3, 3, 1, 0xc8102e, 2);
-  },
-  "certificate-aime": g => {
-    frame(g, 21, 21, 0x7a1f2b, () => 0xfbf6e6);
-    centeredText(g, "AIME", 12, 1, 0x7a1f2b);
-    for (let i = 0; i < 11; i++) g.set(-5 + i, 9, 1, 0x9a9a9a);
-    g.box(-2, 3, 1, 4, 4, 1, GOLD).set(-1, 2, 1, 0x7a1f2b).set(1, 2, 1, 0x7a1f2b);
-  },
-  "certificate-waterloo": g => {
-    for (const [i, seal] of [[0, GOLD], [1, 0xb0b8c0], [2, 0xc08040]] as const) {
-      const x = -11 + i * 8;
-      g.box(x, 6, -1, 7, 10, 1, WOOD_DARK);
-      panel(g, x + 1, 7, 0, 5, 8, (a, b) => b === 1 ? 0x6b4fa0 : (b === 3 || b === 4) && a > 0 && a < 4 ? 0x9a9a9a : b === 6 && a === 2 ? seal : 0xfbf8ef);
-    }
-    g.box(-10, 0, -1, 21, 7, 1, 0x3e2c6e);
-    centeredText(g, "CEMC", 1, 0, 0xf6d23c);
   },
   "bookshelf-math": g => {
     shelfUnit(g, 18, 24, 6, [8, 16], WOOD);
@@ -431,14 +408,17 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.box(10, 5, 1, 5, 5, 1, 0xfde047).box(10, 2, 1, 5, 2, 1, 0xf9a8d4);
   },
   "fblc-banner": g => {
-    g.box(-12, 17, -1, 24, 1, 1, METAL_DARK);
-    panel(g, -11, 0, 0, 22, 17, (i, j) => j > 14 && (i + j) % 2 ? 0x16213f : (j === 16 && i % 3 === 0) ? -1 : 0x1e2f5c);
-    centeredText(g, "FBLC", 9, 1, GOLD);
-    for (let i = 0; i < 5; i++) g.set(-2 + i, 4 + (i === 2 ? 1 : 0), 1, GOLD);
-    g.box(-1, 2, 1, 3, 1, 1, GOLD);
+    g.box(-12, 21, -1, 24, 1, 1, METAL_DARK);
+    panel(g, -11, 0, 0, 22, 21, () => 0x232744);
+    LOGOS.fbla.rows.slice(0, 10).forEach((row, r) => [...row.slice(4, 18)].forEach((c, i) => { if (c === "#") g.set(-7 + i, 19 - r, 1, WHITE); }));
+    centeredText(g, "FBLC", 2, 1, GOLD);
   },
-  "trophy-bronze": g => trophy(g, 0xc07a3c, "3RD", "2024"),
-  "trophy-gold": g => trophy(g, 0xf2c230, "1ST", "2025"),
+  "plaque-fbla-bronze": g => plaque(g, LOGOS.fbla, [5, 18], 10, "FBLA", 0xc07a3c),
+  "plaque-fbla-gold": g => plaque(g, LOGOS.fbla, [5, 18], 10, "FBLA", 0xf2c230),
+  "plaque-cemc": g => plaque(g, LOGOS.cemc, [0, 17], 15, "CEMC", 0x3e2c6e),
+  "plaque-cemc-gold": g => plaque(g, LOGOS.cemc, [0, 17], 15, "CEMC", GOLD),
+  "plaque-maa": g => plaque(g, LOGOS.maa, [0, 13], 11, "MAA", 0x0b5cad),
+  "jane-street-tees": g => { g.box(-15, 14, 0, 30, 1, 1, METAL_DARK); tee(g, -14, 0x1d2b4f, "24"); tee(g, 1, 0x1d2b4f, "25"); },
   lockers: g => {
     for (let i = 0; i < 4; i++) {
       const x = -10 + i * 5;

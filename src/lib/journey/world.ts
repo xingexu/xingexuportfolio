@@ -6,9 +6,9 @@ export type Box = { minX: number; maxX: number; minZ: number; maxZ: number };
 export type Vec = { x: number; z: number };
 export const WALL = 2, WALL_HEIGHT = 38, DOOR_HALF = 7, DOOR_HEIGHT = 28, ENTRANCE = 28, INTERACT_RANGE = 7;
 
-/** Walkable interior; the open near edge (+z) is where the camera sits. */
+/** Walkable interior. Indoor rooms are closed on all four sides; the arrival apron is open behind you. */
 export function interior(chapter: Chapter): Box {
-  return { minX: -chapter.width / 2 + WALL, maxX: chapter.width / 2 - WALL, minZ: -chapter.depth / 2 + WALL, maxZ: chapter.depth / 2 };
+  return { minX: -chapter.width / 2 + WALL, maxX: chapter.width / 2 - WALL, minZ: -chapter.depth / 2 + WALL, maxZ: chapter.depth / 2 - (chapter.outdoor ? 0 : WALL) };
 }
 
 export function placementBox(p: Placement): Box {
@@ -50,7 +50,8 @@ export function blocked(index: number, x: number, z: number, r: number) {
   const chapter = CHAPTERS[index], room = interior(chapter);
   const inDoor = Math.abs(x) <= DOOR_HALF - r && z < room.minZ + r;
   if (!inDoor && (x < room.minX + r || x > room.maxX - r || z < room.minZ + r)) return true;
-  if (z > room.maxZ - (index === 0 ? r : 0)) return true;
+  const inBackDoor = index > 0 && Math.abs(x) <= DOOR_HALF - r;
+  if (!inBackDoor && z > room.maxZ - r) return true;
   return obstacles(index).some(box => hits(box, x, z, r));
 }
 
@@ -64,7 +65,7 @@ export function step(index: number, pos: Vec, dx: number, dz: number, r: number)
     if (!blocked(index, x, z + dz / sub, r)) z += dz / sub;
   }
   const chapter = CHAPTERS[index], room = interior(chapter);
-  const exit = z < room.minZ - 1 ? "next" : index > 0 && z > room.maxZ - 3 ? "prev" : null;
+  const exit = z < room.minZ - 1 ? "next" : index > 0 && z > room.maxZ + 1 ? "prev" : null;
   return { x, z, exit };
 }
 
@@ -147,13 +148,12 @@ function luminance(c: Color) { return ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255)
 export function buildRoomShell(index: number): Grid {
   const chapter = CHAPTERS[index], g = new Grid();
   const W = chapter.width, D = chapter.depth, x0 = -W / 2, z0 = -D / 2;
-  const extra = chapter.outdoor ? 36 : 0;
-  for (let x = x0 - extra; x < W / 2 + extra; x++) for (let z = z0; z < D / 2 + ENTRANCE; z++) {
-    g.set(x, -1, z, z >= D / 2 && !chapter.outdoor ? shade(floorColor(chapter, x, z), 0.55) : floorColor(chapter, x, z));
-  }
+  const extra = chapter.outdoor ? 60 : 0, zEnd = chapter.outdoor ? D / 2 + ENTRANCE + 40 : D / 2;
+  for (let x = x0 - extra; x < W / 2 + extra; x++) for (let z = z0; z < zEnd; z++) g.set(x, -1, z, floorColor(chapter, x, z));
+  const nearZ = D / 2 - WALL;
   if (index > 0) {
-    for (let x = -8; x < 8; x++) for (let z = D / 2 - 5; z < D / 2; z++) {
-      const arrow = Math.abs(x + 0.5) <= (z - (D / 2 - 5)) && x > -4 && x < 4;
+    for (let x = -8; x < 8; x++) for (let z = nearZ - 5; z < nearZ; z++) {
+      const arrow = Math.abs(x + 0.5) <= (z - (nearZ - 5)) && x > -4 && x < 4;
       g.set(x, 0, z, arrow ? 0xd8d8d8 : 0x2b2b30);
     }
   }
@@ -175,8 +175,17 @@ export function buildRoomShell(index: number): Grid {
   } else {
     g.box(x0, 0, z0, WALL, WALL_HEIGHT, D, wallColor).box(W / 2 - WALL, 0, z0, WALL, WALL_HEIGHT, D, wallColor);
     g.box(x0, 0, z0, W, WALL_HEIGHT, WALL, wallColor);
-    g.box(x0 + WALL, 0, z0 + WALL, 1, 2, D - WALL, chapter.trim).box(W / 2 - WALL - 1, 0, z0 + WALL, 1, 2, D - WALL, chapter.trim);
-    g.box(x0 + WALL, 0, z0 + WALL, W - WALL * 2, 2, 1, chapter.trim);
+    g.box(x0, 0, nearZ, W, WALL_HEIGHT, WALL, wallColor);
+    g.box(x0, WALL_HEIGHT, z0, W, 1, D, (x, _y, z) => (x + 512) % 12 === 0 || (z + 512) % 12 === 0 ? shade(chapter.trim, 0.95) : shade(chapter.wall, 1.08));
+    g.box(x0 + WALL, 0, z0 + WALL, 1, 2, D - WALL * 2, chapter.trim).box(W / 2 - WALL - 1, 0, z0 + WALL, 1, 2, D - WALL * 2, chapter.trim);
+    g.box(x0 + WALL, 0, z0 + WALL, W - WALL * 2, 2, 1, chapter.trim).box(x0 + WALL, 0, nearZ - 1, W - WALL * 2, 2, 1, chapter.trim);
+    if (index > 0) {
+      g.box(-DOOR_HALF, 0, nearZ - 1, DOOR_HALF * 2, DOOR_HEIGHT, WALL + 1, -1);
+      g.box(-DOOR_HALF, 0, D / 2 + 1, DOOR_HALF * 2, DOOR_HEIGHT, 1, 0x3a3a44);
+      g.box(-DOOR_HALF - 1, 0, nearZ - 1, 1, DOOR_HEIGHT + 1, WALL + 2, chapter.trim).box(DOOR_HALF, 0, nearZ - 1, 1, DOOR_HEIGHT + 1, WALL + 2, chapter.trim);
+      g.box(-DOOR_HALF - 1, DOOR_HEIGHT, nearZ - 1, DOOR_HALF * 2 + 2, 1, WALL + 2, chapter.trim);
+      for (let x = -DOOR_HALF; x < DOOR_HALF; x++) for (let z = nearZ; z < D / 2 + 2; z++) g.set(x, -1, z, 0x2b2b30);
+    }
   }
   // The doorway glows with the next chapter.
   g.box(-DOOR_HALF, 0, z0, DOOR_HALF * 2, DOOR_HEIGHT, WALL + 1, -1);

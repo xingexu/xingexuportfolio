@@ -165,8 +165,9 @@ export default function About() {
         {!moved && !near && !status.volley && <p className="journey-touch-note">Drag anywhere in the scene or use the joystick. Tap an object to inspect it.</p>}
       </>}
 
-      {!intro && !opened && !transition && (near || status.volley) && (
+      {!intro && !opened && !transition && (near || status.volley || status.roommate) && (
         <div className="journey-prompts">
+          {!near && !status.volley && status.roommate && <span className="journey-companion">{status.roommate}</span>}
           {near && <button type="button" className="journey-prompt" onClick={() => openItem(near.id)} aria-keyshortcuts="E">
             <kbd aria-hidden="true">E</kbd><span>{near.label}</span>
           </button>}
@@ -213,10 +214,10 @@ export default function About() {
             <p className="journey-eyebrow">{home.stop} · age {ageLabel(home)}</p>
             <h2 id="journey-dialog-title">{item.title}</h2>
             {item.video ? <video key={item.video.src} className="journey-video" src={item.video.src} poster={item.video.poster} controls playsInline preload="metadata" aria-label={item.video.label}>
-              <track kind="captions" src={item.video.captions} srcLang="en" label="English" />
+              {item.video.captions && <track kind="captions" src={item.video.captions} srcLang="en" label="English" />}
               <a href={item.video.src}>Watch {item.video.label}</a>
             </video> : <ObjectPreview model={item.model} label={item.label} />}
-            <p className="journey-copy">{item.description}</p>
+            {item.description && <p className="journey-copy">{item.description}</p>}
             {item.links && <div className="journey-links">{item.links.map(link => <StoryLink key={link.href} link={link} />)}</div>}
             {chapterItems.length > 1 && <nav className="journey-item-nav" aria-label={`More from ${home.place}`}>
               <button type="button" onClick={() => openItem(chapterItems[(itemIndex + chapterItems.length - 1) % chapterItems.length].id)} aria-label="Previous object">←</button>

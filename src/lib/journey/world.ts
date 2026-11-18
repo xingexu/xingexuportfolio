@@ -37,13 +37,20 @@ export function roomSide(room: Box, x: number, z: number, inset = 0): RoomSide |
   return null;
 }
 
-export function cutawaySides(room: Box, camera: Vec): Set<RoomSide> {
-  const sides = new Set<RoomSide>();
-  if (camera.x < room.minX) sides.add("left");
-  if (camera.x > room.maxX) sides.add("right");
-  if (camera.z < room.minZ) sides.add("front");
-  if (camera.z > room.maxZ) sides.add("back");
-  return sides;
+export function cutawayOpacity(room: Box, camera: Vec): Record<RoomSide, number> {
+  const fade = (gap: number) => {
+    const t = Math.max(0, Math.min(1, (gap - 2) / 6));
+    return t * t * (3 - 2 * t);
+  };
+  return { left: fade(camera.x - room.minX), right: fade(room.maxX - camera.x),
+    front: fade(camera.z - room.minZ), back: fade(room.maxZ - camera.z) };
+}
+
+export function cameraLookAhead(room: Box, player: Vec, forward: Vec, lead: number) {
+  const limit = (at: number, direction: number, min: number, max: number) =>
+    direction > 0 ? (max - 2 - at) / direction : direction < 0 ? (min + 2 - at) / direction : Infinity;
+  return Math.max(0, Math.min(lead, limit(player.x, forward.x, room.minX, room.maxX),
+    limit(player.z, forward.z, room.minZ, room.maxZ)));
 }
 
 export function doorwayOpening(z: number, player: Vec) {
@@ -91,11 +98,19 @@ const CUSTOM_BLOCKS: Record<string, Box[]> = {
 
 export function chapterObstacles(index: number): Box[] {
   const chapter = CHAPTERS[index];
-  return [...chapter.items, ...chapter.decor].flatMap(p => {
+  const blocks = [...chapter.items, ...chapter.decor].flatMap(p => {
     if (p.solid === false || p.bump || p.ball) return [];
     if ("id" in p && CUSTOM_BLOCKS[(p as JourneyItem).id]) return CUSTOM_BLOCKS[(p as JourneyItem).id];
     return [placementBox(p)];
   });
+  const seated = roommateFootprint(chapter);
+  if (seated) blocks.push(seated);
+  return blocks;
+}
+
+function roommateFootprint(chapter: Chapter): Box | undefined {
+  const at = chapter.roommate;
+  return at && { minX: at.x - 2, maxX: at.x + 8, minZ: at.z - 4, maxZ: at.z + 4 };
 }
 
 export function buildBallField(index: number): BallField {
@@ -113,6 +128,8 @@ export function buildBallField(index: number): BallField {
     }
     return [{ ...box, bottom, top: bottom + modelFootprint(p.model).height }];
   });
+  const seated = roommateFootprint(chapter);
+  if (seated) blocks.push({ ...seated, bottom: 0, top: 22 });
   return { ...interior(chapter), ceiling: WALL_HEIGHT, blocks, net };
 }
 

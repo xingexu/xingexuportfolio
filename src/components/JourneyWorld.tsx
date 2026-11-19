@@ -115,6 +115,7 @@ export default function JourneyWorld(props: Props) {
     }
     const markerGeometry = gridGeometry(markerGrid, [-0.25, -0.25, -0.25], 0, 0.5);
     const arrowGeometry = gridGeometry(buildJourneyArrow(), [-0.25, 0, 0], 0, 0.5);
+    const arrowMaterial = new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false });
     owned.push(markerGeometry, arrowGeometry);
 
     type ItemView = { material: MeshBasicMaterial; marker: Mesh; markerMaterial: MeshBasicMaterial; markerY: number };
@@ -229,12 +230,12 @@ export default function JourneyWorld(props: Props) {
       const field = balls.length ? buildBallField(index) : undefined;
       if (roommate) field?.blocks.push(roommate.ballBlock);
       const route = journeyArrows(index).map(({ x, z }) => {
-        const arrow = new Mesh(arrowGeometry, baseMaterial);
+        const arrow = new Mesh(arrowGeometry, arrowMaterial);
         arrow.position.set(x, 3.4, z);
         group.add(arrow);
         return arrow;
       });
-      const exitArrow = new Mesh(arrowGeometry, baseMaterial);
+      const exitArrow = new Mesh(arrowGeometry, arrowMaterial);
       exitArrow.rotation.set(Math.PI / 2, Math.PI, 0);
       exitArrow.position.set(0, 24, bounds.minZ + 3);
       exitArrow.scale.setScalar(1.15);
@@ -900,6 +901,7 @@ export default function JourneyWorld(props: Props) {
       grassTexture.dispose();
       occludedMaterial.dispose();
       glassMaterial.dispose();
+      arrowMaterial.dispose();
       baseMaterial.dispose();
       renderer.dispose();
       delete region.dataset.ready;

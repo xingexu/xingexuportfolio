@@ -266,10 +266,10 @@ export function buildJourneyArrow() {
     "..####.####..", ".####...####.", "####.....####", "###.......###"];
   shape.forEach((row, z) => [...row].forEach((pixel, x) => {
     if (pixel !== "#") return;
-    arrow.box(x - 7, 0, z - 5, 3, 2, 3, 0x163244);
+    arrow.box(x - 7, 0, z - 5, 3, 2, 3, 0x828282);
   }));
   shape.forEach((row, z) => [...row].forEach((pixel, x) => {
-    if (pixel === "#") arrow.set(x - 6, 2, z - 4, z < 4 ? 0xc5fcff : 0x75dedf);
+    if (pixel === "#") arrow.set(x - 6, 2, z - 4, z < 4 ? 0xffffff : 0xe8e8e8);
   }));
   return arrow;
 }

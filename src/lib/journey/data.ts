@@ -13,8 +13,8 @@ export type JourneyItem = Placement & {
   links?: JourneyLink[];
   video?: { src: string; label: string; captions?: string; poster: string };
 };
-export type Outfit = "kid" | "starwars" | "essentials" | "western";
-export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate";
+export type Outfit = "kid" | "starwars" | "essentials" | "western" | "csa";
+export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "dance";
 export type Roommate = { id: string; x: number; z: number; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
 type Vec2 = { x: number; z: number };
 export type Chapter = {
@@ -256,8 +256,23 @@ const ROOMS: Chapter[] = [
 ];
 
 export const CHAPTERS = ROOMS.map(chapter => chapter.outdoor || chapter.id === "western" ? chapter : expandRoom(chapter));
+export const WESTERN_INDEX = CHAPTERS.findIndex(chapter => chapter.id === "western");
+export const CSA_POSTER_ID = "csa";
+export const CSA_ROOM_INDEX = CHAPTERS.length;
+export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
+  id: "csa-after-hours", stop: "CSA After Hours", number: "", place: "CSA After Hours", location: "Western University",
+  heading: "CSA After Hours", intro: "A party hidden behind the CSA poster.", stopNote: "Behind the poster · Western University",
+  ageFrom: 18, ageTo: 18, outfit: "csa", outfitLabel: "Black CSA tee · black pants",
+  width: 96, depth: 84, floor: "dance", wall: 0x251e36, trim: 0x563951, background: 0x171221,
+  doorLabel: "DORM", items: [],
+  decor: [
+    { model: "csa-dj-booth", x: 0, z: -26 },
+    { model: "csa-speaker", x: -22, z: -28 },
+    { model: "csa-speaker", x: 22, z: -28 },
+  ],
+}];
 const CHAPTER_ACCENTS = [0x89cced, 0xffcf79, 0x80ddc5, 0xfaac96, 0x91b8f3, 0xc4a2ff];
-export const chapterAccent = (index: number) => CHAPTER_ACCENTS[index] ?? CHAPTER_ACCENTS[0];
+export const chapterAccent = (index: number) => index === CSA_ROOM_INDEX ? 0xff8d6b : CHAPTER_ACCENTS[index] ?? CHAPTER_ACCENTS[0];
 export const ALL_ITEMS = CHAPTERS.flatMap((chapter, index) => chapter.items.map(item => ({ ...item, chapter: index })));
 export const itemById = (id: string) => ALL_ITEMS.find(item => item.id === id);
 export const ageLabel = (chapter: Chapter) => chapter.ageFrom === chapter.ageTo ? `${chapter.ageFrom}` : `${chapter.ageFrom}–${chapter.ageTo}`;

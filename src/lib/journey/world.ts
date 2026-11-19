@@ -1,4 +1,4 @@
-import { CHAPTERS, type Chapter, type JourneyItem, type Placement } from "./data";
+import { CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, type Chapter, type JourneyItem, type Placement } from "./data";
 import { modelFootprint, VOLLEYBALL_NET } from "./models";
 import type { BallField, CourtNet } from "./volleyball";
 import { Grid, hash3, shade, textWidth, type Color } from "./voxel";
@@ -118,7 +118,7 @@ const CUSTOM_BLOCKS: Record<string, Box[]> = {
 };
 
 export function chapterObstacles(index: number): Box[] {
-  const chapter = CHAPTERS[index];
+  const chapter = JOURNEY_ROOMS[index];
   return [...chapter.items, ...chapter.decor].flatMap(p => {
     if (p.solid === false || p.bump || p.ball) return [];
     if ("id" in p && CUSTOM_BLOCKS[(p as JourneyItem).id]) return CUSTOM_BLOCKS[(p as JourneyItem).id];
@@ -127,7 +127,7 @@ export function chapterObstacles(index: number): Box[] {
 }
 
 export function buildBallField(index: number): BallField {
-  const chapter = CHAPTERS[index];
+  const chapter = JOURNEY_ROOMS[index];
   let net: CourtNet | undefined;
   const blocks = [...chapter.items, ...chapter.decor].flatMap(p => {
     if (p.ball || p.bump || p.solid === false) return [];
@@ -157,8 +157,8 @@ function hits(box: Box, x: number, z: number, r: number) {
 }
 
 export function blocked(index: number, x: number, z: number, r: number) {
-  const chapter = CHAPTERS[index], room = interior(chapter);
-  const inDoor = Math.abs(x) <= DOOR_HALF - r && z < room.minZ + r;
+  const chapter = JOURNEY_ROOMS[index], room = interior(chapter);
+  const inDoor = index !== CSA_ROOM_INDEX && Math.abs(x) <= DOOR_HALF - r && z < room.minZ + r;
   if (!inDoor && (x < room.minX + r || x > room.maxX - r || z < room.minZ + r)) return true;
   const inBackDoor = index > 0 && Math.abs(x) <= DOOR_HALF - r;
   if (!inBackDoor && z > room.maxZ - r) return true;
@@ -189,7 +189,7 @@ export function settleBump(index: number, prop: BumpProp, dt: number, reducedMot
     }
     return;
   }
-  const room = interior(CHAPTERS[index]), r = prop.radius;
+  const room = interior(JOURNEY_ROOMS[index]), r = prop.radius;
   const free = (x: number, z: number) => x >= room.minX + r && x <= room.maxX - r &&
     z >= room.minZ + r && z <= room.maxZ - r && !obstacles(index).some(box => hits(box, x, z, r));
   const x = prop.x + prop.vx * dt, z = prop.z + prop.vz * dt;
@@ -200,17 +200,23 @@ export function settleBump(index: number, prop: BumpProp, dt: number, reducedMot
   if (Math.hypot(prop.vx, prop.vz) < 0.12) prop.vx = prop.vz = 0;
 }
 
-export type StepResult = Vec & { exit: "next" | "prev" | null };
+const csaPoster = JOURNEY_ROOMS[WESTERN_INDEX].items.find(item => item.id === CSA_POSTER_ID);
+const csaPortal = csaPoster ? placementBox(csaPoster) : null;
+
+export type StepResult = Vec & { exit: "next" | "prev" | "party" | null };
 /** Moves one axis at a time so the player slides along walls and furniture. */
 export function step(index: number, pos: Vec, dx: number, dz: number, r: number, dynamicBlocked?: (from: Vec, to: Vec, radius: number) => boolean): StepResult {
   let { x, z } = pos;
   const sub = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.5));
+  const room = interior(JOURNEY_ROOMS[index]);
+  const portal = index === WESTERN_INDEX && dx < 0 ? csaPortal : null;
   const free = (nx: number, nz: number) => !blocked(index, nx, nz, r) && !dynamicBlocked?.({ x, z }, { x: nx, z: nz }, r);
   for (let i = 0; i < sub; i++) {
+    if (portal && x <= room.minX + r + 0.55 && x + dx / sub <= room.minX + r + 0.08 &&
+      z >= portal.minZ && z < portal.maxZ) return { x, z, exit: "party" };
     if (free(x + dx / sub, z)) x += dx / sub;
     if (free(x, z + dz / sub)) z += dz / sub;
   }
-  const chapter = CHAPTERS[index], room = interior(chapter);
   const exit = z < room.minZ - 1 ? "next" : index > 0 && z > room.maxZ + 1 ? "prev" : null;
   return { x, z, exit };
 }
@@ -225,7 +231,7 @@ export function boxDistance(box: Box, p: Vec) {
  * on walls reach a little further so what holds them never hides them.
  */
 export function nearbyItems(index: number, p: Vec, limit = 3, range = INTERACT_RANGE, positions?: ReadonlyMap<string, Vec>): JourneyItem[] {
-  return CHAPTERS[index].items
+  return JOURNEY_ROOMS[index].items
     .map(item => {
       const moved = positions?.get(item.id);
       const boxes = CUSTOM_BLOCKS[item.id] ?? [placementBox(moved ? { ...item, x: moved.x, z: moved.z } : item)];
@@ -247,15 +253,20 @@ export function ageAt(chapter: Chapter, z: number) {
 }
 
 export const INTRO_END: Vec = { x: -1, z: -12 };
-export function spawn(index: number, from: "start" | "forward" | "back"): Vec & { yaw: number } {
-  const chapter = CHAPTERS[index], room = interior(chapter);
+export type RoomArrival = "start" | "forward" | "back" | "portal";
+export function spawn(index: number, from: RoomArrival): Vec & { yaw: number } {
+  const room = interior(JOURNEY_ROOMS[index]);
+  if (index === WESTERN_INDEX && from === "portal" && csaPoster) {
+    return { x: room.minX + 8, z: csaPoster.z, yaw: Math.PI / 2 };
+  }
   if (from === "back") return { x: 0, z: room.minZ + 7, yaw: 0 };
   if (index === 0) return { ...INTRO_END, yaw: Math.PI };
   return { x: 0, z: room.maxZ - 7, yaw: Math.PI };
 }
 
 export function journeyArrows(index: number): Vec[] {
-  const exit = interior(CHAPTERS[index]).minZ + 5;
+  if (index === CSA_ROOM_INDEX) return [];
+  const exit = interior(JOURNEY_ROOMS[index]).minZ + 5;
   const first = spawn(index, "forward").z - 8;
   const intervals = Math.max(1, Math.ceil((first - exit) / 12));
   return Array.from({ length: intervals + 1 }, (_, i) => ({ x: 0, z: first + (exit - first) * i / intervals }));
@@ -287,6 +298,13 @@ export function jumpHeight(elapsed: number) {
 function floorColor(chapter: Chapter, x: number, z: number): Color {
   const n = hash3(x, 0, z);
   switch (chapter.floor) {
+    case "dance": {
+      if (x < -30 || x >= 30 || z < -19 || z >= 23) return shade(0x383044, 0.92 + n * 0.13);
+      const col = Math.floor((x + 30) / 6), row = Math.floor((z + 19) / 6);
+      const seam = (x + 30) % 6 === 0 || (z + 19) % 6 === 0;
+      const tiles = [0x3e3850, 0x504267, 0x5c4369, 0x4e4968, 0x645064];
+      return seam ? 0x30283e : shade(tiles[(col * 3 + row * 2) % tiles.length], 0.97 + n * 0.08);
+    }
     case "wood": case "laminate": case "gym": {
       const width = chapter.floor === "laminate" ? 5 : 4, plank = Math.floor((x + 512) / width);
       const seam = (z + 512 + plank * 7) % (chapter.floor === "laminate" ? 22 : 16) === 0;
@@ -421,7 +439,7 @@ function addDoorway(g: Grid, chapter: Chapter, wallZ: number, side: "front" | "b
 }
 
 export function buildRoomShell(index: number): Grid {
-  const chapter = CHAPTERS[index], g = new Grid();
+  const chapter = JOURNEY_ROOMS[index], g = new Grid();
   const W = chapter.width, D = chapter.depth, x0 = -W / 2, z0 = -D / 2;
   const extra = chapter.outdoor ? 60 : 0, zEnd = chapter.outdoor ? D / 2 + ENTRANCE + 40 : D / 2;
   const furniture = obstacles(index);
@@ -478,16 +496,23 @@ export function buildRoomShell(index: number): Grid {
     for (const spec of WINDOWS[chapter.id] ?? []) addWindow(g, interior(chapter), chapter, spec);
     addDoorway(g, chapter, nearZ, "back");
   }
-  addDoorway(g, chapter, z0, "front");
+  const front = index !== CSA_ROOM_INDEX;
+  if (front) addDoorway(g, chapter, z0, "front");
   const label = chapter.doorLabel, w = textWidth(label) + 4;
   const plate = luminance(chapter.trim) > 140 ? 0x2d2d33 : chapter.trim;
-  g.box(-Math.ceil(w / 2), DOOR_HEIGHT + 2, z0 + WALL, w, 7, 1, plate);
-  g.text(label, -Math.ceil(w / 2) + 2, DOOR_HEIGHT + 3, z0 + WALL + 1, 0xf6f1e4);
+  const signZ = front ? z0 + WALL : nearZ - 1, left = -Math.ceil(w / 2) + 2;
+  g.box(-Math.ceil(w / 2), DOOR_HEIGHT + 2, signZ, w, 7, 1, plate);
+  if (front) g.text(label, left, DOOR_HEIGHT + 3, signZ + 1, 0xf6f1e4);
+  else {
+    const lettering = new Grid();
+    lettering.text(label, left, DOOR_HEIGHT + 3, signZ - 1, 0xf6f1e4);
+    lettering.forEach((x, y, z, color) => g.set(-x - 1, y, z, color));
+  }
   return g;
 }
 
 export function buildCutawayShell(index: number) {
-  const chapter = CHAPTERS[index], shell = buildRoomShell(index);
+  const chapter = JOURNEY_ROOMS[index], shell = buildRoomShell(index);
   const fixed = new Grid(), bounds = interior(chapter);
   const walls = { left: new Grid(), right: new Grid(), front: new Grid(), back: new Grid() };
   shell.forEach((x, y, z, color) => {

@@ -958,7 +958,7 @@ export default function JourneyWorld(props: Props) {
         ))}
         <section>
           <h2>CSA After Hours</h2>
-          <p>A hidden dance room behind the CSA poster. Rain Li DJs for {CSA_GUESTS.filter(guest => !guest.dj).map(guest => guest.name).join(", ")}.</p>
+          <p>A hidden auditorium behind the CSA poster. Rain Li DJs, Lucas Xue gives Jason Zhuang a haircut, and {CSA_GUESTS.filter(guest => guest.walk).map(guest => guest.name).join(", ")} walk around.</p>
           <a href={CSA_DJ_LINK.href} target="_blank" rel="noopener noreferrer">{CSA_DJ_LINK.label} ↗</a>
         </section>
       </div>

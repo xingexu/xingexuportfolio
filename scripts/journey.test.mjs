@@ -20,14 +20,14 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(req, result, result.exports);
   return result.exports;
 }
-const { CHAPTERS, ALL_ITEMS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
+const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
-const { CSA_GUESTS, buildCsaGuest, makeCsaParty, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
+const { CSA_GUESTS, buildCsaGuest, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 const { Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
@@ -944,40 +944,54 @@ test('CSA After Hours has a clear return door and a closed wall behind the DJ', 
   assert.ok(!shell.has(0, 5, bounds.maxZ), 'the return doorway is open in the shell');
 });
 
-test('the larger party hall has a CSA logo and walkable food counters with solid bases', () => {
+test('the auditorium has three rows, a clear center aisle, barber furniture, and loose drinks', () => {
   const hall = JOURNEY_ROOMS[CSA_ROOM_INDEX], radius = 3.5 * W.AVATAR_SCALE;
-  assert.ok(hall.width * hall.depth > 3 * 96 * 84);
+  assert.ok(hall.width * hall.depth > 180 * 148);
+  assert.equal(hall.floor, 'auditorium');
   const cells = reachable(CSA_ROOM_INDEX, W.spawn(CSA_ROOM_INDEX, 'portal'), radius);
   assert.ok(cells.some(p => p.x === 0 && p.z === -44), 'a direct approach to the stage is open');
   const logo = hall.decor.find(prop => prop.model === 'csa-stage-logo');
   assert.ok(logo.y >= 20 && logo.solid === false);
   assert.equal(buildModel(logo.model).size, buildModel('poster-csa').size);
-  for (const [id, topping] of [['csa-bubble-tea', 0x3d2839], ['csa-sushi', 0xf58e7e], ['csa-desserts', 0xffd870]]) {
-    const counter = hall.decor.find(prop => prop.model === id), box = W.placementBox(counter);
-    assert.ok(W.blocked(CSA_ROOM_INDEX, counter.x, counter.z, radius));
-    assert.ok(cells.some(p => W.boxDistance(box, p) < radius + 2), id);
-    let details = 0;
-    buildModel(id).forEach((_x, y, _z, color) => { if (y >= 13 && color === topping) details++; });
-    assert.ok(details > 5, id);
+  const rows = hall.decor.filter(prop => prop.model === 'csa-seat-row');
+  assert.deepEqual([...new Set(rows.map(({ z }) => z))], [40, 55, 70]);
+  for (const row of rows) {
+    assert.equal(row.rot, 2, 'seats face the stage');
+    assert.ok(W.blocked(CSA_ROOM_INDEX, row.x, row.z, radius));
+    assert.ok(!W.blocked(CSA_ROOM_INDEX, 0, row.z, radius));
+  }
+  const chair = hall.decor.find(prop => prop.model === 'csa-barber-chair'), bounds = W.placementBox(chair);
+  assert.ok(cells.some(p => W.boxDistance(bounds, p) < radius + 2), 'you can walk up to the haircut');
+  assert.ok(W.blocked(CSA_ROOM_INDEX, chair.x, chair.z, radius));
+  const drinks = hall.decor.filter(prop => /cup|bottle/.test(prop.model));
+  assert.equal(new Set(drinks.map(prop => prop.model)).size, 3);
+  assert.ok(drinks.length >= 8);
+  for (const drink of drinks) {
+    assert.equal(drink.solid, false);
+    assert.ok(buildModel(drink.model).size > 50);
   }
 });
 
-test('all eight guests animate in place, with reduced motion and a dedicated DJ', () => {
+test('the five walkers face their movement and clear seats, stage, and one another', () => {
   assert.deepEqual(CSA_GUESTS.map(guest => guest.name), [
     'Jason Zhuang', 'Rain Li', 'Amelie Hu', 'Lydia Zheng', 'Daniel Su', 'Lucas Xue', 'Jeffrey Ban', 'William Wang',
   ]);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.scale < 1).map(guest => guest.name), ['Amelie Hu', 'Lydia Zheng']);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.dj).map(guest => guest.name), ['Rain Li']);
+  const walkers = CSA_GUESTS.map((guest, i) => ({ guest, i })).filter(({ guest }) => guest.walk);
+  assert.equal(walkers.length, 5);
   for (const [i, guest] of CSA_GUESTS.entries()) {
-    const first = sampleCsaGuest(guest, i, 0, false), next = sampleCsaGuest(guest, i, 0.3, false);
-    assert.notDeepEqual(first, next, guest.name);
     assert.deepEqual(sampleCsaGuest(guest, i, 0, true), sampleCsaGuest(guest, i, 3, true));
-    if (guest.dj) assert.deepEqual([next.x, next.z], [first.x, first.z]);
-    else assert.notEqual(next.x, first.x);
-    for (let tick = 0; tick < 20; tick++) {
-      const pose = sampleCsaGuest(guest, i, tick * 0.1, false);
-      assert.ok(!W.blocked(CSA_ROOM_INDEX, pose.x, pose.z, 2.5), guest.name);
-    }
+  }
+  for (let time = 0; time < 44; time += 0.22) {
+    const positions = walkers.map(({ guest, i }) => {
+      const at = sampleCsaGuest(guest, i, time, false), next = sampleCsaGuest(guest, i, time + 0.01, false);
+      assert.ok(!W.blocked(CSA_ROOM_INDEX, at.x, at.z, 2.5), guest.name);
+      assert.ok((next.x - at.x) * Math.sin(at.yaw) + (next.z - at.z) * Math.cos(at.yaw) > 0, guest.name + ' faces their stride');
+      return at;
+    });
+    positions.forEach((at, i) => positions.slice(i + 1).forEach(next =>
+      assert.ok(Math.hypot(at.x - next.x, at.z - next.z) > 5, 'walkers keep space')));
   }
 });
 
@@ -1004,6 +1018,9 @@ test('reference-based hairstyles have distinct silhouettes', () => {
   const guest = name => buildCsaGuest(CSA_GUESTS.find(entry => entry.name === name));
   const jason = guest('Jason Zhuang'), william = guest('William Wang');
   assert.ok(william.head.bounds().maxY > jason.head.bounds().maxY, 'William has taller tousled tips');
+  assert.equal(jason.head.get(-10, 4, 2), 0xf8fdff, 'left diamond stud');
+  assert.equal(jason.head.get(9, 4, 2), 0xf8fdff, 'right diamond stud');
+  assert.notEqual(jason.head.get(-8, 5, -4), jason.head.get(-8, 9, -4), 'the fade starts low near the ear');
   assert.ok(guest('Lydia Zheng').head.bounds().minY < guest('Amelie Hu').head.bounds().minY, 'Lydia has longer straight hair');
   assert.equal(william.torso.get(2, 21, 3), 0xe1ded7, 'the silver chain is on the chest');
   const { head } = guest('Rain Li');
@@ -1030,14 +1047,40 @@ test('the DJ meshes can be picked and the same URL is available by the booth', t
   const material = new MeshBasicMaterial({ vertexColors: true });
   const party = makeCsaParty(material, material), dj = CSA_GUESTS.find(guest => guest.dj);
   t.after(() => { party.dispose(); material.dispose(); });
-  party.update(0, true, { x: 0, z: -44 });
+  party.update(0, true, { x: 0, z: CSA_STAGE_Z + 10 });
   party.group.updateMatrixWorld(true);
   const ray = new Raycaster(new Vector3(dj.x, 21, dj.z + 18), new Vector3(0, 0, -1));
   const hit = ray.intersectObjects(party.djPickables, false)[0];
   assert.ok(hit?.object.userData.csaDj);
-  assert.ok(party.nearDj({ x: 0, z: -44 }));
+  assert.ok(party.nearDj({ x: 0, z: CSA_STAGE_Z + 10 }));
   assert.ok(!party.nearDj(W.spawn(CSA_ROOM_INDEX, 'portal')));
   assert.equal(CSA_DJ_LINK.href, 'https://wewantdrought.me');
+});
+
+test('Rain cues his headphones and Lucas keeps the moving clippers near Jason’s low fade', t => {
+  assert.deepEqual(sampleCsaDj(0, true), sampleCsaDj(6, true));
+  assert.deepEqual(sampleCsaCut(0, true), sampleCsaCut(6, true));
+  assert.ok(sampleCsaDj(2.8, false).right.y > 21, 'Rain reaches for his headphones');
+  assert.ok(sampleCsaDj(0.3, false).right.y < 17, 'Rain works the mixer');
+  assert.notEqual(sampleCsaDj(0.3, false).vinyl, sampleCsaDj(0, false).vinyl);
+  const oldDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });
+  const material = new MeshBasicMaterial({ vertexColors: true }), party = makeCsaParty(material, material);
+  t.after(() => { party.dispose(); material.dispose(); });
+  const client = party.group.getObjectByName('Jason Zhuang'), tool = party.group.getObjectByName('Lucas’s clippers');
+  const head = client.getObjectByName('Head'), thigh = client.getObjectByName('Seated thigh');
+  const at = { x: -51, z: -3 };
+  for (let time = 0; time < 3; time += 0.1) {
+    party.update(time === 0 ? 0 : 0.1, false, at);
+    assert.equal(thigh.rotation.x, -Math.PI / 2);
+    assert.ok(Math.abs(thigh.getWorldPosition(new Vector3()).y - CSA_BARBER_SEAT) < 0.1);
+    const tip = new Vector3(0, 1.86, 0).applyQuaternion(tool.quaternion).add(tool.position);
+    const blade = sampleCsaCut(time, false).blade;
+    assert.ok(tip.distanceTo(new Vector3(blade.x, blade.y, blade.z)) < 0.65);
+    assert.ok(tip.distanceTo(head.getWorldPosition(new Vector3())) < 6.1);
+    assert.ok(Math.abs(tip.x - CSA_BARBER_CHAIR.x) < 2);
+  }
 });
 
 test('the floating arrows mark the walkable aisle from every spawn to its exit', () => {

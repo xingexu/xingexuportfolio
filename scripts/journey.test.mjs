@@ -682,16 +682,29 @@ test('a moving Richard displaces a loose volleyball and does not leave it in mid
   field.blocks.push(block);
   const practice = beatAt('practice', 0.5), seat = beatAt('seat', 0);
   view.apply(practice, practice.yaw);
-  const loose = V.makeBall(practice.x + 0.5, 0, practice.z, 1.3);
+  const loose = V.makeBall(block.maxX + 0.8, 0, practice.z, 1.3);
+  const startX = loose.x;
   V.pushBallFromMovingBlock(loose, field, block);
   assert.ok(Math.hypot(loose.vx, loose.vz) >= 6, 'the ball rolls out from under him');
-  assert.ok(loose.x !== practice.x + 0.5 || loose.z !== practice.z);
+  assert.ok(loose.x > startX);
   const balanced = V.makeBall(practice.x, block.top, practice.z, 1.3);
   V.stepBall(balanced, field, 0.1);
   assert.ok(balanced.grounded && balanced.y > balanced.radius);
   view.apply(seat, seat.yaw);
   V.stepBall(balanced, field, 0.1);
   assert.ok(!balanced.grounded && balanced.vy < 0, 'gravity resumes once Richard moves underneath it');
+});
+
+test('a volleyball pinned between Richard and furniture does not jump through him', () => {
+  const actor = { minX: 0, maxX: 4, minZ: -2, maxZ: 2, bottom: 0, top: 10 };
+  const furniture = { minX: -4, maxX: -1.3, minZ: -2, maxZ: 2, bottom: 0, top: 5 };
+  const field = { minX: -10, maxX: 10, minZ: -10, maxZ: 10, ceiling: 20, blocks: [actor, furniture] };
+  const ball = V.makeBall(-0.2, 0, 0, 1);
+  V.pushBallFromMovingBlock(ball, field, actor);
+  assert.equal(ball.x, -0.2);
+  assert.equal(ball.z, 0);
+  assert.equal(ball.vx, 0);
+  assert.equal(ball.vz, 0);
 });
 
 test('Richard stickhandles with a grounded blade and keeps the puck on the pad', () => {

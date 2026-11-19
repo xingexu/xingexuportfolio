@@ -41,9 +41,11 @@ export function pushBallFromMovingBlock(ball: Ball, field: BallField, block: Bal
   const exits = [
     { x: block.minX - gap, z }, { x: block.maxX + gap, z },
     { x, z: block.minZ - gap }, { x, z: block.maxZ + gap },
-  ].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
-  const exit = exits.find(p => ballSpace(field, radius, p.x, y, p.z));
-  if (!exit) return;
+  ];
+  const distance = (p: Vec) => Math.abs(p.x - x) + Math.abs(p.z - z);
+  const exit = exits.reduce((nearest, p) => distance(p) < distance(nearest) ? p : nearest);
+  // Leave a pinned ball in place rather than snapping it through the actor.
+  if (distance(exit) > gap || !ballSpace(field, radius, exit.x, y, exit.z)) return;
   ball.x = exit.x; ball.z = exit.z;
   if (exit.x !== x) ball.vx = Math.sign(exit.x - x) * Math.max(6, Math.abs(ball.vx));
   if (exit.z !== z) ball.vz = Math.sign(exit.z - z) * Math.max(6, Math.abs(ball.vz));

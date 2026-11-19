@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { Box3, Color, DataTexture, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, NearestMipmapLinearFilter, PerspectiveCamera, PlaneGeometry, Ray, Raycaster, RepeatWrapping, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
-import { CHAPTERS, chapterAccent, type Placement } from "@/lib/journey/data";
+import { CHAPTERS, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
+import { CSA_GUESTS, makeCsaParty } from "@/lib/journey/csaParty";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
 import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
-import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomSide } from "@/lib/journey/world";
+import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
@@ -18,13 +19,15 @@ export type JourneyControls = {
   jump: () => void;
   volley: () => void;
   goTo: (index: number) => void;
+  visitCsa: () => void;
+  leaveCsa: () => void;
   skip: () => void;
   focus: () => void;
   toggleCamera: (mode: keyof CameraMode) => void;
 };
 export type CameraMode = { front: boolean; tilt: boolean };
 export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction };
-export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" };
+export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" | "portal" };
 type Props = {
   controls: RefObject<JourneyControls | null>;
   blocked: boolean;
@@ -44,6 +47,8 @@ const KEYS: Record<string, "up" | "down" | "left" | "right"> = {
 const COVER = 0.6, HOLD = 1.9, REVEAL = 0.6, INTRO = 6, TURN_SPEED = 2.8;
 const smooth = (t: number) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
 const stairHeight = (x: number) => x < -22 ? 8 : x < -6 ? 8 - Math.floor((x + 22) / 2) : 0;
+const transitionArrival = (direction: TransitionInfo["direction"]): RoomArrival =>
+  direction === "back" || direction === "portal" ? direction : "forward";
 
 /** The whole voxel world, rendered with a uniform screen pixel pitch. */
 export default function JourneyWorld(props: Props) {
@@ -126,7 +131,7 @@ export default function JourneyWorld(props: Props) {
     type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
     type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty> };
     const rooms = new Map<number, RoomView>();
     function setOpacity(material: MeshBasicMaterial, opacity: number) {
       material.opacity = opacity;
@@ -141,7 +146,8 @@ export default function JourneyWorld(props: Props) {
     function room(index: number): RoomView {
       const cached = rooms.get(index);
       if (cached) return cached;
-      const chapter = CHAPTERS[index], group = new Group(), items = new Map<string, ItemView>(), pickables: Object3D[] = [];
+      const chapter = JOURNEY_ROOMS[index], group = new Group(), items = new Map<string, ItemView>(), pickables: Object3D[] = [];
+      const isParty = index === CSA_ROOM_INDEX;
       const wall = (): WallView => ({ group: new Group(), material: baseMaterial.clone() });
       const walls = { left: wall(), right: wall(), front: wall(), back: wall() };
       const shell = buildCutawayShell(index), bounds = interior(chapter);
@@ -158,7 +164,7 @@ export default function JourneyWorld(props: Props) {
       }
       const leafGeometry = gridGeometry(buildDoorLeaf(chapter), [0, 0, 0], 0.02, DOOR_VOXEL_SIZE);
       owned.push(leafGeometry);
-      const sides: DoorView["side"][] = chapter.outdoor ? ["front"] : ["front", "back"];
+      const sides: DoorView["side"][] = isParty ? ["back"] : chapter.outdoor ? ["front"] : ["front", "back"];
       const doors = sides.map((side): DoorView => {
         const z = side === "front" ? bounds.minZ - 0.5 : bounds.maxZ + 0.5;
         const left = new Mesh(leafGeometry, walls[side].material), right = new Mesh(leafGeometry, walls[side].material);
@@ -235,13 +241,17 @@ export default function JourneyWorld(props: Props) {
         group.add(arrow);
         return arrow;
       });
-      const exitArrow = new Mesh(arrowGeometry, arrowMaterial);
-      exitArrow.rotation.set(Math.PI / 2, Math.PI, 0);
-      exitArrow.position.set(0, 24, bounds.minZ + 3);
-      exitArrow.scale.setScalar(1.15);
-      group.add(exitArrow);
-      route.push(exitArrow);
-      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate };
+      if (!isParty) {
+        const exitArrow = new Mesh(arrowGeometry, arrowMaterial);
+        exitArrow.rotation.set(Math.PI / 2, Math.PI, 0);
+        exitArrow.position.set(0, 24, bounds.minZ + 3);
+        exitArrow.scale.setScalar(1.15);
+        group.add(exitArrow);
+        route.push(exitArrow);
+      }
+      const party = isParty ? makeCsaParty(baseMaterial) : undefined;
+      if (party) group.add(party.group);
+      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party };
       rooms.set(index, view);
       return view;
     }
@@ -263,7 +273,7 @@ export default function JourneyWorld(props: Props) {
     const elbowL = new Group(), elbowR = new Group();
     let parts: AvatarParts | null = null, avatarKey = "";
     const avatarGeometries: BufferGeometry[] = [];
-    function setAvatar(age: number, outfit: typeof CHAPTERS[number]["outfit"]) {
+    function setAvatar(age: number, outfit: Outfit) {
       const key = `${age}-${outfit}`;
       if (key === avatarKey) return;
       avatarKey = key;
@@ -312,20 +322,20 @@ export default function JourneyWorld(props: Props) {
     const pointer = new Vector2(), raycaster = new Raycaster();
     let pointerDirty = false, pointerInside = false;
 
-    function enterRoom(index: number, from: "start" | "forward" | "back") {
+    function enterRoom(index: number, from: RoomArrival) {
       const previous = rooms.get(chapter);
       if (previous) scene.remove(previous.group);
       chapter = index;
       const next = room(index);
       scene.add(next.group);
-      const current = CHAPTERS[index];
+      const current = JOURNEY_ROOMS[index];
       scene.background = new Color(current.background);
       grass.visible = !current.outdoor;
-      grass.material.color.setHex(current.id === "western" ? 0x77889c : 0xffffff, LinearSRGBColorSpace);
+      grass.material.color.setHex(index === WESTERN_INDEX || index === CSA_ROOM_INDEX ? 0x77889c : 0xffffff, LinearSRGBColorSpace);
       const at = spawn(index, from);
       player.x = at.x; player.z = at.z; player.yaw = at.yaw; player.vx = 0; player.vz = 0; player.spin = 0; player.y = 0;
-      player.age = ageAt(CHAPTERS[index], player.z);
-      setAvatar(player.age, CHAPTERS[index].outfit);
+      player.age = ageAt(current, player.z);
+      setAvatar(player.age, current.outfit);
       nearby = null; hovered = null; tooltip.hidden = true;
       volley = null; kickPose = 0; jumpElapsed = null;
       snapCamera();
@@ -339,7 +349,7 @@ export default function JourneyWorld(props: Props) {
       const view = cameraOffsets(height, camera.aspect, frontBlend, tiltBlend);
       const fx = Math.sin(yaw + view.orbit), fz = Math.cos(yaw + view.orbit);
       pos.set(x - fx * view.distance, y + view.rise, z - fz * view.distance);
-      const current = CHAPTERS[chapter];
+      const current = JOURNEY_ROOMS[chapter];
       const lead = current.outdoor ? view.lead : cameraLookAhead(interior(current), { x, z }, { x: fx, z: fz }, view.lead);
       look.set(x + fx * lead, y + view.lookHeight, z + fz * lead);
     }
@@ -353,7 +363,7 @@ export default function JourneyWorld(props: Props) {
     }
 
     function updateCutaway() {
-      const current = CHAPTERS[chapter];
+      const current = JOURNEY_ROOMS[chapter];
       const opacity = cutawayOpacity(interior(current), camera.position);
       const walls = room(chapter).walls;
       for (const side of Object.keys(walls) as RoomSide[]) {
@@ -521,7 +531,7 @@ export default function JourneyWorld(props: Props) {
     }
 
     function startTransition(to: number, direction: TransitionInfo["direction"]) {
-      if (transition || to < 0 || to >= CHAPTERS.length) return;
+      if (transition || to < 0 || to >= JOURNEY_ROOMS.length) return;
       clearInput();
       if (intro) finishIntro();
       transition = { to, direction, t: motion.matches ? COVER : 0, switched: false };
@@ -529,7 +539,7 @@ export default function JourneyWorld(props: Props) {
     }
     function finishTransition() {
       if (!transition) return;
-      if (!transition.switched) enterRoom(transition.to, transition.direction === "back" ? "back" : "forward");
+      if (!transition.switched) enterRoom(transition.to, transitionArrival(transition.direction));
       transition = null;
       drawCover(0);
       live.current.onTransition(null);
@@ -559,7 +569,9 @@ export default function JourneyWorld(props: Props) {
       interact,
       jump,
       volley: playVolley,
-      goTo: index => { if (index !== chapter || intro) startTransition(index, "jump"); },
+      goTo: index => { if (index < CHAPTERS.length && (index !== chapter || intro)) startTransition(index, "jump"); },
+      visitCsa: () => { if (chapter !== CSA_ROOM_INDEX) startTransition(CSA_ROOM_INDEX, "portal"); },
+      leaveCsa: () => { if (chapter === CSA_ROOM_INDEX) startTransition(WESTERN_INDEX, "portal"); },
       skip: () => { if (transition) finishTransition(); else if (intro) finishIntro(); },
       focus: () => region.focus({ preventScroll: true }),
       toggleCamera: mode => {
@@ -680,7 +692,7 @@ export default function JourneyWorld(props: Props) {
       previous = now;
       if (document.hidden) return;
       time += dt;
-      const current = CHAPTERS[chapter];
+      const current = JOURNEY_ROOMS[chapter];
       const blockedNow = live.current.blocked;
       let speedNow = 0, jumpLift = 0;
 
@@ -725,8 +737,9 @@ export default function JourneyWorld(props: Props) {
         if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
         if (Math.hypot(player.vx, player.vz) > 0.02) {
           const radius = (height >= 29 ? 3.5 : 3) * AVATAR_SCALE;
-          const npc = room(chapter).roommate;
-          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, npc ? (from, to, r) => npc.blocks(from, to, r, npc.pose) : undefined);
+          const { roommate: npc, party } = room(chapter);
+          const collider = npc ? (from: Vec, to: Vec, r: number) => npc.blocks(from, to, r, npc.pose) : party?.blocks;
+          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, collider);
           const movement = { x: result.x - player.x, z: result.z - player.z };
           player.x = result.x; player.z = result.z;
           for (const { state } of room(chapter).reactive) bumpProp(state, result, movement, radius, dt);
@@ -734,10 +747,14 @@ export default function JourneyWorld(props: Props) {
             if (jumpElapsed === null && volley?.ball !== ball && kickBall(ball.state, player, movement, radius, dt)) kickPose = 0.28;
           }
           player.phase += Math.hypot(movement.x, movement.z) * 0.45;
-          if (result.exit === "next") {
+          if (result.exit === "party") startTransition(CSA_ROOM_INDEX, "portal");
+          else if (result.exit === "next") {
             if (chapter < CHAPTERS.length - 1) startTransition(chapter + 1, "forward");
             else { player.z = interior(current).minZ + 5; player.vx = 0; player.vz = 0; held.clear(); live.current.onFinale(); }
-          } else if (result.exit === "prev") startTransition(chapter - 1, "back");
+          } else if (result.exit === "prev") {
+            if (chapter === CSA_ROOM_INDEX) startTransition(WESTERN_INDEX, "portal");
+            else startTransition(chapter - 1, "back");
+          }
           const age = ageAt(current, player.z);
           if (age !== player.age) { player.age = age; setAvatar(age, current.outfit); }
         }
@@ -757,7 +774,7 @@ export default function JourneyWorld(props: Props) {
         transition.t += real;
         const reduced = motion.matches;
         if (!transition.switched && transition.t >= COVER) {
-          enterRoom(transition.to, transition.direction === "back" ? "back" : "forward");
+          enterRoom(transition.to, transitionArrival(transition.direction));
           jumpLift = 0;
           transition.switched = true;
         }
@@ -768,6 +785,7 @@ export default function JourneyWorld(props: Props) {
       }
 
       const activeRoom = room(chapter);
+      activeRoom.party?.update(!blockedNow && !transition ? dt : 0, motion.matches, player);
       if (!transition && !blockedNow && !intro) {
         kickPose = Math.max(0, kickPose - dt);
         const npc = activeRoom.roommate;
@@ -895,6 +913,7 @@ export default function JourneyWorld(props: Props) {
         r.props.forEach(p => { p.material.dispose(); p.glass?.dispose(); });
         r.items.forEach(i => i.markerMaterial.dispose());
         Object.values(r.walls).forEach(wall => wall.material.dispose());
+        r.party?.dispose();
       });
       shadow.material.dispose();
       grass.material.dispose();
@@ -926,6 +945,10 @@ export default function JourneyWorld(props: Props) {
             ))}</ul>
           </section>
         ))}
+        <section>
+          <h2>CSA After Hours</h2>
+          <p>A hidden dance room behind the CSA poster. Rain Li DJs for {CSA_GUESTS.filter(guest => !guest.dj).map(guest => guest.name).join(", ")}.</p>
+        </section>
       </div>
     </div>
   );

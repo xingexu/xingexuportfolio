@@ -21,6 +21,7 @@ function load(file) {
   return result.exports;
 }
 const { CHAPTERS, ALL_ITEMS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
+const { roomFromUrl, roomPath } = load('src/lib/journey/navigation.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
@@ -31,6 +32,27 @@ const { CSA_GUESTS, buildCsaGuest, makeCsaParty, sampleCsaGuest } = load('src/li
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 const { Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
+
+test('each journey room can be restored at its normal entrance from the About URL', () => {
+  const about = 'https://xinge.ca/about';
+  assert.equal(roomFromUrl(about), null, 'a fresh visit can play the intro');
+  for (const [index, room] of JOURNEY_ROOMS.entries()) {
+    const path = roomPath(about, index), href = new URL(path, about).href;
+    assert.equal(path, '/about?room=' + room.id);
+    assert.equal(roomFromUrl(href), index);
+    assert.equal(roomPath(href, index), null, 'the written URL is stable on refresh');
+    const { x, z } = W.spawn(index, 'start');
+    assert.ok(!W.blocked(index, x, z, 3.5 * W.AVATAR_SCALE), room.id);
+  }
+});
+
+test('writing room navigation keeps the route and unrelated URL state', () => {
+  const href = 'https://xinge.ca/about?from=portfolio&room=unknown&room=elm#notes';
+  assert.equal(roomFromUrl(href), null, 'an unknown room falls back to the normal intro');
+  assert.equal(roomPath(href, WESTERN_INDEX), '/about?from=portfolio&room=western#notes');
+  assert.equal(roomPath(href, -1), null);
+  assert.equal(roomPath(href, JOURNEY_ROOMS.length), null);
+});
 
 test('every item is written out, linked properly and has a model', () => {
   const ids = new Set();

@@ -254,6 +254,26 @@ export function spawn(index: number, from: "start" | "forward" | "back"): Vec & 
   return { x: 0, z: room.maxZ - 7, yaw: Math.PI };
 }
 
+export function journeyArrows(index: number): Vec[] {
+  const exit = interior(CHAPTERS[index]).minZ + 5;
+  const first = spawn(index, "forward").z - 8;
+  const intervals = Math.max(1, Math.ceil((first - exit) / 12));
+  return Array.from({ length: intervals + 1 }, (_, i) => ({ x: 0, z: first + (exit - first) * i / intervals }));
+}
+
+export function buildJourneyArrow() {
+  const arrow = new Grid(), shape = ["......#......", ".....###.....", "....#####....", "...#######...",
+    "..####.####..", ".####...####.", "####.....####", "###.......###"];
+  shape.forEach((row, z) => [...row].forEach((pixel, x) => {
+    if (pixel !== "#") return;
+    arrow.box(x - 7, 0, z - 5, 3, 2, 3, 0x163244);
+  }));
+  shape.forEach((row, z) => [...row].forEach((pixel, x) => {
+    if (pixel === "#") arrow.set(x - 6, 2, z - 4, z < 4 ? 0xc5fcff : 0x75dedf);
+  }));
+  return arrow;
+}
+
 export const walkSpeed = (height: number) => 20 + height * 0.6;
 export const JUMP_DURATION = 0.64, JUMP_HEIGHT = 4;
 

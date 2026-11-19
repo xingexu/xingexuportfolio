@@ -593,9 +593,26 @@ test('Richard walks a furniture-free route, yields to the player and returns to 
   const inside = { x: 44.9, z: 32 };
   const pose = beatAt('take', 0.5);
   view.apply(pose, pose.yaw);
-  const fromNorth = { x: inside.x, z: inside.z + 11 };
-  const movement = W.step(index, fromNorth, 0, -13, 2.38, (from, to, r) => view.blocks(from, to, r, pose.sit));
+  const fromSouth = { x: inside.x, z: inside.z + 11 };
+  const movement = W.step(index, fromSouth, 0, -13, 2.38, (from, to, r) => view.blocks(from, to, r, pose));
   assert.ok(movement.z > inside.z + 4, 'player cannot walk through the open door and Richard');
+});
+
+test('the fridge door pauses before it swings into a stationary visitor', () => {
+  const player = { x: 44.8, z: 38.1 }, radius = 2.38;
+  assert.ok(!W.blocked(CHAPTERS.length - 1, player.x, player.z, radius), 'the visitor can stand in the aisle');
+  for (const action of ['open', 'shut']) {
+    const { start, end } = routine.beats.find(b => b.action === action);
+    let time = start, hit = false;
+    const visitor = action === 'open' ? player : { x: 44.8, z: 32.1 };
+    for (let i = 0; i < 100 && time < end; i++) {
+      const next = R.advanceRoommate(routine, time, 0.016, visitor, radius);
+      if (next === time) { hit = true; break; }
+      time = next;
+    }
+    assert.ok(hit, `door pauses while trying to ${action}`);
+    assert.ok(R.advanceRoommate(routine, time, 0.016, { x: 8, z: 18 }, radius) > time, 'door resumes when clear');
+  }
 });
 
 test('the animated fridge opens, hands off the carton, closes and returns it after a sip', () => {

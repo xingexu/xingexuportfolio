@@ -13,6 +13,7 @@ export const FRIDGE_HINGE = { x: 4.5, y: 0, z: 3.5 };
 export const FRIDGE_HANDLE = { x: -8.75, y: 11.6, z: 1.25 };
 export const FRIDGE_MILK = { x: -3, y: 10.35, z: 2.6 };
 export const FRIDGE_SWING = 1.1;
+export const FRIDGE_DOOR_MARGIN = 0.6;
 
 const clamp = (t: number) => Math.max(0, Math.min(1, t));
 export const easeRoommate = (t: number) => { const u = clamp(t); return u * u * (3 - 2 * u); };
@@ -129,6 +130,15 @@ export function placementPoint(p: Placement, x: number, z: number): Vec {
   return { x: p.x + [x, z, -x, -z][rot], z: p.z + [z, -x, -z, x][rot] };
 }
 
+export function fridgeDoorDistance(fridge: Placement, open: number, p: Vec) {
+  const theta = open * FRIDGE_SWING;
+  const hinge = placementPoint(fridge, FRIDGE_HINGE.x, FRIDGE_HINGE.z);
+  const end = placementPoint(fridge, FRIDGE_HINGE.x - 9.5 * Math.cos(theta), FRIDGE_HINGE.z + 9.5 * Math.sin(theta));
+  const dx = end.x - hinge.x, dz = end.z - hinge.z;
+  const t = clamp(((p.x - hinge.x) * dx + (p.z - hinge.z) * dz) / (dx * dx + dz * dz));
+  return Math.hypot(p.x - hinge.x - t * dx, p.z - hinge.z - t * dz);
+}
+
 export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Placement) {
   const out = { x: spec.x + 5, z: spec.z };
   const fridgeSpot = placementPoint(fridge, -2, 8.1), fridgeYaw = ((fridge.rot ?? 0) + 2) * Math.PI / 2;
@@ -163,7 +173,7 @@ export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Pla
   add("rack", 0.8);
   walk(crossing, north, east, out);
   add("sit", 0.65, spec, Math.PI / 2);
-  return { beats, total };
+  return { beats, total, fridge };
 }
 
 export type RoommateRoutine = ReturnType<typeof buildRoommateRoutine>;
@@ -189,5 +199,14 @@ export function advanceRoommate(routine: RoommateRoutine, time: number, dt: numb
   const current = sampleRoommate(routine, time), next = sampleRoommate(routine, time + dt);
   const distance = Math.hypot(next.x - player.x, next.z - player.z);
   if (distance < radius + ROOMMATE_RADIUS && distance < Math.hypot(current.x - player.x, current.z - player.z)) return time;
+  if (next.door !== current.door) {
+    const steps = Math.ceil(Math.abs(next.door - current.door) / 0.035);
+    let distance = fridgeDoorDistance(routine.fridge, current.door, player);
+    for (let i = 1; i <= steps; i++) {
+      const tested = fridgeDoorDistance(routine.fridge, current.door + (next.door - current.door) * i / steps, player);
+      if (tested < radius + FRIDGE_DOOR_MARGIN && tested < distance) return time;
+      distance = tested;
+    }
+  }
   return (time + dt) % routine.total;
 }

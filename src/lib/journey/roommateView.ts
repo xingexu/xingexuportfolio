@@ -3,7 +3,7 @@ import { AVATAR_VOXEL_SIZE } from "./avatar";
 import type { Placement, Roommate } from "./data";
 import {
   buildFridgeCabinet, buildFridgeDoor, buildHockeyStick, buildMilkCarton, buildRoommate, buildRoommateRoutine,
-  easeRoommate, FRIDGE_HANDLE, FRIDGE_HINGE, FRIDGE_MILK, FRIDGE_SWING, FRIDGE_VOXEL_SIZE,
+  easeRoommate, fridgeDoorDistance, FRIDGE_DOOR_MARGIN, FRIDGE_HANDLE, FRIDGE_HINGE, FRIDGE_MILK, FRIDGE_SWING, FRIDGE_VOXEL_SIZE,
   RANGERS_CREST_VOXEL_SIZE, ROOMMATE_RADIUS, ROOMMATE_SEAT, sampleRoommate, type RoommatePose,
 } from "./roommate";
 import { AVATAR_SCALE, type Vec } from "./world";
@@ -159,20 +159,14 @@ export function makeRoommateView(spec: Roommate, fridge: Placement, pad: Placeme
     return head.position.y + floor + (parts.head.bounds().maxY + 1) * SIZE + 2.5;
   }
 
-  function blocks(from: Vec, to: Vec, radius: number, sit: number) {
-    const centerX = holder.position.x + sit * 2.4, centerZ = holder.position.z;
+  function blocks(from: Vec, to: Vec, radius: number, pose: RoommatePose) {
+    const centerX = holder.position.x + pose.sit * 2.4, centerZ = holder.position.z;
     const distance = (pos: Vec) => Math.hypot(pos.x - centerX, pos.z - centerZ);
     const nextDistance = distance(to);
     if (nextDistance < radius + ROOMMATE_RADIUS && nextDistance < distance(from)) return true;
-    if (hinge.rotation.y < 0.01) return false;
-    const a = hinge.localToWorld(new Vector3()), b = hinge.localToWorld(new Vector3(-9.5, 0, 0));
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const doorDistance = (pos: Vec) => {
-      const t = Math.min(1, Math.max(0, ((pos.x - a.x) * dx + (pos.z - a.z) * dz) / (dx * dx + dz * dz)));
-      return Math.hypot(pos.x - a.x - t * dx, pos.z - a.z - t * dz);
-    };
-    const nextDoor = doorDistance(to);
-    return nextDoor < radius + 0.6 && nextDoor < doorDistance(from);
+    if (pose.door <= 0) return false;
+    const nextDoor = fridgeDoorDistance(fridge, pose.door, to);
+    return nextDoor < radius + FRIDGE_DOOR_MARGIN && nextDoor < fridgeDoorDistance(fridge, pose.door, from);
   }
 
   const pose = sampleRoommate(routine, 0);

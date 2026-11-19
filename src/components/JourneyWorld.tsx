@@ -706,7 +706,7 @@ export default function JourneyWorld(props: Props) {
         if (Math.hypot(player.vx, player.vz) > 0.02) {
           const radius = (height >= 29 ? 3.5 : 3) * AVATAR_SCALE;
           const npc = room(chapter).roommate;
-          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, npc ? (from, to, r) => npc.blocks(from, to, r, npc.pose.sit) : undefined);
+          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, npc ? (from, to, r) => npc.blocks(from, to, r, npc.pose) : undefined);
           const movement = { x: result.x - player.x, z: result.z - player.z };
           player.x = result.x; player.z = result.z;
           for (const { state } of room(chapter).reactive) bumpProp(state, result, movement, radius, dt);

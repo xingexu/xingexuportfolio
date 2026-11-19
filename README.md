@@ -10,7 +10,7 @@ Feel free to explore my work or reach out at [xingexu1107@gmail.com](mailto:xing
 
 It's a Next.js (App Router) site. Here's where everything lives:
 
-- `src/app/` — routes and pages (home, `/about`, `/projects`, `/resume`), plus the layout, metadata, sitemap, and the generated Open Graph image.
+- `src/app/` — routes and pages (`/about`, `/home`, `/projects`, `/resume`), plus the layout, metadata, sitemap, and the generated Open Graph image.
 - `src/components/` — the actual UI: the animated day/night `Background`, the `Hero` section, `Resume`, `Projects`, and the small bits like `Nav` and `Footer`.
 - `src/lib/` — small shared helpers (right now, just the audio context used for sound effects).
 - `public/images/` — photos and animation frames used around the site.
@@ -25,7 +25,7 @@ npm run dev
 
 Then open `http://localhost:3000` and you're good to go.
 
-The `/about` page is a small 3D game: I grow up from age 7 to 18 as you walk forward through six rooms — arriving in Canada, 18 Holsworthy Crescent, grade 5, 10 Elm Avenue, Bayview Secondary, and my room in Ontario Hall at Western. Use **W/S** or **↑/↓** to move, **A/D** or **←/→** to turn, **E** to inspect the nearest object, and **Esc** to skip an intro or transition. Doors open as you approach. Drag the scene with a mouse or finger, or use the touch joystick. Click or tap an object to inspect it.
+The site opens at `/about`, a small 3D game: I grow up from age 7 to 18 as you walk through six rooms, from arriving in Canada to Ontario Hall at Western. Use **W/S** or **↑/↓** to move, **A/D** or **←/→** to turn, **Space** to jump, **E** to inspect, and **Esc** to skip an intro or transition. Drag the scene or use the touch joystick and Jump button. **Skip to portfolio** opens the original homepage at `/home`.
 
 - `src/lib/journey/voxel.ts` is a sparse grid with a 3×5 voxel font for signs. `models.ts` draws the props, using a finer grid for details like the MacBook and trophy labels. `avatar.ts` builds the character and `world.ts` builds room shells and handles collisions, reach, spawns and age-by-position.
 - `src/lib/journey/data.ts` is the content: chapters, outfits, and every object’s text and links. Add or edit an object there; its position, model and links live in one entry.
@@ -48,4 +48,4 @@ Run `npm run test:world` to check that every object has real text and valid link
 
 The parser verifies all dates and checks that daily counts add up to GitHub's headline total. If GitHub changes its calendar markup or is unavailable, the tracker shows a retry option and a link to the profile instead of an incorrect total.
 
-About fills the viewport without the standard site header or footer. A small exit icon returns home. The existing pixel-ink entrance waits for the world's first frame; Escape and reduced motion skip it, and interrupted navigation has a recovery timeout. Other page links retain their short fades. Project sections reveal as they enter the viewport.
+About fills the viewport without the standard site header or footer. The textured lawn stays visible outside indoor rooms when the camera cuts away walls. The pixel-ink transition plays when entering About from another page; direct visits start with the skippable arrival scene. Other page links retain their short fades.

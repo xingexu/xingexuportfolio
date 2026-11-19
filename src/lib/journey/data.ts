@@ -77,7 +77,7 @@ const ROOMS: Chapter[] = [
     id: "holsworthy", stop: "18 Holsworthy", stopNote: "my first home in Canada", number: "02", place: "18 Holsworthy Crescent", location: "Markham, Ontario", heading: "My first home.",
     intro: "My first home in Canada. This is the room where chess, badminton and computer games all started.",
     ageFrom: 7, ageTo: 9, outfit: "kid", outfitLabel: "Propeller cap · rainbow lollipop · shorts",
-    width: 64, depth: 72, floor: "wood", wall: 0xa9c7d6, trim: 0xf1ead8, background: 0x0e1014, doorLabel: "SCHOOL",
+    width: 64, depth: 72, floor: "wood", wall: 0xa9c7d6, trim: 0xf1ead8, background: 0xa6c6d5, doorLabel: "SCHOOL",
     items: [
       { id: "chess", model: "chess-table", x: -14, z: -16, label: "Chessboard", title: "Chessboard",
         description: "I started playing chess at 18 Holsworthy.",
@@ -103,7 +103,7 @@ const ROOMS: Chapter[] = [
     id: "school", stop: "Primary school", number: "03", place: "Grade 5", location: "Elementary school", heading: "Getting into code.",
     intro: "Grade 5: a perfect score on the Beaver Computing Challenge, Scratch, Python and Raspberry Pis.",
     ageFrom: 10, ageTo: 11, outfit: "starwars", outfitLabel: "Star Wars hoodie · pants · Nike Air Max",
-    width: 64, depth: 72, floor: "tile", wall: 0xe6dcc2, trim: 0x5d8a6b, background: 0x0e1014, doorLabel: "ELM AVE",
+    width: 64, depth: 72, floor: "tile", wall: 0xe6dcc2, trim: 0x5d8a6b, background: 0xa6c6d5, doorLabel: "ELM AVE",
     items: [
       { id: "beaver", model: "plaque-cemc-gold", x: 18, z: -33, y: 14, solid: false, label: "Beaver Computing Challenge certificate", title: "Beaver Computing Challenge",
         description: "I got a perfect score in grade 5.",
@@ -123,7 +123,7 @@ const ROOMS: Chapter[] = [
     id: "elm", stop: "Middle school", number: "04", place: "10 Elm Avenue", location: "10 Elm Avenue", heading: "A new house. A new instrument.",
     intro: "We moved into 10 Elm Avenue. I picked up piano and started writing math contests.",
     ageFrom: 11, ageTo: 13, outfit: "starwars", outfitLabel: "Star Wars hoodie · pants · Nike Air Max",
-    width: 64, depth: 72, floor: "carpet", wall: 0xb7c4a5, trim: 0xf3efe2, background: 0x0e1014, doorLabel: "BAYVIEW",
+    width: 64, depth: 72, floor: "carpet", wall: 0xb7c4a5, trim: 0xf3efe2, background: 0xa6c6d5, doorLabel: "BAYVIEW",
     items: [
       { id: "piano", model: "grand-piano", x: -17, z: -15, label: "Yamaha grand piano", title: "Yamaha grand piano",
         description: "I started playing piano after we moved to Elm Avenue.",
@@ -144,7 +144,7 @@ const ROOMS: Chapter[] = [
     id: "bayview", stop: "Secondary school", number: "05", place: "Bayview Secondary School", location: "Richmond Hill, Ontario", heading: "High school.",
     intro: "Volleyball, competitive programming, the AIME, Brawl Stars, my own projects, and FBLC, from member to president.",
     ageFrom: 14, ageTo: 17, outfit: "essentials", outfitLabel: "Essentials hoodie · grey sweatpants · Yeezy Slides",
-    width: 72, depth: 76, floor: "gym", wall: 0xc8ccd2, trim: 0x23477a, background: 0x0e1014, doorLabel: "WESTERN",
+    width: 72, depth: 76, floor: "gym", wall: 0xc8ccd2, trim: 0x23477a, background: 0xa6c6d5, doorLabel: "WESTERN",
     items: [
       { id: "volleyball", model: "volleyball", x: -17, z: 17, ball: "mikasa", label: "Mikasa volleyball", title: "Mikasa volleyball",
         description: "I started playing in high school. Press R or tap Spike near the ball.",
@@ -196,7 +196,7 @@ const ROOMS: Chapter[] = [
     id: "western", stop: "University", number: "06", place: "Ontario Hall", location: "Western University · London, Ontario", heading: "Where I am now.",
     intro: "My first-year double room at Western.",
     ageFrom: 18, ageTo: 18, outfit: "western", outfitLabel: "Regular-fit black hoodie & sweatpants · black UGGs",
-    width: 132, depth: 128, floor: "laminate", wall: 0x3f3c4e, trim: 0x554463, background: 0x0d0c16, doorLabel: "NEXT",
+    width: 132, depth: 128, floor: "laminate", wall: 0x3f3c4e, trim: 0x554463, background: 0x25334c, doorLabel: "NEXT",
     items: [
       { id: "degree", model: "cs-ivey", x: 47, z: 61, y: 18, rot: 2, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey",
         description: "I study Computer Science at Western and have Ivey AEO status.",

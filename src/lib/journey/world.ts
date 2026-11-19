@@ -11,6 +11,27 @@ export const AVATAR_SCALE = 0.68;
 export const DOOR_VOXEL_SIZE = 0.5;
 export const renderPixelSize = (width: number, height: number) => Math.max(1, Math.ceil(Math.sqrt(width * height / 420_000))) / 2;
 
+export const GRASS_TILE_SIZE = 128;
+
+export function buildGrassTile() {
+  const size = GRASS_TILE_SIZE, pixels = new Uint8Array(size * size * 4);
+  const patch = (x: number, z: number, width: number) => {
+    const count = size / width;
+    const at = (u: number, v: number) => hash3(u % count, width, v % count);
+    const i = Math.floor(x / width), j = Math.floor(z / width);
+    const u = x / width - i, v = z / width - j;
+    return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) +
+      (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+  };
+  for (let z = 0; z < size; z++) for (let x = 0; x < size; x++) {
+    const blade = hash3(x, 71, z), clump = patch(x, z, 8), field = patch(x, z, 32);
+    const tone = field > 0.59 ? 0x79944a : 0x5e884c;
+    const color = shade(tone, 0.74 + 0.25 * clump + 0.13 * field + 0.14 * blade + (blade > 0.95 ? 0.12 : 0));
+    pixels.set([(color >> 16) & 255, (color >> 8) & 255, color & 255, 255], (z * size + x) * 4);
+  }
+  return pixels;
+}
+
 export function cameraOffsets(height: number, aspect: number, front: number, tilt: number) {
   const portrait = Math.max(0, 1 - aspect);
   const level = 44 + 10 * portrait - 15 * front;
@@ -242,7 +263,13 @@ export function spawn(index: number, from: "start" | "forward" | "back"): Vec & 
   return { x: 0, z: room.maxZ - 7, yaw: Math.PI };
 }
 
-export const walkSpeed = (height: number) => 18 + height * 0.55;
+export const walkSpeed = (height: number) => 20 + height * 0.6;
+export const JUMP_DURATION = 0.64, JUMP_HEIGHT = 4;
+
+export function jumpHeight(elapsed: number) {
+  const t = Math.max(0, Math.min(1, elapsed / JUMP_DURATION));
+  return 4 * JUMP_HEIGHT * t * (1 - t);
+}
 
 /* ── Room shells ─────────────────────────────────────────────────────── */
 

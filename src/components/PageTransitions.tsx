@@ -14,6 +14,7 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 export default function PageTransitions({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const previousPath = useRef(pathname);
   const animation = useRef<Animation | null>(null);
   const navigating = useRef(false);
   const recovery = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -53,11 +54,13 @@ export default function PageTransitions({ children }: { children: ReactNode }) {
 
   useLayoutEffect(() => {
     const content = document.getElementById("page-content");
+    const changedPage = previousPath.current !== pathname;
+    previousPath.current = pathname;
     navigationId.current += 1;
     navigating.current = false;
     clearTimeout(recovery.current);
     animation.current?.cancel();
-    if (pathname === "/about" && !skipRoomEntrance.current && !reducedMotion() && !document.hidden) {
+    if (pathname === "/about" && changedPage && !skipRoomEntrance.current && !reducedMotion() && !document.hidden) {
       void roomTransition.current?.enter();
     } else {
       roomTransition.current?.clear();

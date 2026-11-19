@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import Hero from "@/components/Hero";
 import HomeIntro from "@/components/HomeIntro";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/home" },
+  openGraph: { url: "/home" },
+};
 
 /**
  * Home route. Server component — the Hero (a client component for its typing

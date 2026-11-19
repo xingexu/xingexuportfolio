@@ -66,8 +66,8 @@ function mp4Tracks(file) {
   return tracks.sort();
 }
 
-test('CSA keeps its captioned audio and Buldak ships as a genuinely silent video', () => {
-  for (const [id, filename] of [['csa', 'csa'], ['buldak', 'buldak']]) {
+test('CSA keeps its captioned audio; Buldak and Richard have silent playable videos', () => {
+  for (const [id, filename] of [['csa', 'csa'], ['buldak', 'buldak'], ['richard', 'richard']]) {
     const { video } = ALL_ITEMS.find(item => item.id === id);
     assert.equal(video.src, `/videos/journey/${filename}.mp4`);
     assert.ok(video.label);

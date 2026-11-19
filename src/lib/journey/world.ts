@@ -1,4 +1,4 @@
-import { CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, type Chapter, type JourneyItem, type Placement } from "./data";
+import { CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, WESTERN_INDEX, type Chapter, type JourneyItem, type Placement } from "./data";
 import { modelFootprint, VOLLEYBALL_NET } from "./models";
 import type { BallField, CourtNet } from "./volleyball";
 import { Grid, hash3, shade, textWidth, type Color } from "./voxel";
@@ -256,6 +256,7 @@ export const INTRO_END: Vec = { x: -1, z: -12 };
 export type RoomArrival = "start" | "forward" | "back" | "portal";
 export function spawn(index: number, from: RoomArrival): Vec & { yaw: number } {
   const room = interior(JOURNEY_ROOMS[index]);
+  if (index === CSA_ROOM_INDEX) return { x: 0, z: 40, yaw: Math.PI };
   if (index === WESTERN_INDEX && from === "portal" && csaPoster) {
     return { x: room.minX + 8, z: csaPoster.z, yaw: Math.PI / 2 };
   }
@@ -299,11 +300,15 @@ function floorColor(chapter: Chapter, x: number, z: number): Color {
   const n = hash3(x, 0, z);
   switch (chapter.floor) {
     case "dance": {
-      if (x < -30 || x >= 30 || z < -19 || z >= 23) return shade(0x383044, 0.92 + n * 0.13);
-      const col = Math.floor((x + 30) / 6), row = Math.floor((z + 19) / 6);
-      const seam = (x + 30) % 6 === 0 || (z + 19) % 6 === 0;
-      const tiles = [0x3e3850, 0x504267, 0x5c4369, 0x4e4968, 0x645064];
-      return seam ? 0x30283e : shade(tiles[(col * 3 + row * 2) % tiles.length], 0.97 + n * 0.08);
+      if (Math.abs(x) < 48 && z < -39 && z > CSA_STAGE_Z - 15) return shade(0x50314b, 0.85 + n * 0.14);
+      if (x < -46 || x >= 46 || z < -38 || z >= 41) {
+        const seam = x % 8 === 0 || z % 8 === 0;
+        return shade(seam ? 0x30283b : 0x3b3348, 0.92 + n * 0.13);
+      }
+      const col = Math.floor((x + 46) / 8), row = Math.floor((z + 38) / 8);
+      const seam = (x + 46) % 8 === 0 || (z + 38) % 8 === 0;
+      const tiles = [0x44385a, 0x604a75, 0x6b466e, 0x4d5478, 0x63526f];
+      return seam ? 0x352a48 : shade(tiles[(col * 3 + row * 2) % tiles.length], 0.97 + n * 0.08);
     }
     case "wood": case "laminate": case "gym": {
       const width = chapter.floor === "laminate" ? 5 : 4, plank = Math.floor((x + 512) / width);

@@ -20,17 +20,17 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(req, result, result.exports);
   return result.exports;
 }
-const { CHAPTERS, ALL_ITEMS, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
+const { CHAPTERS, ALL_ITEMS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
-const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
+const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
-const { CSA_GUESTS, csaHeadphones, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
+const { CSA_GUESTS, buildCsaGuest, makeCsaParty, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
-const { Group, Mesh, MeshBasicMaterial, Vector3 } = require('three');
+const { Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
 
 test('every item is written out, linked properly and has a model', () => {
   const ids = new Set();
@@ -915,12 +915,30 @@ test('CSA After Hours has a clear return door and a closed wall behind the DJ', 
   const radius = 3.5 * W.AVATAR_SCALE, spawn = W.spawn(CSA_ROOM_INDEX, 'portal');
   assert.ok(!W.blocked(CSA_ROOM_INDEX, spawn.x, spawn.z, radius));
   assert.equal(spawn.yaw, Math.PI);
-  assert.equal(W.step(CSA_ROOM_INDEX, spawn, 0, 10, radius).exit, 'prev');
   const bounds = W.interior(JOURNEY_ROOMS[CSA_ROOM_INDEX]);
+  assert.equal(W.step(CSA_ROOM_INDEX, spawn, 0, bounds.maxZ - spawn.z + 2, radius).exit, 'prev');
   assert.ok(W.blocked(CSA_ROOM_INDEX, 0, bounds.minZ - 2, radius));
   const shell = W.buildRoomShell(CSA_ROOM_INDEX);
   assert.ok(shell.has(0, 5, bounds.minZ - 1), 'no door opening in the stage wall');
   assert.ok(!shell.has(0, 5, bounds.maxZ), 'the return doorway is open in the shell');
+});
+
+test('the larger party hall has a CSA logo and walkable food counters with solid bases', () => {
+  const hall = JOURNEY_ROOMS[CSA_ROOM_INDEX], radius = 3.5 * W.AVATAR_SCALE;
+  assert.ok(hall.width * hall.depth > 3 * 96 * 84);
+  const cells = reachable(CSA_ROOM_INDEX, W.spawn(CSA_ROOM_INDEX, 'portal'), radius);
+  assert.ok(cells.some(p => p.x === 0 && p.z === -44), 'a direct approach to the stage is open');
+  const logo = hall.decor.find(prop => prop.model === 'csa-stage-logo');
+  assert.ok(logo.y >= 20 && logo.solid === false);
+  assert.equal(buildModel(logo.model).size, buildModel('poster-csa').size);
+  for (const [id, topping] of [['csa-bubble-tea', 0x3d2839], ['csa-sushi', 0xf58e7e], ['csa-desserts', 0xffd870]]) {
+    const counter = hall.decor.find(prop => prop.model === id), box = W.placementBox(counter);
+    assert.ok(W.blocked(CSA_ROOM_INDEX, counter.x, counter.z, radius));
+    assert.ok(cells.some(p => W.boxDistance(box, p) < radius + 2), id);
+    let details = 0;
+    buildModel(id).forEach((_x, y, _z, color) => { if (y >= 13 && color === topping) details++; });
+    assert.ok(details > 5, id);
+  }
 });
 
 test('all eight guests animate in place, with reduced motion and a dedicated DJ', () => {
@@ -942,21 +960,50 @@ test('all eight guests animate in place, with reduced motion and a dedicated DJ'
   }
 });
 
-test('the black CSA tee has a light front print and the DJ headphones sit outside the head', () => {
-  const { torso, head, legL } = buildAvatar(18, 'csa');
-  let print = 0;
-  torso.forEach((x, y, z, color) => {
-    if (color === 0xf6efe4) {
-      assert.equal(z, 3);
-      assert.ok(!torso.has(x, y, z + 1));
-      print++;
-    }
+test('the black CSA tee has only a small chest wordmark and larger cat artwork on the back', () => {
+  const { torso, shirtPrint, legL } = buildAvatar(18, 'csa');
+  assert.ok(SHIRT_PRINT_VOXEL_SIZE < AVATAR_VOXEL_SIZE);
+  const front = new Grid();
+  let back = 0;
+  shirtPrint.forEach((x, y, z, color) => {
+    assert.ok(torso.has(Math.floor(x / 4), Math.floor(y / 4), z > 0 ? 3 : -4), 'ink is on the shirt');
+    if (z === 16) front.set(x, y, z, color);
+    else { assert.equal(z, -17); back++; }
   });
-  assert.ok(print > 35);
+  const bounds = front.bounds();
+  const glyphStarts = [-1, 3, 7, 11, 15, 21];
+  assert.ok(glyphStarts.every(x => [0, 1, 2].some(dx => front.has(x + dx, bounds.maxY, 16))));
+  assert.equal(bounds.maxY - bounds.minY + 1, 4, 'small lowercase wordmark');
+  assert.ok(bounds.minX >= -1 && bounds.minY > torso.bounds().maxY * 2);
+  assert.ok(back > front.size * 3);
   legL.forEach((_x, _y, _z, color) => assert.ok(color <= 0x363636));
-  assert.ok(!head.has(-10, 8, 0));
-  csaHeadphones(head);
+});
+
+test('the four reference-based hairstyles have distinct silhouettes', () => {
+  const guest = name => buildCsaGuest(CSA_GUESTS.find(entry => entry.name === name));
+  const jason = guest('Jason Zhuang'), william = guest('William Wang');
+  assert.ok(william.head.bounds().maxY > jason.head.bounds().maxY, 'William has taller tousled tips');
+  assert.ok(guest('Lydia Zheng').head.bounds().minY < guest('Amelie Hu').head.bounds().minY, 'Lydia has longer straight hair');
+  assert.equal(william.torso.get(2, 21, 3), 0xe1ded7, 'the silver chain is on the chest');
+  const { head } = guest('Rain Li');
   assert.ok(head.has(-10, 8, 0) && head.has(9, 8, 0) && head.has(0, 15, 0));
+});
+
+test('the DJ meshes can be picked and the same URL is available by the booth', t => {
+  const document = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (document) globalThis.document = document; else delete globalThis.document; });
+  const material = new MeshBasicMaterial({ vertexColors: true });
+  const party = makeCsaParty(material, material), dj = CSA_GUESTS.find(guest => guest.dj);
+  t.after(() => { party.dispose(); material.dispose(); });
+  party.update(0, true, { x: 0, z: -44 });
+  party.group.updateMatrixWorld(true);
+  const ray = new Raycaster(new Vector3(dj.x, 21, dj.z + 18), new Vector3(0, 0, -1));
+  const hit = ray.intersectObjects(party.djPickables, false)[0];
+  assert.ok(hit?.object.userData.csaDj);
+  assert.ok(party.nearDj({ x: 0, z: -44 }));
+  assert.ok(!party.nearDj(W.spawn(CSA_ROOM_INDEX, 'portal')));
+  assert.equal(CSA_DJ_LINK.href, 'https://wewantdrought.me');
 });
 
 test('the floating arrows mark the walkable aisle from every spawn to its exit', () => {

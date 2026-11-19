@@ -207,7 +207,7 @@ export default function JourneyWorld(props: Props) {
           owned.push(geometry);
           return new Mesh(geometry, paint);
         });
-        const prop = { holder: npc.holder, material, bounds: new Box3().setFromObject(npc.holder), visibility: 1 };
+        const prop = { holder: npc.holder, material, bounds: npc.bounds, visibility: 1 };
         group.add(npc.group);
         props.push(prop);
         roommate = { ...npc, prop, fridge: fridgeProp };
@@ -225,7 +225,9 @@ export default function JourneyWorld(props: Props) {
         parent.add(marker);
         items.set(item.id, { material, marker, markerMaterial, markerY });
       }
-      const view = { group, items, props, reactive, balls, itemPositions, field: balls.length ? buildBallField(index) : undefined, doors, pickables, walls, roommate };
+      const field = balls.length ? buildBallField(index) : undefined;
+      if (roommate) field?.blocks.push(roommate.ballBlock);
+      const view = { group, items, props, reactive, balls, itemPositions, field, doors, pickables, walls, roommate };
       rooms.set(index, view);
       return view;
     }
@@ -749,7 +751,6 @@ export default function JourneyWorld(props: Props) {
 
       const activeRoom = room(chapter);
       if (!transition && !blockedNow && !intro) {
-        updateVolleyballs(dt, activeRoom);
         kickPose = Math.max(0, kickPose - dt);
         const npc = activeRoom.roommate;
         if (npc && (!motion.matches || npc.time !== 0)) {
@@ -761,10 +762,10 @@ export default function JourneyWorld(props: Props) {
             const turn = npc.pose.yaw - npc.yaw;
             npc.yaw += Math.atan2(Math.sin(turn), Math.cos(turn)) * (motion.matches ? 1 : 1 - Math.exp(-dt * 16));
             npc.markerY = npc.apply(npc.pose, npc.yaw);
-            npc.prop.bounds.setFromObject(npc.holder);
             if (npc.pose.door !== previous.door) npc.fridge.bounds.setFromObject(npc.fridge.holder).expandByScalar(1);
           }
         }
+        updateVolleyballs(dt, activeRoom);
       }
 
       // Avatar pose

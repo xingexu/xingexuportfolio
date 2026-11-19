@@ -1,4 +1,4 @@
-import { Group, Mesh, MeshBasicMaterial, Vector3 } from "three";
+import { Box3, Group, Mesh, MeshBasicMaterial, Vector3 } from "three";
 import { AVATAR_VOXEL_SIZE } from "./avatar";
 import type { Placement, Roommate } from "./data";
 import {
@@ -7,6 +7,7 @@ import {
   RANGERS_CREST_VOXEL_SIZE, ROOMMATE_RADIUS, ROOMMATE_SEAT, sampleRoommate, type RoommatePose,
 } from "./roommate";
 import { AVATAR_SCALE, type Vec } from "./world";
+import type { BallBlock } from "./volleyball";
 import { Grid } from "./voxel";
 
 type VoxelMesh = (grid: Grid, size: number, material?: MeshBasicMaterial) => Mesh;
@@ -85,6 +86,8 @@ export function makeRoommateView(spec: Roommate, fridge: Placement, pad: Placeme
   stand.position.set(pad.x + Math.cos(padYaw) * 2.5, PAD_HEIGHT, pad.z - Math.sin(padYaw) * 2.5);
   group.add(milk, stick, puck, stand);
   const routine = buildRoommateRoutine(spec, fridge, pad);
+  const bounds = new Box3();
+  const ballBlock: BallBlock = { minX: 0, maxX: 0, minZ: 0, maxZ: 0, bottom: 0, top: 0 };
 
   function apply(pose: RoommatePose, yaw: number) {
     const { action, u, sit, stride, door, heldMilk } = pose;
@@ -156,6 +159,10 @@ export function makeRoommateView(spec: Roommate, fridge: Placement, pad: Placeme
     });
     milk.position.copy(heldMilk ? holder.localToWorld(palms[1]) : shelf);
     milk.rotation.set(-drink * 1.04, heldMilk ? yaw : fridgeHolder.rotation.y, 0, "YXZ");
+    bounds.setFromObject(holder);
+    ballBlock.minX = bounds.min.x; ballBlock.maxX = bounds.max.x;
+    ballBlock.minZ = bounds.min.z; ballBlock.maxZ = bounds.max.z;
+    ballBlock.bottom = Math.max(0, bounds.min.y); ballBlock.top = bounds.max.y;
     return head.position.y + floor + (parts.head.bounds().maxY + 1) * SIZE + 2.5;
   }
 
@@ -171,5 +178,5 @@ export function makeRoommateView(spec: Roommate, fridge: Placement, pad: Placeme
 
   const pose = sampleRoommate(routine, 0);
   const markerY = apply(pose, pose.yaw);
-  return { group, holder, id: spec.id, routine, pose, markerY, time: 0, yaw: pose.yaw, apply, blocks };
+  return { group, holder, id: spec.id, routine, pose, markerY, time: 0, yaw: pose.yaw, apply, blocks, bounds, ballBlock };
 }

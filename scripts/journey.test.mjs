@@ -648,6 +648,25 @@ function roommateScene() {
   return { view, fridge };
 }
 
+test('the volleyball bounces off Richard in both his seated and moving poses', () => {
+  const { view } = roommateScene();
+  const field = W.buildBallField(CHAPTERS.length - 1);
+  field.blocks.push(view.ballBlock);
+  const checkBounce = () => {
+    const { maxX, minZ, maxZ } = view.ballBlock, z = (minZ + maxZ) / 2;
+    const ball = V.makeBall(maxX + 2.4, 0, z, 1.3);
+    V.launchBall(ball, { x: -19, y: 0, z: 0 });
+    V.stepBall(ball, field, 0.14);
+    assert.ok(ball.vx > 0 && ball.x > maxX + ball.radius, 'the ball bounces before entering his model');
+  };
+  const seatedMaxX = view.ballBlock.maxX;
+  checkBounce();
+  const walking = R.sampleRoommate(routine, routine.beats.find(b => b.action === 'walk').end - 0.1);
+  view.apply(walking, walking.yaw);
+  assert.ok(view.ballBlock.minX > seatedMaxX, 'the collider leaves the bed with Richard');
+  checkBounce();
+});
+
 test('Richard stickhandles with a grounded blade and keeps the puck on the pad', () => {
   const { view } = roommateScene();
   const stick = view.group.getObjectByName('Hockey stick'), puck = view.group.getObjectByName('Puck');

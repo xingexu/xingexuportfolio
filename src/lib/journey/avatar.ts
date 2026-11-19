@@ -118,10 +118,10 @@ function csaTee(height: number, ink: Color) {
   return print;
 }
 
-export function buildAvatar(age: number, outfit: Outfit, palette?: Partial<Pick<Look, "top" | "topDark">> & { skin?: Color; skinDark?: Color; hair?: Color }): AvatarParts {
-  const look = { ...LOOKS[outfit], ...palette };
-  const skin = palette?.skin ?? SKIN, skinDark = palette?.skinDark ?? SKIN_DARK;
-  const hair = palette?.hair ?? HAIR;
+export function buildAvatar(age: number, outfit: Outfit, style?: Partial<Pick<Look, "top" | "topDark" | "shorts">> & { skin?: Color; skinDark?: Color; hair?: Color }): AvatarParts {
+  const look = { ...LOOKS[outfit], ...style };
+  const skin = style?.skin ?? SKIN, skinDark = style?.skinDark ?? SKIN_DARK;
+  const hair = style?.hair ?? HAIR;
   const western = outfit === "western";
   const csa = outfit === "csa", adult = western || csa;
   const H = avatarHeight(age), t = (Math.min(18, Math.max(7, age)) - 7) / 11;
@@ -190,7 +190,7 @@ export function buildAvatar(age: number, outfit: Outfit, palette?: Partial<Pick<
     if (look.shorts) {
       leg.box(x, -Math.round(legs * 0.45), -D / 2, w, Math.round(legs * 0.45), D, look.pants);
       leg.box(x, -legs + footH, -1, w, legs - footH - Math.round(legs * 0.45), 2, skin);
-      leg.box(x, -legs + footH, -1, w, 1, 2, 0xf4f4f4);
+      leg.box(x, -legs + footH, -1, w, 1, 2, csa ? look.shoe : 0xf4f4f4);
     } else {
       leg.box(x, -legs + footH, -D / 2, w, legs - footH, D, look.pants);
       if (outfit === "essentials") leg.box(x, -legs + footH, -D / 2, w, 1, D, 0x7a7c80);

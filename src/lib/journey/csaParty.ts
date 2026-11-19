@@ -5,41 +5,53 @@ import { gridGeometry } from "./mesh";
 import { Grid, hash3, shade, type Color } from "./voxel";
 import { AVATAR_SCALE, type Vec } from "./world";
 
-type Hairstyle = "curtains" | "tousled" | "straight" | "waves";
-type Guest = Vec & { name: string; yaw: number; scale: number; dj?: boolean; hair?: Hairstyle; hairColor?: Color; chain?: boolean };
+type Hairstyle = "curtains" | "tousled" | "straight" | "waves" | "side-part" | "cropped-fringe";
+type Guest = Vec & {
+  name: string; yaw: number; scale: number; dj?: boolean; hair?: Hairstyle; hairColor?: Color;
+  skin?: Color; chain?: boolean; shorts?: boolean;
+};
 
 export const CSA_GUESTS: readonly Guest[] = [
   { name: "Jason Zhuang", x: -19, z: -14, yaw: 0.35, scale: 1, hair: "curtains", hairColor: 0x302722 },
   { name: "Rain Li", x: 0, z: CSA_STAGE_Z - 8, yaw: 0, scale: 1, dj: true },
   { name: "Amelie Hu", x: -34, z: 5, yaw: 1.15, scale: 0.91, hair: "waves", hairColor: 0x382821 },
   { name: "Lydia Zheng", x: 23, z: 8, yaw: -0.6, scale: 0.93, hair: "straight", hairColor: 0x453128 },
-  { name: "Daniel Su", x: 35, z: -22, yaw: -0.8, scale: 1 },
-  { name: "Lucas Xue", x: 36, z: 27, yaw: -1.9, scale: 1 },
+  { name: "Daniel Su", x: 35, z: -22, yaw: -0.8, scale: 1, hair: "side-part", hairColor: 0x2b2420, skin: 0xefd2ba },
+  { name: "Lucas Xue", x: 36, z: 27, yaw: -1.9, scale: 1.06, hair: "cropped-fringe", hairColor: 0x201e1e, skin: 0xe6c7ab, shorts: true },
   { name: "Jeffrey Ban", x: -31, z: 25, yaw: 1.7, scale: 1 },
   { name: "William Wang", x: 12, z: -18, yaw: -0.25, scale: 1, hair: "tousled", hairColor: 0x252020, chain: true },
 ];
 
 export function buildCsaGuest(guest: Guest) {
   const base = guest.hairColor ?? 0x242022;
-  const parts = buildAvatar(18, "csa", { hair: base });
+  const skin = guest.skin ?? 0xf8e1d0;
+  const parts = buildAvatar(18, "csa", { hair: base, skin: guest.skin, skinDark: guest.skin && shade(guest.skin, 0.91), shorts: guest.shorts ?? false });
   const { head, torso } = parts;
   const strand = (x: number, y: number, z: number) => shade(base, 0.81 + hash3(x, y, z) * 0.21 + ((x + z) % 3 === 0 ? 0.2 : 0));
   const hair = guest.hair;
   if (hair) {
     const long = hair === "straight" || hair === "waves";
+    const sidePart = hair === "side-part", cropped = hair === "cropped-fringe";
+    const fringeLengths = [0, 1, 1, 2, 4, 2, 0, 1, 0, 2, 4, 1, 0, 1, 3, 2, 1, 0];
     for (let x = -9; x < 9; x++) for (let z = -8; z <= 8; z++) {
-      const rim = (x + 0.5) ** 2 / 93 + (z + 0.5) ** 2 / 85;
+      const rim = (x + 0.5) ** 2 / (cropped ? 81 : 93) + (z + 0.5) ** 2 / 85;
       if (rim > 1.13) continue;
-      const tuft = hair === "tousled" ? Math.floor(hash3(x, 17, z) * 3) : 0;
-      const part = hair !== "tousled" && (x === -1 || x === 0) && z > -3;
+      const tuft = hair === "tousled" || cropped ? Math.floor(hash3(x, 17, z) * 3) : 0;
+      const part = hair !== "tousled" && !cropped && (sidePart ? x === 3 : x === -1 || x === 0) && z > -3;
       const top = 14 + Math.round((1 - rim) * (long ? 3 : 4)) + tuft - (part ? 2 : 0);
-      const fringe = long ? (Math.abs(x + 0.5) < 4 ? 12 : 8)
+      const bang = long ? (Math.abs(x + 0.5) < 4 ? 12 : 8)
+        : sidePart ? 8 + Math.max(0, 5 - Math.abs(x - 2))
+        : cropped ? 9 + fringeLengths[x + 9]
         : hair === "tousled" ? 9 + (x * x + 1) % 4 : 8 + Math.max(0, 4 - Math.abs(x));
-      const bottom = z > 5 ? fringe : Math.abs(x + 0.5) > 7 ? 8 : 12;
+      const bottom = z > 5 ? bang : Math.abs(x + 0.5) > 7 && !cropped ? 8 : 12;
       if (z >= 6 && bottom > 8) for (let y = 8; y < bottom; y++) {
-        if (head.get(x, y, z) === base) head.set(x, y, z, 0xf8e1d0);
+        if (head.get(x, y, z) === base) head.set(x, y, z, skin);
       }
       head.box(x, bottom, z, 1, Math.max(0, top - bottom + 1), 1, strand);
+    }
+    if (sidePart) {
+      for (const x of [-8, 7]) head.box(x, 0, 6, 1, 2, 2, -1);
+      head.box(-3, 0, 7, 6, 1, 1, 0xa75f53).set(-4, 1, 7, 0xa75f53).set(3, 1, 7, 0xa75f53);
     }
     if (long) {
       const wavy = hair === "waves", length = wavy ? 16 : 20;

@@ -979,7 +979,7 @@ test('the black CSA tee has only a small chest wordmark and larger cat artwork o
   legL.forEach((_x, _y, _z, color) => assert.ok(color <= 0x363636));
 });
 
-test('the four reference-based hairstyles have distinct silhouettes', () => {
+test('reference-based hairstyles have distinct silhouettes', () => {
   const guest = name => buildCsaGuest(CSA_GUESTS.find(entry => entry.name === name));
   const jason = guest('Jason Zhuang'), william = guest('William Wang');
   assert.ok(william.head.bounds().maxY > jason.head.bounds().maxY, 'William has taller tousled tips');
@@ -987,6 +987,19 @@ test('the four reference-based hairstyles have distinct silhouettes', () => {
   assert.equal(william.torso.get(2, 21, 3), 0xe1ded7, 'the silver chain is on the chest');
   const { head } = guest('Rain Li');
   assert.ok(head.has(-10, 8, 0) && head.has(9, 8, 0) && head.has(0, 15, 0));
+});
+
+test('Lucas wears black athletic shorts and Daniel has a swept side part, both with the CSA tee', () => {
+  const lucas = CSA_GUESTS.find(guest => guest.name === 'Lucas Xue');
+  const daniel = CSA_GUESTS.find(guest => guest.name === 'Daniel Su');
+  const cropped = buildCsaGuest(lucas), parted = buildCsaGuest(daniel);
+  assert.ok(lucas.scale > daniel.scale);
+  assert.ok(cropped.head.bounds().maxY > parted.head.bounds().maxY, 'Lucas has a textured crop');
+  assert.ok(!parted.head.has(7, 0, 7), 'Daniel has a rounded jaw');
+  const calf = -2 * cropped.hip + 6;
+  assert.equal(cropped.legL.get(-4, calf, 0), lucas.skin);
+  assert.ok(parted.legL.get(-4, calf, 0) < 0x303030, 'Daniel keeps long black pants');
+  assert.deepEqual(cropped.shirtPrint.cells, parted.shirtPrint.cells);
 });
 
 test('the DJ meshes can be picked and the same URL is available by the booth', t => {

@@ -279,7 +279,7 @@ export default function JourneyWorld(props: Props) {
       limbs.legR.add(mesh(next.legR)); limbs.legR.position.set(0, next.hip, 0);
       for (const [limb, elbow, grid, side] of [[limbs.armL, elbowL, next.armL, -1], [limbs.armR, elbowR, next.armR, 1]] as const) {
         limb.position.set(side * next.shoulderX, torsoTop, 0);
-        if (outfit !== "western" && outfit !== "essentials") {
+        if (outfit !== "western" && outfit !== "stussy") {
           limb.add(mesh(grid));
           continue;
         }

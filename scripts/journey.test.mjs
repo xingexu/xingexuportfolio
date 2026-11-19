@@ -475,7 +475,7 @@ test('front and tilt camera modes keep the full avatar in frame, even at the jum
 
 test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading', () => {
   assert.equal(AVATAR_VOXEL_SIZE, 0.5);
-  for (const outfit of ['starwars', 'essentials']) {
+  for (const outfit of ['starwars', 'stussy']) {
     const parts = buildAvatar(18, outfit);
     assert.equal(parts.height, 34);
     assert.ok(parts.head.bounds().minZ < -10);
@@ -483,6 +483,27 @@ test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading
     const cuffColors = new Set();
     parts.armL.forEach((_x, _y, z, color) => { if (z === 2) cuffColors.add(color); });
     assert.ok(cuffColors.size > 3);
+  }
+});
+
+test('Bayview wears a Stüssy hoodie and cuffed grey sweats throughout high school', () => {
+  const chapter = CHAPTERS.find(room => room.id === 'bayview');
+  assert.match(chapter.outfitLabel, /Stüssy hoodie · grey sweatpants/);
+  for (let age = chapter.ageFrom; age <= chapter.ageTo; age++) {
+    const { torso, legL, legR, hip } = buildAvatar(age, chapter.outfit);
+    const logo = { front: 0, back: 0 };
+    torso.forEach((_x, _y, z, color) => {
+      if (color === 0xece9e2) logo[z > 0 ? 'front' : 'back']++;
+    });
+    assert.ok(logo.front >= 10 && logo.back > logo.front * 2);
+    for (const [leg, outerX] of [[legL, -8], [legR, 7]]) {
+      const ankle = -2 * (hip - 2), knee = ankle + 5;
+      assert.equal(leg.has(outerX, ankle, 0), false, 'cuff tapers above the slides');
+      const grey = leg.get(outerX, knee, 0);
+      const value = grey & 255;
+      assert.equal(grey, value * 0x010101);
+      assert.ok(value >= 120 && value <= 190);
+    }
   }
 });
 
@@ -808,9 +829,9 @@ test('the story runs from age 7 to 18 with the requested outfits', () => {
   assert.equal(CHAPTERS[0].ageFrom, 7);
   assert.equal(CHAPTERS.at(-1).ageTo, 18);
   for (let i = 1; i < CHAPTERS.length; i++) assert.ok(CHAPTERS[i].ageFrom <= CHAPTERS[i - 1].ageTo + 1 && CHAPTERS[i].ageFrom >= CHAPTERS[i - 1].ageTo, CHAPTERS[i].id);
-  assert.deepEqual(CHAPTERS.map(c => c.outfit), ['kid', 'kid', 'starwars', 'starwars', 'essentials', 'western']);
+  assert.deepEqual(CHAPTERS.map(c => c.outfit), ['kid', 'kid', 'starwars', 'starwars', 'stussy', 'western']);
   for (let age = 8; age <= 18; age++) assert.ok(avatarHeight(age) > avatarHeight(age - 1), `grows at ${age}`);
-  for (const outfit of ['kid', 'starwars', 'essentials', 'western']) for (const age of [7, 11, 15, 18]) {
+  for (const outfit of ['kid', 'starwars', 'stussy', 'western']) for (const age of [7, 11, 15, 18]) {
     const parts = buildAvatar(age, outfit);
     assert.equal(parts.height, avatarHeight(age));
     assert.equal(!!parts.propeller, outfit === 'kid');

@@ -14,6 +14,7 @@ export type AvatarParts = {
 };
 
 const SKIN = 0xf8e1d0, SKIN_DARK = 0xecc9b4, HAIR = 0x1d1714, EYE = 0x15161a;
+export { SKIN as AVATAR_SKIN };
 const HEIGHTS: Record<number, number> = { 7: 20, 8: 21, 9: 22, 10: 23, 11: 24, 12: 26, 13: 27, 14: 29, 15: 30, 16: 31, 17: 32, 18: 34 };
 export const avatarHeight = (age: number) => HEIGHTS[Math.max(7, Math.min(18, Math.round(age)))];
 export const AVATAR_VOXEL_SIZE = 0.5;
@@ -80,8 +81,8 @@ function straightLeg(side: -1 | 1, length: number, look: Look) {
   return leg;
 }
 
-export function buildAvatar(age: number, outfit: Outfit): AvatarParts {
-  const look = LOOKS[outfit];
+export function buildAvatar(age: number, outfit: Outfit, topColors?: Pick<Look, "top" | "topDark">): AvatarParts {
+  const look = { ...LOOKS[outfit], ...topColors };
   const western = outfit === "western";
   const H = avatarHeight(age), t = (Math.min(18, Math.max(7, age)) - 7) / 11;
   const headH = !western && age >= 13 ? 8 : 7;

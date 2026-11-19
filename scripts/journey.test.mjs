@@ -22,7 +22,7 @@ function load(file) {
 }
 const { CHAPTERS, ALL_ITEMS } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
-const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
+const { AVATAR_SKIN, AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
@@ -508,7 +508,7 @@ test('the Western avatar grows taller without widening the Grade 5 face or shoul
   assert.match(CHAPTERS.at(-1).outfitLabel, /UGGs/);
 });
 
-test('Richard sits on the second bed with a white hoodie, shorts, a cap and a milk carton', () => {
+test('Richard sits on the second bed in shorts with a milk carton', () => {
   const room = CHAPTERS.at(-1), index = CHAPTERS.length - 1;
   const beds = room.items.filter(item => item.model.startsWith('bed-'));
   assert.equal(beds.length, 2);
@@ -518,12 +518,37 @@ test('Richard sits on the second bed with a white hoodie, shorts, a cap and a mi
   assert.equal(buildModel(bed.model).get(7, R.ROOMMATE_SEAT - 1, 0) >= 0, true);
   assert.ok(W.blocked(index, at.x + 5, at.z, 1), 'the aisle collision includes his knees');
   assert.ok(!W.blocked(index, at.x + 11, at.z, 2), 'there is still room to walk up');
-  const { seated, head, forearm, carton } = R.buildRoommate();
+  const { seated, forearm, carton } = R.buildRoommate();
   assert.equal(seated.get(-5, -1, 4), 0x384351, 'shorts');
-  assert.equal(seated.get(-5, -6, 10), 0xe9bf9d, 'bare shins');
-  assert.equal(seated.get(0, 14, 0) >>> 16 >= 0xcc, true, 'white fleece');
-  assert.equal(head.get(0, 7, 9), 0x31415e, 'cap brim');
+  assert.equal(seated.get(-5, -6, 10), AVATAR_SKIN, 'bare shins match the avatar skin tone');
   assert.ok(forearm.size > 0 && carton.size > 0);
+});
+
+test('Richard shares the Western avatar face and fit, with a backward black cap', () => {
+  const avatar = buildAvatar(18, 'western'), { head, torso, headHeight } = R.buildRoommate();
+  assert.deepEqual(torso.bounds(), avatar.torso.bounds());
+  assert.equal(headHeight, avatar.shoulder - avatar.hip + 2);
+  assert.ok((torso.get(0, 14, 0) >> 16) >= 0xcc, 'white fleece');
+  avatar.head.forEach((x, y, z, color) => {
+    if (z >= 0 && y < 12) assert.equal(head.get(x, y, z), color, 'same face and fringe');
+  });
+  assert.ok(head.bounds().maxY > avatar.head.bounds().maxY, 'cap crown wraps his hair');
+  assert.ok(head.bounds().minZ < -12 && head.bounds().maxZ < 10, 'the bill extends only behind the head');
+  assert.ok(head.get(0, 11, -16) < 0x303030, 'the rear bill is black');
+});
+
+test('the hoodie crest fits the chest and arcs RANGERS over a centered maple leaf', () => {
+  const { crest, torso } = R.buildRoommate();
+  const chestWidth = (torso.bounds().maxX - torso.bounds().minX + 1) * AVATAR_VOXEL_SIZE * W.AVATAR_SCALE;
+  const crestBounds = crest.bounds();
+  assert.ok((crestBounds.maxX - crestBounds.minX + 1) * R.RANGERS_CREST_VOXEL_SIZE < chestWidth);
+  const outline = (minX, maxX) => {
+    let top = -Infinity;
+    crest.forEach((x, y, _z, color) => { if (x >= minX && x <= maxX && color === 0x203957) top = Math.max(top, y); });
+    return top;
+  };
+  assert.ok(outline(-2, 1) > outline(-14, -12) && outline(-2, 1) > outline(11, 13), 'the lettering rises in the middle');
+  for (const [x, y] of [[0, 10], [-6, 5], [6, 5], [0, 0]]) assert.equal(crest.get(x, y, 0), 0xc52636, 'the leaf has a tip, lobes and a centered stem');
 });
 
 test('the milk sip plays once per approach, with a still pose for reduced motion', () => {
@@ -535,6 +560,7 @@ test('the milk sip plays once per approach, with a still pose for reduced motion
   for (const reduced of [false, true]) {
     const pose = R.sipPose(state.elapsed, reduced);
     assert.ok(pose.arm < -1 && pose.carton > 0.7 && pose.head < 0);
+    assert.ok(pose.armYaw < 0.01 && R.sipPose(0, reduced).armYaw > 0.5, 'the carton rests away from the crest and swings in to sip');
     assert.deepEqual(R.sipPose(R.SIP_DURATION, reduced), R.sipPose(0, reduced));
   }
   R.stepRoommate(state, 12, R.SIP_DURATION);

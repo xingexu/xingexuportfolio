@@ -271,10 +271,11 @@ export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
   doorLabel: "DORM", items: [],
   decor: [
     { model: "csa-dj-booth", x: 0, z: CSA_STAGE_Z },
-    { model: "csa-speaker", x: -38, z: CSA_STAGE_Z - 3 },
-    { model: "csa-speaker", x: -27, z: CSA_STAGE_Z - 3 },
-    { model: "csa-speaker", x: 27, z: CSA_STAGE_Z - 3 },
-    { model: "csa-speaker", x: 38, z: CSA_STAGE_Z - 3 },
+    { model: "csa-dj-macbook", x: 12, z: CSA_STAGE_Z - 0.75, y: 13, rot: 2, solid: false },
+    { model: "csa-speaker", x: -41, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: -28, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: 28, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: 41, z: CSA_STAGE_Z - 3 },
     { model: "csa-stage-logo", x: 0, z: CSA_STAGE_Z - 16, y: 20, solid: false },
     ...[40, 55, 70].flatMap(z => [-32, 32].map(x => ({ model: "csa-seat-row", x, z, rot: 2 as const }))),
     { model: "csa-barber-chair", ...CSA_BARBER_CHAIR, rot: 1 },
@@ -287,7 +288,7 @@ export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
     { model: "csa-water-bottle", x: 28, z: 61, solid: false },
     { model: "csa-boba-cup", x: 66, z: -22, rot: 2, solid: false },
     { model: "csa-soda-cup", x: -72, z: -21, solid: false },
-    { model: "csa-boba-cup", x: -9, z: CSA_STAGE_Z - 1, y: 13, solid: false },
+    { model: "csa-boba-cup", x: -13, z: CSA_STAGE_Z + 2, y: 13, solid: false },
   ],
 }];
 const CHAPTER_ACCENTS = [0x89cced, 0xffcf79, 0x80ddc5, 0xfaac96, 0x91b8f3, 0xc4a2ff];

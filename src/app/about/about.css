@@ -56,7 +56,7 @@
 .journey-prompt span { overflow: hidden; text-overflow: ellipsis; }
 .journey-volley { flex: none; color: #e4f9ff; background: #173744; border-color: #91e2f5; }
 .journey-csa-guests { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; margin-top: 20px; list-style: none; }
-.journey-csa-guests li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid #55445b; background: #261c2e; font-size: 13px; }
+.journey-csa-guests li { display: grid; align-content: start; gap: 4px; padding: 10px 12px; border: 1px solid #55445b; background: #261c2e; font-size: 13px; }
 .journey-csa-guests span { color: #ffad92; font: 11px var(--font-mono), monospace; }
 .journey-skip, .journey-back, .journey-jump { position: absolute; right: max(20px, env(safe-area-inset-right)); min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding-inline: 12px; border: 1px solid #767679; background: #0b0b0ef0; color: #eee; font-size: 12px; text-decoration: none; cursor: pointer; box-shadow: 3px 3px #000; }
 .journey-skip { z-index: 5; top: max(18px, env(safe-area-inset-top)); }

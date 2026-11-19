@@ -43,6 +43,11 @@ test('every item is written out, linked properly and has a model', () => {
   for (const chapter of CHAPTERS) for (const p of chapter.decor) assert.ok(MODEL_IDS.includes(p.model), p.model);
 });
 
+test('the badminton card uses the requested description verbatim', () => {
+  const racket = ALL_ITEMS.find(item => item.id === 'badminton');
+  assert.equal(racket.description, 'I played competitive badminton at KC Badminton from grade 2 up until grade 6.');
+});
+
 function mp4Tracks(file) {
   const tracks = [];
   function read(start, end) {
@@ -103,6 +108,13 @@ test('CEMC and MAA logos are raised on white paper inside their frames', () => {
     });
     assert.ok(white > 800 && ink > 100, id);
   }
+});
+
+test('the primary-school CEMC certificate clears the chair rail and upper fixtures', () => {
+  const room = CHAPTERS.find(chapter => chapter.id === 'school');
+  const poster = room.items.find(item => item.id === 'beaver');
+  assert.ok(poster.y > 12, 'leave a gap above the chair rail');
+  assert.ok(poster.y + modelFootprint(poster.model).height <= 28, 'stay below the upper fixtures');
 });
 
 test('Bayview has three distinct math-award displays with appropriate links', () => {

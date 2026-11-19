@@ -13,7 +13,9 @@ export const FRIDGE_HINGE = { x: 4.5, y: 0, z: 3.5 };
 export const FRIDGE_HANDLE = { x: -8.75, y: 11.6, z: 1.25 };
 export const FRIDGE_MILK = { x: -3, y: 10.35, z: 2.6 };
 export const FRIDGE_SWING = 1.1;
-export const FRIDGE_DOOR_MARGIN = 0.6;
+const DOOR_SLAB = [-19, 1, 0, 2] as const;
+const DOOR_HANDLE = [-19, -16, 2, 3] as const;
+const DOOR_BINS = [-17, -1, -1, 0] as const;
 
 const clamp = (t: number) => Math.max(0, Math.min(1, t));
 export const easeRoommate = (t: number) => { const u = clamp(t); return u * u * (3 - 2 * u); };
@@ -105,11 +107,12 @@ export function buildFridgeCabinet(g: Grid) {
 }
 
 export function buildFridgeDoor(g: Grid) {
-  g.box(-19, 0, 0, 20, 26, 2, 0x34373c)
-    .box(-19, 17, 1, 20, 1, 1, 0x1e2024)
-    .box(-19, 20, 2, 3, 5, 1, 0xaebbc7)
-    .box(-17, 6, -1, 16, 3, 1, 0xb7cbd8)
-    .box(-17, 12, -1, 16, 2, 1, 0xb7cbd8);
+  const layer = ([x, x1, z, z1]: readonly [number, number, number, number], y: number, h: number, color: number) =>
+    g.box(x, y, z, x1 - x, h, z1 - z, color);
+  layer(DOOR_SLAB, 0, 26, 0x34373c).box(-19, 17, 1, 20, 1, 1, 0x1e2024);
+  layer(DOOR_HANDLE, 20, 5, 0xaebbc7);
+  layer(DOOR_BINS, 6, 3, 0xb7cbd8);
+  layer(DOOR_BINS, 12, 2, 0xb7cbd8);
 }
 
 export function buildHockeyStick() {
@@ -131,12 +134,12 @@ export function placementPoint(p: Placement, x: number, z: number): Vec {
 }
 
 export function fridgeDoorDistance(fridge: Placement, open: number, p: Vec) {
-  const theta = open * FRIDGE_SWING;
+  const theta = (fridge.rot ?? 0) * Math.PI / 2 + open * FRIDGE_SWING;
   const hinge = placementPoint(fridge, FRIDGE_HINGE.x, FRIDGE_HINGE.z);
-  const end = placementPoint(fridge, FRIDGE_HINGE.x - 9.5 * Math.cos(theta), FRIDGE_HINGE.z + 9.5 * Math.sin(theta));
-  const dx = end.x - hinge.x, dz = end.z - hinge.z;
-  const t = clamp(((p.x - hinge.x) * dx + (p.z - hinge.z) * dz) / (dx * dx + dz * dz));
-  return Math.hypot(p.x - hinge.x - t * dx, p.z - hinge.z - t * dz);
+  const dx = p.x - hinge.x, dz = p.z - hinge.z, c = Math.cos(theta), s = Math.sin(theta);
+  const x = (dx * c - dz * s) / FRIDGE_VOXEL_SIZE, z = (dx * s + dz * c) / FRIDGE_VOXEL_SIZE;
+  return FRIDGE_VOXEL_SIZE * Math.min(...[DOOR_SLAB, DOOR_HANDLE, DOOR_BINS].map(([x0, x1, z0, z1]) =>
+    Math.hypot(Math.max(x0 - x, x - x1, 0), Math.max(z0 - z, z - z1, 0))));
 }
 
 export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Placement) {
@@ -204,7 +207,7 @@ export function advanceRoommate(routine: RoommateRoutine, time: number, dt: numb
     let distance = fridgeDoorDistance(routine.fridge, current.door, player);
     for (let i = 1; i <= steps; i++) {
       const tested = fridgeDoorDistance(routine.fridge, current.door + (next.door - current.door) * i / steps, player);
-      if (tested < radius + FRIDGE_DOOR_MARGIN && tested < distance) return time;
+      if (tested < radius && tested < distance) return time;
       distance = tested;
     }
   }

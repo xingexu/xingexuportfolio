@@ -615,6 +615,15 @@ test('the fridge door pauses before it swings into a stationary visitor', () => 
   }
 });
 
+test('the fridge door collision follows the protruding handle', () => {
+  const { fridge, view } = roommateScene();
+  const pose = beatAt('take', 0.5);
+  view.apply(pose, pose.yaw);
+  const door = fridge.getObjectByName('Fridge door');
+  const p = door.localToWorld(new Vector3(-9, 11.6, 1.5 + 2.2));
+  assert.ok(R.fridgeDoorDistance(npcFridge, pose.door, p) < 2.38, 'the handle reaches a visitor outside the door slab');
+});
+
 test('the animated fridge opens, hands off the carton, closes and returns it after a sip', () => {
   const { fridge, view } = roommateScene();
   const door = fridge.getObjectByName('Fridge door'), carton = view.group.getObjectByName('Milk carton');

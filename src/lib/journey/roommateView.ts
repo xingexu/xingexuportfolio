@@ -3,7 +3,7 @@ import { AVATAR_VOXEL_SIZE } from "./avatar";
 import type { Placement, Roommate } from "./data";
 import {
   buildFridgeCabinet, buildFridgeDoor, buildHockeyStick, buildMilkCarton, buildRoommate, buildRoommateRoutine,
-  easeRoommate, fridgeDoorDistance, FRIDGE_DOOR_MARGIN, FRIDGE_HANDLE, FRIDGE_HINGE, FRIDGE_MILK, FRIDGE_SWING, FRIDGE_VOXEL_SIZE,
+  easeRoommate, fridgeDoorDistance, FRIDGE_HANDLE, FRIDGE_HINGE, FRIDGE_MILK, FRIDGE_SWING, FRIDGE_VOXEL_SIZE,
   RANGERS_CREST_VOXEL_SIZE, ROOMMATE_RADIUS, ROOMMATE_SEAT, sampleRoommate, type RoommatePose,
 } from "./roommate";
 import { AVATAR_SCALE, type Vec } from "./world";
@@ -173,7 +173,7 @@ export function makeRoommateView(spec: Roommate, fridge: Placement, pad: Placeme
     if (nextDistance < radius + ROOMMATE_RADIUS && nextDistance < distance(from)) return true;
     if (pose.door <= 0) return false;
     const nextDoor = fridgeDoorDistance(fridge, pose.door, to);
-    return nextDoor < radius + FRIDGE_DOOR_MARGIN && nextDoor < fridgeDoorDistance(fridge, pose.door, from);
+    return nextDoor < radius && nextDoor < fridgeDoorDistance(fridge, pose.door, from);
   }
 
   const pose = sampleRoommate(routine, 0);

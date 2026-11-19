@@ -241,7 +241,7 @@ export default function About() {
             <section key={entry.id}>
               <h3>{entry.place} · age {ageLabel(entry)}</h3>
               <ul>{entry.items.map(entryItem => <li key={entryItem.id}>
-                <strong>{entryItem.label}:</strong> {entryItem.description} {entryItem.links?.map(link => <a key={link.href} href={link.href}> {link.label}</a>)}
+                <strong>{entryItem.label}{entryItem.description ? ":" : ""}</strong> {entryItem.description} {entryItem.links?.map(link => <a key={link.href} href={link.href}> {link.label}</a>)}
                 {entryItem.video && <a href={entryItem.video.src}> Watch {entryItem.video.label}</a>}
               </li>)}</ul>
             </section>

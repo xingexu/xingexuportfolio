@@ -846,7 +846,7 @@ export default function JourneyWorld(props: Props) {
           <section key={entry.id}>
             <h2>{entry.stop}{entry.stopNote ? ` · ${entry.stopNote}` : ""}</h2>
             <ul>{entry.items.map(item => (
-              <li key={item.id}><strong>{item.label}:</strong> {item.description}{item.links?.map(link => (
+              <li key={item.id}><strong>{item.label}{item.description ? ":" : ""}</strong> {item.description}{item.links?.map(link => (
                 <a key={link.href} href={link.href} target="_blank" rel="noopener noreferrer"> {link.label} ↗</a>
               ))}{item.video && <a href={item.video.src}> Watch {item.video.label}</a>}</li>
             ))}</ul>

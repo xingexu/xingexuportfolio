@@ -14,7 +14,7 @@ export type JourneyItem = Placement & {
   video?: { src: string; label: string; captions?: string; poster: string };
 };
 export type Outfit = "kid" | "starwars" | "stussy" | "western" | "csa";
-export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "dance";
+export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "auditorium";
 export type Roommate = { id: string; x: number; z: number; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
 type Vec2 = { x: number; z: number };
 export type Chapter = {
@@ -259,13 +259,15 @@ export const CHAPTERS = ROOMS.map(chapter => chapter.outdoor || chapter.id === "
 export const WESTERN_INDEX = CHAPTERS.findIndex(chapter => chapter.id === "western");
 export const CSA_POSTER_ID = "csa";
 export const CSA_ROOM_INDEX = CHAPTERS.length;
-export const CSA_STAGE_Z = -54;
+export const CSA_STAGE_Z = -62;
+export const CSA_BARBER_CHAIR = { x: -65, z: -10 } as const;
+export const CSA_BARBER_SEAT = 10;
 export const CSA_DJ_LINK: JourneyLink = { href: "https://wewantdrought.me", label: "Rain Li’s website" };
 export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
   id: "csa-after-hours", stop: "CSA After Hours", number: "", place: "CSA After Hours", location: "Western University",
-  heading: "CSA After Hours", intro: "A party hidden behind the CSA poster.", stopNote: "Behind the poster · Western University",
+  heading: "CSA After Hours", intro: "An auditorium hidden behind the CSA poster.", stopNote: "Behind the poster · Western University",
   ageFrom: 18, ageTo: 18, outfit: "csa", outfitLabel: "Black CSA tee · black pants",
-  width: 180, depth: 148, floor: "dance", wall: 0x251e36, trim: 0x563951, background: 0x171221,
+  width: 190, depth: 176, floor: "auditorium", wall: 0x302739, trim: 0x65424b, background: 0x171221,
   doorLabel: "DORM", items: [],
   decor: [
     { model: "csa-dj-booth", x: 0, z: CSA_STAGE_Z },
@@ -274,9 +276,18 @@ export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
     { model: "csa-speaker", x: 27, z: CSA_STAGE_Z - 3 },
     { model: "csa-speaker", x: 38, z: CSA_STAGE_Z - 3 },
     { model: "csa-stage-logo", x: 0, z: CSA_STAGE_Z - 16, y: 20, solid: false },
-    { model: "csa-bubble-tea", x: -63, z: 7, rot: 1 },
-    { model: "csa-sushi", x: 63, z: -18, rot: 3 },
-    { model: "csa-desserts", x: 63, z: 32, rot: 3 },
+    ...[40, 55, 70].flatMap(z => [-32, 32].map(x => ({ model: "csa-seat-row", x, z, rot: 2 as const }))),
+    { model: "csa-barber-chair", ...CSA_BARBER_CHAIR, rot: 1 },
+    { model: "csa-barber-mirror", x: -66, z: CSA_BARBER_CHAIR.z - 11 },
+    { model: "csa-boba-cup", x: 19, z: 32, rot: 1, solid: false },
+    { model: "csa-water-bottle", x: -45, z: 34, solid: false },
+    { model: "csa-soda-cup", x: 52, z: 47, solid: false },
+    { model: "csa-boba-cup", x: -18, z: 49, solid: false },
+    { model: "csa-soda-cup", x: -63, z: 25, rot: 3, solid: false },
+    { model: "csa-water-bottle", x: 28, z: 61, solid: false },
+    { model: "csa-boba-cup", x: 66, z: -22, rot: 2, solid: false },
+    { model: "csa-soda-cup", x: -72, z: -21, solid: false },
+    { model: "csa-boba-cup", x: -9, z: CSA_STAGE_Z - 1, y: 13, solid: false },
   ],
 }];
 const CHAPTER_ACCENTS = [0x89cced, 0xffcf79, 0x80ddc5, 0xfaac96, 0x91b8f3, 0xc4a2ff];

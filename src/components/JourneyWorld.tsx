@@ -6,7 +6,7 @@ import { CHAPTERS, chapterAccent, type Placement } from "@/lib/journey/data";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { buildRoommate, ROOMMATE_SEAT, ROOMMATE_VOXEL_SIZE, SIP_DURATION, sipPose, stepRoommate, type RoommateState } from "@/lib/journey/roommate";
+import { buildRoommate, RANGERS_CREST_VOXEL_SIZE, ROOMMATE_SEAT, ROOMMATE_VOXEL_SIZE, SIP_DURATION, sipPose, stepRoommate, type RoommateState } from "@/lib/journey/roommate";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomSide } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
@@ -173,22 +173,28 @@ export default function JourneyWorld(props: Props) {
         const { x, z, name } = chapter.roommate;
         const holder = new Group(), material = baseMaterial.clone();
         const parts = buildRoommate();
-        const model = (grid: Grid) => {
-          const geometry = gridGeometry(grid, [0, 0, 0], 0.015, ROOMMATE_VOXEL_SIZE);
+        const model = (grid: Grid, size = ROOMMATE_VOXEL_SIZE) => {
+          const geometry = gridGeometry(grid, [0, 0, 0], 0.015, size);
           owned.push(geometry);
           return new Mesh(geometry, material);
         };
-        const head = model(parts.head), arm = model(parts.forearm), carton = model(parts.carton);
-        head.position.set(0, 8.5, 0);
-        arm.position.set(3.25, 4.7, 1);
+        const avatarVoxel = AVATAR_VOXEL_SIZE * AVATAR_SCALE;
+        const torso = model(parts.torso, avatarVoxel), head = model(parts.head, avatarVoxel);
+        const crest = model(parts.crest, RANGERS_CREST_VOXEL_SIZE);
+        crest.position.set(0, 3.6, (parts.torso.bounds().maxZ + 1) * avatarVoxel);
+        torso.add(crest);
+        const arm = model(parts.forearm), carton = model(parts.carton);
+        head.position.y = parts.headHeight * AVATAR_SCALE;
+        arm.position.set(2.85, 4.7, 1);
         carton.scale.setScalar(0.9);
         carton.position.set(-2.5, -0.1, 3.7);
         arm.add(carton);
-        holder.add(model(parts.seated), head, arm);
+        holder.add(model(parts.seated), torso, head, arm);
         holder.position.set(x, ROOMMATE_SEAT, z);
         holder.rotation.y = Math.PI / 2;
         group.add(holder);
         props.push({ holder, bounds: new Box3().setFromObject(holder), material, visibility: 1 });
+        arm.rotation.y = sipPose(SIP_DURATION, false).armYaw;
         roommate = { holder, name, arm, carton, head, state: { near: false, elapsed: SIP_DURATION } };
       }
       const addProp = (p: Placement) => {
@@ -761,6 +767,7 @@ export default function JourneyWorld(props: Props) {
           stepRoommate(npc.state, Math.hypot(player.x - npc.holder.position.x, player.z - npc.holder.position.z), dt);
           const pose = sipPose(npc.state.elapsed, motion.matches);
           npc.arm.rotation.x = pose.arm;
+          npc.arm.rotation.y = pose.armYaw;
           npc.carton.rotation.x = pose.carton;
           npc.head.rotation.x = pose.head;
         }

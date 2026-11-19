@@ -54,7 +54,6 @@
 .journey-prompts { position: absolute; z-index: 3; left: 50%; bottom: calc(max(24px, env(safe-area-inset-bottom)) + 40px); transform: translateX(-50%); display: flex; justify-content: center; gap: 8px; max-width: calc(100% - 32px); pointer-events: none; }
 .journey-prompt { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid #f2d24b; background: #111114f0; color: #f2d24b; box-shadow: 3px 3px 0 #000; font-size: 13px; cursor: pointer; white-space: nowrap; pointer-events: auto; }
 .journey-prompt span { overflow: hidden; text-overflow: ellipsis; }
-.journey-companion { padding: 8px 12px; border: 1px solid #6e637b; background: #111114f0; color: #eee9f2; font-size: 13px; white-space: nowrap; }
 .journey-volley { flex: none; color: #e4f9ff; background: #173744; border-color: #91e2f5; }
 .journey-skip, .journey-back, .journey-jump { position: absolute; right: max(20px, env(safe-area-inset-right)); min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding-inline: 12px; border: 1px solid #767679; background: #0b0b0ef0; color: #eee; font-size: 12px; text-decoration: none; cursor: pointer; box-shadow: 3px 3px #000; }
 .journey-skip { z-index: 5; top: max(18px, env(safe-area-inset-top)); }

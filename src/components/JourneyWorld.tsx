@@ -6,7 +6,8 @@ import { CHAPTERS, chapterAccent, type Placement } from "@/lib/journey/data";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { buildRoommate, RANGERS_CREST_VOXEL_SIZE, ROOMMATE_SEAT, ROOMMATE_VOXEL_SIZE, SIP_DURATION, sipPose, stepRoommate, type RoommateState } from "@/lib/journey/roommate";
+import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
+import { makeRoommateView } from "@/lib/journey/roommateView";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomSide } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
@@ -22,7 +23,7 @@ export type JourneyControls = {
   toggleCamera: (mode: keyof CameraMode) => void;
 };
 export type CameraMode = { front: boolean; tilt: boolean };
-export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; roommate?: string };
+export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction };
 export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" };
 type Props = {
   controls: RefObject<JourneyControls | null>;
@@ -122,8 +123,8 @@ export default function JourneyWorld(props: Props) {
     type Volley = { ball: BallView; sequence: VolleySequence };
     type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
-    type RoommateView = { holder: Group; name: string; arm: Mesh; carton: Mesh; head: Mesh; state: RoommateState };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; ballPositions: Map<string, Ball>; field?: BallField; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView };
+    type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView };
     const rooms = new Map<number, RoomView>();
     function setOpacity(material: MeshBasicMaterial, opacity: number) {
       material.opacity = opacity;
@@ -167,36 +168,7 @@ export default function JourneyWorld(props: Props) {
       });
       const wallFor = (p: Placement) =>
         !p.ball && !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) ?? undefined : undefined;
-      const props: PropView[] = [], reactive: ReactiveView[] = [], balls: BallView[] = [], ballPositions = new Map<string, Ball>();
-      let roommate: RoommateView | undefined;
-      if (chapter.roommate) {
-        const { x, z, name } = chapter.roommate;
-        const holder = new Group(), material = baseMaterial.clone();
-        const parts = buildRoommate();
-        const model = (grid: Grid, size = ROOMMATE_VOXEL_SIZE) => {
-          const geometry = gridGeometry(grid, [0, 0, 0], 0.015, size);
-          owned.push(geometry);
-          return new Mesh(geometry, material);
-        };
-        const avatarVoxel = AVATAR_VOXEL_SIZE * AVATAR_SCALE;
-        const torso = model(parts.torso, avatarVoxel), head = model(parts.head, avatarVoxel);
-        const crest = model(parts.crest, RANGERS_CREST_VOXEL_SIZE);
-        crest.position.set(0, 3.6, (parts.torso.bounds().maxZ + 1) * avatarVoxel);
-        torso.add(crest);
-        const arm = model(parts.forearm), carton = model(parts.carton);
-        head.position.y = parts.headHeight * AVATAR_SCALE;
-        arm.position.set(2.85, 4.7, 1);
-        carton.scale.setScalar(0.9);
-        carton.position.set(-2.5, -0.1, 3.7);
-        arm.add(carton);
-        holder.add(model(parts.seated), torso, head, arm);
-        holder.position.set(x, ROOMMATE_SEAT, z);
-        holder.rotation.y = Math.PI / 2;
-        group.add(holder);
-        props.push({ holder, bounds: new Box3().setFromObject(holder), material, visibility: 1 });
-        arm.rotation.y = sipPose(SIP_DURATION, false).armYaw;
-        roommate = { holder, name, arm, carton, head, state: { near: false, elapsed: SIP_DURATION } };
-      }
+      const props: PropView[] = [], reactive: ReactiveView[] = [], balls: BallView[] = [], itemPositions = new Map<string, Ball | Vector3>();
       const addProp = (p: Placement) => {
         const material = baseMaterial.clone(), holder = place(p, material);
         const glass = modelHasGlass(p.model) ? glassMaterial.clone() : undefined;
@@ -225,10 +197,26 @@ export default function JourneyWorld(props: Props) {
         return prop;
       };
       for (const p of chapter.decor) addProp(p);
+      const spec = chapter.roommate, fridge = chapter.items.find(item => item.id === spec?.fridge), pad = chapter.items.find(item => item.id === spec?.pad);
+      let roommate: RoommateView | undefined;
+      const fridgeProp = fridge && addProp(fridge);
+      if (spec && fridge && fridgeProp && pad) {
+        const material = baseMaterial.clone();
+        const npc = makeRoommateView(spec, fridge, pad, fridgeProp.holder, fridgeProp.material, material, (grid, size, paint = baseMaterial) => {
+          const geometry = gridGeometry(grid, [0, 0, 0], 0.015, size);
+          owned.push(geometry);
+          return new Mesh(geometry, paint);
+        });
+        const prop = { holder: npc.holder, material, bounds: new Box3().setFromObject(npc.holder), visibility: 1 };
+        group.add(npc.group);
+        props.push(prop);
+        roommate = { ...npc, prop, fridge: fridgeProp };
+        itemPositions.set(spec.id, npc.holder.position);
+      }
       for (const item of chapter.items) {
-        const { holder, material, wall } = addProp(item);
+        const { holder, material, wall } = item.id === roommate?.id ? roommate.prop : item.id === fridge?.id && fridgeProp ? fridgeProp : addProp(item);
         holder.traverse(object => { object.userData.itemId = item.id; if (object instanceof Mesh) pickables.push(object); });
-        if (item.ball) ballPositions.set(item.id, balls[balls.length - 1].state);
+        if (item.ball) itemPositions.set(item.id, balls[balls.length - 1].state);
         const parent = wall ? walls[wall].group : group;
         const box = placementBox(item), markerMaterial = new MeshBasicMaterial({ vertexColors: true });
         const marker = new Mesh(markerGeometry, markerMaterial);
@@ -237,7 +225,7 @@ export default function JourneyWorld(props: Props) {
         parent.add(marker);
         items.set(item.id, { material, marker, markerMaterial, markerY });
       }
-      const view = { group, items, props, reactive, balls, ballPositions, field: balls.length ? buildBallField(index) : undefined, doors, pickables, walls, roommate };
+      const view = { group, items, props, reactive, balls, itemPositions, field: balls.length ? buildBallField(index) : undefined, doors, pickables, walls, roommate };
       rooms.set(index, view);
       return view;
     }
@@ -717,7 +705,8 @@ export default function JourneyWorld(props: Props) {
         if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
         if (Math.hypot(player.vx, player.vz) > 0.02) {
           const radius = (height >= 29 ? 3.5 : 3) * AVATAR_SCALE;
-          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius);
+          const npc = room(chapter).roommate;
+          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, npc ? (from, to, r) => npc.blocks(from, to, r, npc.pose.sit) : undefined);
           const movement = { x: result.x - player.x, z: result.z - player.z };
           player.x = result.x; player.z = result.z;
           for (const { state } of room(chapter).reactive) bumpProp(state, result, movement, radius, dt);
@@ -763,13 +752,18 @@ export default function JourneyWorld(props: Props) {
         updateVolleyballs(dt, activeRoom);
         kickPose = Math.max(0, kickPose - dt);
         const npc = activeRoom.roommate;
-        if (npc) {
-          stepRoommate(npc.state, Math.hypot(player.x - npc.holder.position.x, player.z - npc.holder.position.z), dt);
-          const pose = sipPose(npc.state.elapsed, motion.matches);
-          npc.arm.rotation.x = pose.arm;
-          npc.arm.rotation.y = pose.armYaw;
-          npc.carton.rotation.x = pose.carton;
-          npc.head.rotation.x = pose.head;
+        if (npc && (!motion.matches || npc.time !== 0)) {
+          const time = motion.matches ? 0 : advanceRoommate(npc.routine, npc.time, dt, player, 3.5 * AVATAR_SCALE);
+          if (time !== npc.time) {
+            const previous = npc.pose;
+            npc.time = time;
+            npc.pose = sampleRoommate(npc.routine, time);
+            const turn = npc.pose.yaw - npc.yaw;
+            npc.yaw += Math.atan2(Math.sin(turn), Math.cos(turn)) * (motion.matches ? 1 : 1 - Math.exp(-dt * 16));
+            npc.markerY = npc.apply(npc.pose, npc.yaw);
+            npc.prop.bounds.setFromObject(npc.holder);
+            if (npc.pose.door !== previous.door) npc.fridge.bounds.setFromObject(npc.fridge.holder).expandByScalar(1);
+          }
         }
       }
 
@@ -812,7 +806,11 @@ export default function JourneyWorld(props: Props) {
       fadeForeground(dt);
 
       // Nearby + hover highlights
-      const nearList = intro || transition ? [] : nearbyItems(chapter, player, undefined, undefined, activeRoom.ballPositions).map(item => item.id);
+      const npc = activeRoom.roommate;
+      let nearList = intro || transition ? [] : nearbyItems(chapter, player, undefined, undefined, activeRoom.itemPositions).map(item => item.id);
+      if (!intro && !transition && npc && Math.hypot(player.x - npc.pose.x, player.z - npc.pose.z) <= 8) {
+        nearList = [npc.id, ...nearList.filter(id => id !== npc.id)].slice(0, 3);
+      }
       const action = intro || transition || blockedNow ? undefined : nextVolley()?.action;
       const near = nearList[0] ?? null;
       if (pointerDirty && pointerInside && !intro && !transition) {
@@ -830,16 +828,16 @@ export default function JourneyWorld(props: Props) {
         item.material.color.setScalar(active ? 1.32 : 1);
         item.marker.visible = active && item.material.opacity >= 0.5;
         item.markerMaterial.color.setScalar(visited.has(id) ? 0.45 : active ? 1.25 : 1);
-        const ball = activeRoom.ballPositions.get(id);
-        if (ball) item.marker.position.set(ball.x, ball.y + ball.radius + 4, ball.z);
+        const pos = activeRoom.itemPositions.get(id);
+        if (npc && id === npc.id) item.marker.position.set(npc.pose.x, npc.markerY, npc.pose.z);
+        else if (pos && "radius" in pos) item.marker.position.set(pos.x, pos.y + pos.radius + 4, pos.z);
         else item.marker.position.y = item.markerY;
         item.marker.position.y += motion.matches ? 0 : Math.round(Math.sin(time * 3 + item.markerY) * 2) / 2;
         item.marker.rotation.y = motion.matches ? 0.6 : time * 1.6;
         item.marker.scale.setScalar(0.65);
       }
-      const roommate = !intro && !transition && activeRoom.roommate?.state.near ? activeRoom.roommate.name : undefined;
-      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}|${roommate ?? ""}`;
-      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action, roommate }); }
+      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}`;
+      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action }); }
 
       renderer.render(scene, camera);
       // Show the avatar through foreground props without drawing it solidly in front of them.

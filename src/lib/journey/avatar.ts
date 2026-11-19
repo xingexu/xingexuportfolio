@@ -14,7 +14,6 @@ export type AvatarParts = {
 };
 
 const SKIN = 0xf8e1d0, SKIN_DARK = 0xecc9b4, HAIR = 0x1d1714, EYE = 0x15161a;
-export { SKIN as AVATAR_SKIN };
 const HEIGHTS: Record<number, number> = { 7: 20, 8: 21, 9: 22, 10: 23, 11: 24, 12: 26, 13: 27, 14: 29, 15: 30, 16: 31, 17: 32, 18: 34 };
 export const avatarHeight = (age: number) => HEIGHTS[Math.max(7, Math.min(18, Math.round(age)))];
 export const AVATAR_VOXEL_SIZE = 0.5;
@@ -81,8 +80,9 @@ function straightLeg(side: -1 | 1, length: number, look: Look) {
   return leg;
 }
 
-export function buildAvatar(age: number, outfit: Outfit, topColors?: Pick<Look, "top" | "topDark">): AvatarParts {
-  const look = { ...LOOKS[outfit], ...topColors };
+export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "top" | "topDark"> & { skin?: Color; skinDark?: Color }): AvatarParts {
+  const look = { ...LOOKS[outfit], ...palette };
+  const skin = palette?.skin ?? SKIN, skinDark = palette?.skinDark ?? SKIN_DARK;
   const western = outfit === "western";
   const H = avatarHeight(age), t = (Math.min(18, Math.max(7, age)) - 7) / 11;
   const headH = !western && age >= 13 ? 8 : 7;
@@ -92,7 +92,7 @@ export function buildAvatar(age: number, outfit: Outfit, topColors?: Pick<Look, 
   const head = new Grid(), torso = new Grid(), armL = new Grid(), armR = new Grid(), legL = new Grid(), legR = new Grid();
 
   // Head, built from its base (neck) upward.
-  head.box(-4, 0, -4, 8, headH, 8, SKIN)
+  head.box(-4, 0, -4, 8, headH, 8, skin)
     .box(-4, headH - 2, -4, 8, 2, 8, HAIR).box(-4, 0, -4, 8, headH, 2, HAIR).box(-4, 2, -4, 1, headH - 2, 6, HAIR).box(3, 2, -4, 1, headH - 2, 6, HAIR);
   head.box(-4, headH - 3, 3, 8, 1, 1, HAIR).box(-3, headH - 4, 3, 2, 1, 1, HAIR);
   const eyeY = headH - 5;
@@ -111,8 +111,8 @@ export function buildAvatar(age: number, outfit: Outfit, topColors?: Pick<Look, 
   // Torso from the hip (y = 0) to the shoulders.
   torso.box(-hw, 0, -D / 2, W, torsoH, D, look.top);
   torso.box(-hw, 0, -D / 2, W, 1, D, look.topDark);
-  torso.box(-1, torsoH, -1, 2, 1, 2, SKIN_DARK);
-  if (outfit === "kid") torso.box(-1, torsoH - 1, D / 2, 2, 1, 1, SKIN).set(-1, torsoH - 3, D / 2, 0xffffff).set(0, torsoH - 3, D / 2, 0xffd23f);
+  torso.box(-1, torsoH, -1, 2, 1, 2, skinDark);
+  if (outfit === "kid") torso.box(-1, torsoH - 1, D / 2, 2, 1, 1, skin).set(-1, torsoH - 3, D / 2, 0xffffff).set(0, torsoH - 3, D / 2, 0xffd23f);
   if (outfit === "starwars") {
     const logoY = Math.max(1, torsoH - 5);
     torso.box(-hw + 1, logoY, D / 2, W - 2, 3, 1, 0xf6d23c).box(-hw + 2, logoY + 1, D / 2, W - 4, 1, 1, 0x1c1c22);
@@ -128,8 +128,8 @@ export function buildAvatar(age: number, outfit: Outfit, topColors?: Pick<Look, 
   const armLen = torsoH + (age >= 12 ? 1 : 0);
   for (const [arm, side] of [[armL, -1], [armR, 1]] as const) {
     const x = side < 0 ? -armW : 0;
-    arm.box(x, -armLen + 2, -1, armW, armLen - 2, 2, look.top).box(x, -armLen, -1, armW, 2, 2, SKIN);
-    if (outfit === "kid") arm.box(x, -armLen + 2, -1, armW, armLen - 5, 2, SKIN);
+    arm.box(x, -armLen + 2, -1, armW, armLen - 2, 2, look.top).box(x, -armLen, -1, armW, 2, 2, skin);
+    if (outfit === "kid") arm.box(x, -armLen + 2, -1, armW, armLen - 5, 2, skin);
     else arm.box(x, -armLen + 2, -1, armW, 1, 2, look.topDark);
   }
   if (outfit === "kid") {
@@ -144,7 +144,7 @@ export function buildAvatar(age: number, outfit: Outfit, topColors?: Pick<Look, 
     const x = side < 0 ? -hw : 0, w = hw;
     if (look.shorts) {
       leg.box(x, -Math.round(legs * 0.45), -D / 2, w, Math.round(legs * 0.45), D, look.pants);
-      leg.box(x, -legs + footH, -1, w, legs - footH - Math.round(legs * 0.45), 2, SKIN);
+      leg.box(x, -legs + footH, -1, w, legs - footH - Math.round(legs * 0.45), 2, skin);
       leg.box(x, -legs + footH, -1, w, 1, 2, 0xf4f4f4);
     } else {
       leg.box(x, -legs + footH, -D / 2, w, legs - footH, D, look.pants);
@@ -153,7 +153,7 @@ export function buildAvatar(age: number, outfit: Outfit, topColors?: Pick<Look, 
     const toe = D / 2 + 1;
     if (look.slides) {
       leg.box(x, -legs, -D / 2, w, 1, D + 1, look.sole);
-      leg.box(x, -legs + 1, -D / 2, w, 1, D + 1, SKIN).box(x, -legs + 1, 0, w, 1, toe, look.shoe);
+      leg.box(x, -legs + 1, -D / 2, w, 1, D + 1, skin).box(x, -legs + 1, 0, w, 1, toe, look.shoe);
     } else {
       leg.box(x, -legs, -D / 2, w, 1, D + 1, look.sole).box(x, -legs + 1, -D / 2, w, 1, D + 1, look.shoe);
       if (outfit === "starwars") leg.set(side < 0 ? x : x + w - 1, -legs + 1, 0, look.accent).set(side < 0 ? x : x + w - 1, -legs, -D / 2, 0x9fd8ff);

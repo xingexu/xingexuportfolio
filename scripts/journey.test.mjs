@@ -890,6 +890,21 @@ test('walking forward leads through the door, and backward returns', () => {
   });
 });
 
+test('the floating arrows mark the walkable aisle from every spawn to its exit', () => {
+  for (const [index, chapter] of CHAPTERS.entries()) {
+    let p = W.spawn(index, 'forward');
+    const arrows = W.journeyArrows(index), radius = 3.5 * W.AVATAR_SCALE;
+    assert.equal(arrows[0].z, p.z - 8);
+    for (const arrow of arrows) {
+      assert.ok(arrow.z < p.z, chapter.id + ' points forward');
+      p = W.step(index, p, arrow.x - p.x, arrow.z - p.z, radius);
+      assert.ok(Math.hypot(p.x - arrow.x, p.z - arrow.z) < 0.001, chapter.id + ' has a clear route');
+      assert.equal(p.exit, null);
+    }
+    assert.equal(W.step(index, p, 0, -7, radius).exit, 'next');
+  }
+});
+
 test('walls and furniture stop the player', () => {
   const room = W.interior(CHAPTERS[1]);
   const r = W.step(1, { x: 0, z: 0 }, -200, 0, 3);

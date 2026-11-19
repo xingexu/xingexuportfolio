@@ -8,7 +8,7 @@ import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/
 import { gridGeometry } from "@/lib/journey/mesh";
 import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
-import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomSide } from "@/lib/journey/world";
+import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomSide } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
@@ -114,7 +114,8 @@ export default function JourneyWorld(props: Props) {
       if (Math.abs(x) + Math.abs(y) + Math.abs(z) <= 4) markerGrid.set(x, y, z, y >= 2 ? 0xffef9e : y < -1 ? 0xe5ac41 : 0xffd84a);
     }
     const markerGeometry = gridGeometry(markerGrid, [-0.25, -0.25, -0.25], 0, 0.5);
-    owned.push(markerGeometry);
+    const arrowGeometry = gridGeometry(buildJourneyArrow(), [-0.25, 0, 0], 0, 0.5);
+    owned.push(markerGeometry, arrowGeometry);
 
     type ItemView = { material: MeshBasicMaterial; marker: Mesh; markerMaterial: MeshBasicMaterial; markerY: number };
     type PropView = { holder: Group; bounds: Box3; material: MeshBasicMaterial; glass?: MeshBasicMaterial; wall?: RoomSide; visibility: number };
@@ -124,7 +125,7 @@ export default function JourneyWorld(props: Props) {
     type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
     type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView };
     const rooms = new Map<number, RoomView>();
     function setOpacity(material: MeshBasicMaterial, opacity: number) {
       material.opacity = opacity;
@@ -227,7 +228,19 @@ export default function JourneyWorld(props: Props) {
       }
       const field = balls.length ? buildBallField(index) : undefined;
       if (roommate) field?.blocks.push(roommate.ballBlock);
-      const view = { group, items, props, reactive, balls, itemPositions, field, doors, pickables, walls, roommate };
+      const route = journeyArrows(index).map(({ x, z }) => {
+        const arrow = new Mesh(arrowGeometry, baseMaterial);
+        arrow.position.set(x, 3.4, z);
+        group.add(arrow);
+        return arrow;
+      });
+      const exitArrow = new Mesh(arrowGeometry, baseMaterial);
+      exitArrow.rotation.set(Math.PI / 2, Math.PI, 0);
+      exitArrow.position.set(0, 24, bounds.minZ + 3);
+      exitArrow.scale.setScalar(1.15);
+      group.add(exitArrow);
+      route.push(exitArrow);
+      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate };
       rooms.set(index, view);
       return view;
     }
@@ -809,6 +822,12 @@ export default function JourneyWorld(props: Props) {
       updateDoors(motion.matches ? 1 : 1 - Math.exp(-dt * 16));
       if (!transition && !blockedNow) updateBumps(dt);
       fadeForeground(dt);
+      activeRoom.route.forEach((arrow, i) => {
+        const atDoor = i === activeRoom.route.length - 1;
+        arrow.visible = !intro && !transition && !blockedNow && arrow.position.z < player.z + (atDoor ? 3 : -1);
+        const y = atDoor ? 24 : 3.4;
+        arrow.position.y = y + (motion.matches ? 0 : Math.sin(time * 3 - i * 0.75) * 0.55);
+      });
 
       // Nearby + hover highlights
       const npc = activeRoom.roommate;

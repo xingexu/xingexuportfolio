@@ -256,7 +256,7 @@ export const INTRO_END: Vec = { x: -1, z: -12 };
 export type RoomArrival = "start" | "forward" | "back" | "portal";
 export function spawn(index: number, from: RoomArrival): Vec & { yaw: number } {
   const room = interior(JOURNEY_ROOMS[index]);
-  if (index === CSA_ROOM_INDEX) return { x: 0, z: 40, yaw: Math.PI };
+  if (index === CSA_ROOM_INDEX) return { x: 0, z: room.maxZ - 8, yaw: Math.PI };
   if (index === WESTERN_INDEX && from === "portal" && csaPoster) {
     return { x: room.minX + 8, z: csaPoster.z, yaw: Math.PI / 2 };
   }
@@ -299,16 +299,16 @@ export function jumpHeight(elapsed: number) {
 function floorColor(chapter: Chapter, x: number, z: number): Color {
   const n = hash3(x, 0, z);
   switch (chapter.floor) {
-    case "dance": {
-      if (Math.abs(x) < 48 && z < -39 && z > CSA_STAGE_Z - 15) return shade(0x50314b, 0.85 + n * 0.14);
-      if (x < -46 || x >= 46 || z < -38 || z >= 41) {
-        const seam = x % 8 === 0 || z % 8 === 0;
-        return shade(seam ? 0x30283b : 0x3b3348, 0.92 + n * 0.13);
+    case "auditorium": {
+      const stageEdge = CSA_STAGE_Z + 18;
+      if (Math.abs(x) < 67 && z <= stageEdge) {
+        if (z === stageEdge) return Math.abs(x) < 8 ? 0x906b63 : 0x95625b;
+        const board = Math.floor((z + 256) / 4);
+        return shade(z % 4 === 0 ? 0x55403e : 0x8e654f, 0.84 + hash3(board, 0, Math.floor((x + board * 4) / 24)) * 0.18 + n * 0.06);
       }
-      const col = Math.floor((x + 46) / 8), row = Math.floor((z + 38) / 8);
-      const seam = (x + 46) % 8 === 0 || (z + 38) % 8 === 0;
-      const tiles = [0x44385a, 0x604a75, 0x6b466e, 0x4d5478, 0x63526f];
-      return seam ? 0x352a48 : shade(tiles[(col * 3 + row * 2) % tiles.length], 0.97 + n * 0.08);
+      if (z > stageEdge && Math.abs(x) <= 8) return shade(Math.abs(x) === 8 ? 0x896060 : 0x623347, 0.91 + n * 0.14);
+      const seam = x % 8 === 0 && z % 8 === 0;
+      return shade(seam ? 0x30283b : 0x47394e, 0.90 + n * 0.16);
     }
     case "wood": case "laminate": case "gym": {
       const width = chapter.floor === "laminate" ? 5 : 4, plank = Math.floor((x + 512) / width);

@@ -676,6 +676,24 @@ test('the volleyball bounces off Richard in both his seated and moving poses', (
   checkBounce();
 });
 
+test('a moving Richard displaces a loose volleyball and does not leave it in midair', () => {
+  const { view } = roommateScene(), field = W.buildBallField(CHAPTERS.length - 1);
+  const block = view.ballBlock;
+  field.blocks.push(block);
+  const practice = beatAt('practice', 0.5), seat = beatAt('seat', 0);
+  view.apply(practice, practice.yaw);
+  const loose = V.makeBall(practice.x + 0.5, 0, practice.z, 1.3);
+  V.pushBallFromMovingBlock(loose, field, block);
+  assert.ok(Math.hypot(loose.vx, loose.vz) >= 6, 'the ball rolls out from under him');
+  assert.ok(loose.x !== practice.x + 0.5 || loose.z !== practice.z);
+  const balanced = V.makeBall(practice.x, block.top, practice.z, 1.3);
+  V.stepBall(balanced, field, 0.1);
+  assert.ok(balanced.grounded && balanced.y > balanced.radius);
+  view.apply(seat, seat.yaw);
+  V.stepBall(balanced, field, 0.1);
+  assert.ok(!balanced.grounded && balanced.vy < 0, 'gravity resumes once Richard moves underneath it');
+});
+
 test('Richard stickhandles with a grounded blade and keeps the puck on the pad', () => {
   const { view } = roommateScene();
   const stick = view.group.getObjectByName('Hockey stick'), puck = view.group.getObjectByName('Puck');

@@ -9,7 +9,7 @@ import { gridGeometry } from "@/lib/journey/mesh";
 import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomSide } from "@/lib/journey/world";
-import { advanceVolley, kickBall, makeBall, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
+import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
 export type JourneyControls = {
@@ -414,7 +414,11 @@ export default function JourneyWorld(props: Props) {
         const x = state.x, y = state.y, z = state.z;
         if (volley?.ball === ball) {
           if (advanceVolley(volley.sequence, state, field, dt)) volley = null;
-        } else if (!(state.grounded && !state.vx && !state.vz && !state.kickDelay)) stepBall(state, field, dt);
+        } else {
+          const actor = activeRoom.roommate?.ballBlock;
+          if (actor) pushBallFromMovingBlock(state, field, actor);
+          if (!state.grounded || state.y > state.radius || state.vx || state.vz || state.kickDelay) stepBall(state, field, dt);
+        }
         const dx = state.x - x, dz = state.z - z, travel = Math.hypot(dx, dz);
         if (travel || state.y !== y) {
           holder.position.set(state.x, state.y, state.z);

@@ -24,7 +24,7 @@ type Look = { top: Color; topDark: Color; pants: Color; shoe: Color; sole: Color
 const LOOKS: Record<Outfit, Look> = {
   kid: { top: 0x4fa3e0, topDark: 0x3b86bf, pants: 0xc9a46a, shoe: 0xe0453a, sole: 0xf4f4f4, accent: 0xffffff, hood: false, shorts: true, slides: false },
   starwars: { top: 0x1c1c22, topDark: 0x121216, pants: 0x3c4f6e, shoe: 0xf3f3f3, sole: 0xd8d8d8, accent: 0xe03a3a, hood: true, shorts: false, slides: false },
-  essentials: { top: 0xcdbb9e, topDark: 0xb7a587, pants: 0x8d8f94, shoe: 0xd8ccb4, sole: 0xc6b99d, accent: 0x6e6455, hood: true, shorts: false, slides: true },
+  stussy: { top: 0x272729, topDark: 0x1b1b1d, pants: 0xa1a1a1, shoe: 0xd8ccb4, sole: 0xc6b99d, accent: 0xece9e2, hood: true, shorts: false, slides: true },
   western: { top: 0x222226, topDark: 0x151518, pants: 0x29292e, shoe: 0x25232a, sole: 0x373438, accent: 0x4d4748, hood: true, shorts: false, slides: false },
   csa: { top: 0x26252a, topDark: 0x19181c, pants: 0x202024, shoe: 0x161619, sole: 0x303035, accent: 0xf6efe4, hood: false, shorts: false, slides: false },
 };
@@ -60,6 +60,38 @@ function fullerHoodie(head: Grid, torso: Grid, armL: Grid, armR: Grid, W: number
   head.box(-7, 0, -12, 14, 3, 2, weave).box(-6, 3, -11, 12, 3, 2, weave);
   head.box(-8, 1, -10, 2, 5, 3, shadow).box(6, 1, -10, 2, 5, 3, shadow);
   head.box(-6, 3, -12, 12, 1, 1, seam);
+}
+
+const STUSSY_BACK = [
+  ".....#........",
+  "....##....#.#.",
+  "..#######...##",
+  "#######.######",
+  "..######.#.###",
+  "..#.#.......##",
+  "............#.",
+  ".............#",
+  ".............#",
+];
+const STUSSY_CHEST = ["..#.....", ".#####.#", "####.###", "..#.#..#", ".......#"];
+
+function stussyPrint(torso: Grid, height: number, ink: Color) {
+  const stamp = (pattern: string[], left: number, top: number, z: number) => {
+    pattern.forEach((row, dy) => [...row].forEach((pixel, dx) => {
+      const x = left + (z < 0 ? row.length - 1 - dx : dx), y = top - dy;
+      if (pixel === "#" && torso.has(x, y, z)) torso.set(x, y, z, ink);
+    }));
+  };
+  stamp(STUSSY_BACK, -7, height - 4, -6);
+  stamp(STUSSY_CHEST, 0, height - 5, 3);
+}
+
+function cuffSweats(leg: Grid, side: -1 | 1, width: number, length: number, look: Look) {
+  const x = side < 0 ? -width : 0, cuff = -(length - 2) * 2;
+  const rib = fabric(look.pants, 0.81), seam = fabric(look.pants, 0.89);
+  leg.box(x, cuff, -4, width, 2, 8, -1).box(x + 1, cuff, -3, width - 2, 2, 6, rib);
+  leg.box(side < 0 ? x : x + width - 1, cuff + 2, 0, 1, -cuff - 2, 1, seam);
+  leg.box(x + 1, cuff + 3, 3, width - 2, 1, 1, fabric(look.pants, 0.92));
 }
 
 function straightLeg(side: -1 | 1, length: number, look: Look) {
@@ -159,11 +191,6 @@ export function buildAvatar(age: number, outfit: Outfit, style?: Partial<Pick<Lo
     torso.set(-1, torsoH - 1, D / 2, 0xf0f0f0).set(0, torsoH - 1, D / 2, 0xf0f0f0).set(-1, torsoH - 2, D / 2, 0xf0f0f0).set(0, torsoH - 2, D / 2, 0xf0f0f0);
     torso.box(-hw + 1, 1, D / 2, W - 2, 2, 1, look.topDark);
   }
-  if (outfit === "essentials") {
-    torso.box(-2, torsoH - 4, D / 2, 4, 1, 1, 0x3a352d).set(-2, torsoH - 1, D / 2, 0xf3ede2).set(1, torsoH - 1, D / 2, 0xf3ede2);
-    torso.box(-hw + 1, 1, D / 2, W - 2, 3, 1, look.topDark);
-  }
-
   // Arms hang from the shoulder pivot (y = 0) downward.
   const armLen = torsoH + (age >= 12 ? 1 : 0);
   for (const [arm, side] of [[armL, -1], [armR, 1]] as const) {
@@ -193,7 +220,6 @@ export function buildAvatar(age: number, outfit: Outfit, style?: Partial<Pick<Lo
       leg.box(x, -legs + footH, -1, w, 1, 2, csa ? look.shoe : 0xf4f4f4);
     } else {
       leg.box(x, -legs + footH, -D / 2, w, legs - footH, D, look.pants);
-      if (outfit === "essentials") leg.box(x, -legs + footH, -D / 2, w, 1, D, 0x7a7c80);
     }
     const toe = D / 2 + 1;
     if (look.slides) {
@@ -209,13 +235,19 @@ export function buildAvatar(age: number, outfit: Outfit, style?: Partial<Pick<Lo
   const fineHead = finePart(head);
   const fineTorso = finePart(torso, look.top, look.topDark);
   const fineArmL = finePart(armL, look.top, look.topDark), fineArmR = finePart(armR, look.top, look.topDark);
+  const fineLegL = western ? straightLeg(-1, legs, look) : finePart(legL, look.pants);
+  const fineLegR = western ? straightLeg(1, legs, look) : finePart(legR, look.pants);
   if (!western && look.hood) fullerHoodie(fineHead, fineTorso, fineArmL, fineArmR, W, torsoH, armLen, look);
+  if (outfit === "stussy") {
+    stussyPrint(fineTorso, torsoH * 2, look.accent);
+    cuffSweats(fineLegL, -1, W, legs, look);
+    cuffSweats(fineLegR, 1, W, legs, look);
+  }
   return {
     height: H, hip: legs, shoulder: legs + torsoH - 1, shoulderX: hw, hipX: 0,
     head: fineHead, torso: fineTorso, armL: fineArmL, armR: fineArmR,
     shirtPrint: csa ? csaTee(torsoH * 8, look.accent) : undefined,
-    legL: western ? straightLeg(-1, legs, look) : finePart(legL, look.pants),
-    legR: western ? straightLeg(1, legs, look) : finePart(legR, look.pants),
+    legL: fineLegL, legR: fineLegR,
     propeller: propeller && finePart(propeller), propellerY: headH + 3,
   };
 }

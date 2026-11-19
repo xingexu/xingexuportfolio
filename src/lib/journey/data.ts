@@ -13,7 +13,7 @@ export type JourneyItem = Placement & {
   links?: JourneyLink[];
   video?: { src: string; label: string; captions?: string; poster: string };
 };
-export type Outfit = "kid" | "starwars" | "essentials" | "western" | "csa";
+export type Outfit = "kid" | "starwars" | "stussy" | "western" | "csa";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "dance";
 export type Roommate = { id: string; x: number; z: number; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
 type Vec2 = { x: number; z: number };
@@ -145,7 +145,7 @@ const ROOMS: Chapter[] = [
   {
     id: "bayview", stop: "Secondary school", number: "05", place: "Bayview Secondary School", location: "Richmond Hill, Ontario", heading: "High school.",
     intro: "Volleyball, competitive programming, the AIME, Brawl Stars, my own projects, and FBLC, from member to president.",
-    ageFrom: 14, ageTo: 17, outfit: "essentials", outfitLabel: "Essentials hoodie · grey sweatpants · Yeezy Slides",
+    ageFrom: 14, ageTo: 17, outfit: "stussy", outfitLabel: "Black Stüssy hoodie · grey sweatpants · Yeezy Slides",
     width: 72, depth: 76, floor: "gym", wall: 0xc8ccd2, trim: 0x23477a, background: 0xa6c6d5, doorLabel: "WESTERN",
     items: [
       { id: "volleyball", model: "volleyball", x: -17, z: 17, ball: "mikasa", label: "Mikasa volleyball", title: "Mikasa volleyball",

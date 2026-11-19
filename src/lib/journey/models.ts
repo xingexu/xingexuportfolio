@@ -414,6 +414,31 @@ function macbook(g: Grid) {
 }
 
 const MODELS: Record<string, (g: Grid) => void> = {
+  "csa-dj-booth": g => {
+    g.box(-11, 0, -4, 22, 2, 8, 0x19151f)
+      .box(-10, 2, -3, 20, 9, 6, 0x2c2439)
+      .box(-11, 11, -4, 22, 2, 8, 0x50435b)
+      .box(-10, 2, 3, 20, 8, 1, 0x3b2b46);
+    g.box(-10, 2, 4, 20, 1, 1, 0xff936e).box(-10, 9, 4, 20, 1, 1, 0xc471bb);
+    centeredText(g, "CSA", 4, 4, 0xf5d9d0);
+    for (const x of [-6, 6]) {
+      g.box(x - 3, 13, -3, 6, 1, 6, 0x222028);
+      disc(g, x, 14, 0, 2.3, (i, j) => (i + j) % 3 ? 0x393443 : 0x5e5269);
+      g.set(x, 14, 0, 0xf2a98e).set(x - 2, 14, -2, 0xffa877).set(x + 2, 14, -2, 0xb9a0ee);
+    }
+    g.box(-2, 13, -3, 4, 1, 6, 0x18141e);
+    for (const x of [-2, 0, 1]) for (const z of [-2, 0, 2]) g.set(x, 14, z, z === -2 ? 0x80d5c5 : 0xf79dbc);
+  },
+  "csa-speaker": g => {
+    g.box(-4, 0, -3, 8, 19, 6, 0x29232e).box(-3, 1, 3, 6, 17, 1, 0x17141c);
+    for (const y of [5, 13]) {
+      for (let x = -3; x <= 3; x++) for (let dy = -3; dy <= 3; dy++) {
+        const r = x * x + dy * dy;
+        if (r <= 11) g.set(x, y + dy, 4, r > 7 ? 0x746284 : r <= 2 ? 0x726376 : 0x3d3547);
+      }
+    }
+    g.set(2, 17, 4, 0xe193ae);
+  },
   plane,
   airstairs,
   "luggage-cart": g => {

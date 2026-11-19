@@ -20,13 +20,14 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(req, result, result.exports);
   return result.exports;
 }
-const { CHAPTERS, ALL_ITEMS } = load('src/lib/journey/data.ts');
+const { CHAPTERS, ALL_ITEMS, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
+const { CSA_GUESTS, csaHeadphones, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 const { Group, Mesh, MeshBasicMaterial, Vector3 } = require('three');
@@ -42,7 +43,7 @@ test('every item is written out, linked properly and has a model', () => {
     assert.ok(MODEL_IDS.includes(item.model), `${item.id} model`);
     for (const link of item.links ?? []) assert.match(link.href, /^(https:\/\/|\/)/, `${item.id} link`);
   }
-  for (const chapter of CHAPTERS) for (const p of chapter.decor) assert.ok(MODEL_IDS.includes(p.model), p.model);
+  for (const chapter of JOURNEY_ROOMS) for (const p of chapter.decor) assert.ok(MODEL_IDS.includes(p.model), p.model);
 });
 
 test('the badminton card uses the requested description verbatim', () => {
@@ -832,7 +833,7 @@ test('ages grow as you walk forward through a room', () => {
 });
 
 function reachable(index, start, r = 3.5) {
-  const room = W.interior(CHAPTERS[index]);
+  const room = W.interior(JOURNEY_ROOMS[index]);
   const seen = new Set(), queue = [start], cells = [];
   const key = (p) => `${p.x},${p.z}`;
   seen.add(key(start));
@@ -888,6 +889,74 @@ test('walking forward leads through the door, and backward returns', () => {
     for (let i = 0; i < 400 && !exit; i++) { const r = W.step(index, p, 0, 0.8, 3.5); exit = r.exit; p = r; }
     assert.equal(exit, 'prev', `${chapter.id} back`);
   });
+});
+
+test('the CSA poster is a reachable walk-in portal without changing the six chapters', () => {
+  assert.equal(CHAPTERS.length, 6);
+  assert.equal(JOURNEY_ROOMS[CSA_ROOM_INDEX].id, 'csa-after-hours');
+  const dorm = CHAPTERS[WESTERN_INDEX], radius = 3.5 * W.AVATAR_SCALE;
+  const poster = dorm.items.find(item => item.id === CSA_POSTER_ID);
+  const returnSpot = W.spawn(WESTERN_INDEX, 'portal');
+  assert.equal(returnSpot.z, poster.z);
+  assert.ok(!W.blocked(WESTERN_INDEX, returnSpot.x, returnSpot.z, radius));
+  assert.ok(reachable(WESTERN_INDEX, W.spawn(WESTERN_INDEX, 'forward'), radius)
+    .some(p => p.x === returnSpot.x && p.z === returnSpot.z));
+  assert.ok(W.nearbyItems(WESTERN_INDEX, returnSpot).some(item => item.id === CSA_POSTER_ID));
+  assert.equal(W.step(WESTERN_INDEX, returnSpot, -12, 0, radius).exit, 'party');
+  let approach = returnSpot;
+  for (let i = 0; i < 60 && !approach.exit; i++) approach = W.step(WESTERN_INDEX, approach, -0.19, 0, radius);
+  assert.equal(approach.exit, 'party', 'normal frame-sized movement also enters');
+  assert.equal(W.step(WESTERN_INDEX, returnSpot, 2, 0, radius).exit, null);
+  const otherPoster = dorm.items.find(item => item.id === 'wds');
+  assert.equal(W.step(WESTERN_INDEX, { ...returnSpot, z: otherPoster.z }, -12, 0, radius).exit, null);
+});
+
+test('CSA After Hours has a clear return door and a closed wall behind the DJ', () => {
+  const radius = 3.5 * W.AVATAR_SCALE, spawn = W.spawn(CSA_ROOM_INDEX, 'portal');
+  assert.ok(!W.blocked(CSA_ROOM_INDEX, spawn.x, spawn.z, radius));
+  assert.equal(spawn.yaw, Math.PI);
+  assert.equal(W.step(CSA_ROOM_INDEX, spawn, 0, 10, radius).exit, 'prev');
+  const bounds = W.interior(JOURNEY_ROOMS[CSA_ROOM_INDEX]);
+  assert.ok(W.blocked(CSA_ROOM_INDEX, 0, bounds.minZ - 2, radius));
+  const shell = W.buildRoomShell(CSA_ROOM_INDEX);
+  assert.ok(shell.has(0, 5, bounds.minZ - 1), 'no door opening in the stage wall');
+  assert.ok(!shell.has(0, 5, bounds.maxZ), 'the return doorway is open in the shell');
+});
+
+test('all eight guests animate in place, with reduced motion and a dedicated DJ', () => {
+  assert.deepEqual(CSA_GUESTS.map(guest => guest.name), [
+    'Jason Zhuang', 'Rain Li', 'Amelie Hu', 'Lydia Zheng', 'Daniel Su', 'Lucas Xue', 'Jeffrey Ban', 'William Wang',
+  ]);
+  assert.deepEqual(CSA_GUESTS.filter(guest => guest.scale < 1).map(guest => guest.name), ['Amelie Hu', 'Lydia Zheng']);
+  assert.deepEqual(CSA_GUESTS.filter(guest => guest.dj).map(guest => guest.name), ['Rain Li']);
+  for (const [i, guest] of CSA_GUESTS.entries()) {
+    const first = sampleCsaGuest(guest, i, 0, false), next = sampleCsaGuest(guest, i, 0.3, false);
+    assert.notDeepEqual(first, next, guest.name);
+    assert.deepEqual(sampleCsaGuest(guest, i, 0, true), sampleCsaGuest(guest, i, 3, true));
+    if (guest.dj) assert.deepEqual([next.x, next.z], [first.x, first.z]);
+    else assert.notEqual(next.x, first.x);
+    for (let tick = 0; tick < 20; tick++) {
+      const pose = sampleCsaGuest(guest, i, tick * 0.1, false);
+      assert.ok(!W.blocked(CSA_ROOM_INDEX, pose.x, pose.z, 2.5), guest.name);
+    }
+  }
+});
+
+test('the black CSA tee has a light front print and the DJ headphones sit outside the head', () => {
+  const { torso, head, legL } = buildAvatar(18, 'csa');
+  let print = 0;
+  torso.forEach((x, y, z, color) => {
+    if (color === 0xf6efe4) {
+      assert.equal(z, 3);
+      assert.ok(!torso.has(x, y, z + 1));
+      print++;
+    }
+  });
+  assert.ok(print > 35);
+  legL.forEach((_x, _y, _z, color) => assert.ok(color <= 0x363636));
+  assert.ok(!head.has(-10, 8, 0));
+  csaHeadphones(head);
+  assert.ok(head.has(-10, 8, 0) && head.has(9, 8, 0) && head.has(0, 15, 0));
 });
 
 test('the floating arrows mark the walkable aisle from every spawn to its exit', () => {

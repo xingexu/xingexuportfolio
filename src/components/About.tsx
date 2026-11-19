@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { CHAPTERS, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
+import { CHAPTERS, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
+import { CSA_GUESTS } from "@/lib/journey/csaParty";
 import { LINKS } from "@/app/data";
 import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
 import ObjectPreview from "./ObjectPreview";
 import { TransitionLink } from "./PageTransitions";
 
-type Opened = { kind: "item"; id: string } | { kind: "objects"; chapter: number } | { kind: "finale" } | null;
+type Opened = { kind: "item"; id: string } | { kind: "objects"; chapter: number } | { kind: "finale" | "party" } | null;
 
 const FINAL_LINKS: JourneyLink[] = [
   { href: "/projects", label: "Projects" },
@@ -131,27 +132,30 @@ export default function About() {
     }
   }, [dialogPage]);
 
-  const target = transition ? CHAPTERS[transition.to] : null;
+  const inParty = status.chapter === CSA_ROOM_INDEX;
+  const secretTransition = transition?.direction === "portal";
+  const target = transition ? JOURNEY_ROOMS[transition.to] : null;
+  const transitionTitle = target && (secretTransition && transition?.to !== CSA_ROOM_INDEX ? target.place : target.stop);
   const chapterItems = item ? CHAPTERS[item.chapter].items : [];
   const itemIndex = item ? chapterItems.findIndex(entry => entry.id === item.id) : -1;
 
   return (
-    <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={CHAPTERS[status.chapter].id}>
+    <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={JOURNEY_ROOMS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Follow the floating arrows through the center aisle to the far door, or use Objects to switch rooms without walking. Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows through the center aisle to the far door, or use Objects to switch rooms without walking."} Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
       {intro && <div className="journey-intro" role="status"><Typed text="Welcome to Canada." delay={300} /></div>}
 
-      {target && transition && (
+      {target && transition && transitionTitle && (
         <div className="journey-card" key={transition.to} style={{ "--journey-accent": `#${chapterAccent(transition.to).toString(16).padStart(6, "0")}` } as CSSProperties}>
-          <button type="button" className="journey-pass" onClick={() => controls.current?.skip()} aria-label={`${target.stop}, chapter ${transition.to + 1} of ${CHAPTERS.length}. Skip transition.`}>
-            <span className="journey-route" aria-hidden="true">{CHAPTERS.map((room, i) =>
-              <span key={room.id} data-progress={i === transition.to ? "current" : i < transition.to ? "passed" : "upcoming"} />)}</span>
-            <span className="journey-pass-index" aria-hidden="true">CHAPTER {target.number} / {String(CHAPTERS.length).padStart(2, "0")}</span>
-            <strong><Typed text={target.stop} delay={420} /></strong>
-            {target.stopNote && <span className="journey-pass-note"><Typed text={target.stopNote} delay={550 + target.stop.length * 45} speed={30} /></span>}
+          <button type="button" className="journey-pass" onClick={() => controls.current?.skip()} aria-label={secretTransition ? `${transitionTitle}. Skip transition.` : `${target.stop}, chapter ${transition.to + 1} of ${CHAPTERS.length}. Skip transition.`}>
+            {!secretTransition && <span className="journey-route" aria-hidden="true">{CHAPTERS.map((room, i) =>
+              <span key={room.id} data-progress={i === transition.to ? "current" : i < transition.to ? "passed" : "upcoming"} />)}</span>}
+            <span className="journey-pass-index" aria-hidden="true">{secretTransition ? (transition.to === CSA_ROOM_INDEX ? "SECRET ROOM" : "BACK TO THE DORM") : `CHAPTER ${target.number} / ${String(CHAPTERS.length).padStart(2, "0")}`}</span>
+            <strong><Typed text={transitionTitle} delay={420} /></strong>
+            {target.stopNote && <span className="journey-pass-note"><Typed text={target.stopNote} delay={550 + transitionTitle.length * 45} speed={30} /></span>}
           </button>
         </div>
       )}
@@ -162,13 +166,14 @@ export default function About() {
           <span><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> Turn</span>
           <span><kbd>E</kbd> Inspect</span>
           <span><kbd>Space</kbd> Jump</span>
-          {!moved && <span>Follow the floating arrows to the next door.</span>}
+          {!moved && !inParty && <span>Follow the floating arrows to the next door.</span>}
         </aside>
-        {!moved && !near && !status.volley && <p className="journey-touch-note">Drag the scene or use the joystick. Follow the floating arrows to the next door.</p>}
+        {!moved && !inParty && !near && !status.volley && <p className="journey-touch-note">Drag the scene or use the joystick. Follow the floating arrows to the next door.</p>}
       </>}
 
-      {!intro && !opened && !transition && (near || status.volley) && (
+      {!intro && !opened && !transition && (near || status.volley || inParty) && (
         <div className="journey-prompts">
+          {inParty && <button type="button" className="journey-prompt journey-csa-action" onClick={() => { controls.current?.leaveCsa(); controls.current?.focus(); }}>← Return to dorm</button>}
           {near && <button type="button" className="journey-prompt" onClick={() => openItem(near.id)} aria-keyshortcuts="E">
             <kbd aria-hidden="true">E</kbd><span>{near.label}</span>
           </button>}
@@ -189,7 +194,7 @@ export default function About() {
       {!intro && !transition && <div className="journey-tools" role="group" aria-label="Camera and objects">
         <button type="button" onClick={() => controls.current?.toggleCamera("tilt")} aria-pressed={camera.tilt} aria-keyshortcuts="Q">Tilt up <kbd aria-hidden="true">Q</kbd></button>
         <button type="button" title="See yourself from the front (F)" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
-        <button type="button" onClick={() => browse(status.chapter)} aria-haspopup="dialog">Objects</button>
+        <button type="button" onClick={() => inParty ? setOpened({ kind: "party" }) : browse(status.chapter)} aria-haspopup="dialog">{inParty ? "Guests" : "Objects"}</button>
       </div>}
       {MUSIC_URL && <JourneyMusic src={MUSIC_URL} />}
       <TransitionLink href="/home" replace className="journey-back">Skip to portfolio <span aria-hidden="true">→</span></TransitionLink>
@@ -223,6 +228,7 @@ export default function About() {
             </video> : <ObjectPreview model={item.model} label={item.label} />}
             {item.description && <p className="journey-copy">{item.description}</p>}
             {item.links && <div className="journey-links">{item.links.map(link => <StoryLink key={link.href} link={link} />)}</div>}
+            {item.id === CSA_POSTER_ID && <button type="button" className="journey-continue journey-csa-action" onClick={() => { controls.current?.visitCsa(); close(); }}>Step through the poster <span aria-hidden="true">↗</span></button>}
             {chapterItems.length > 1 && <nav className="journey-item-nav" aria-label={`More from ${home.place}`}>
               <button type="button" onClick={() => openItem(chapterItems[(itemIndex + chapterItems.length - 1) % chapterItems.length].id)} aria-label="Previous object">←</button>
               <button type="button" onClick={() => browse(item.chapter)}>All objects <span>· {itemIndex + 1} / {chapterItems.length}</span></button>
@@ -230,6 +236,11 @@ export default function About() {
             </nav>}
           </>;
         })()}
+        {opened?.kind === "party" && <>
+          <p className="journey-eyebrow">Western University · Secret room</p>
+          <h2 id="journey-dialog-title">CSA After Hours</h2>
+          <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}{guest.dj && <span>DJ</span>}</li>)}</ul>
+        </>}
         {opened?.kind === "finale" && <>
           <p className="journey-eyebrow">Age 18 · today</p>
           <h2 id="journey-dialog-title">That’s me, so far.</h2>

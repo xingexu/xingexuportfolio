@@ -24,6 +24,7 @@ const LOOKS: Record<Outfit, Look> = {
   starwars: { top: 0x1c1c22, topDark: 0x121216, pants: 0x3c4f6e, shoe: 0xf3f3f3, sole: 0xd8d8d8, accent: 0xe03a3a, hood: true, shorts: false, slides: false },
   essentials: { top: 0xcdbb9e, topDark: 0xb7a587, pants: 0x8d8f94, shoe: 0xd8ccb4, sole: 0xc6b99d, accent: 0x6e6455, hood: true, shorts: false, slides: true },
   western: { top: 0x222226, topDark: 0x151518, pants: 0x29292e, shoe: 0x25232a, sole: 0x373438, accent: 0x4d4748, hood: true, shorts: false, slides: false },
+  csa: { top: 0x26252a, topDark: 0x19181c, pants: 0x202024, shoe: 0x161619, sole: 0x303035, accent: 0xf6efe4, hood: false, shorts: false, slides: false },
 };
 
 const fabric = (tone: Color, lift = 1) => (x: number, y: number, z: number) =>
@@ -80,15 +81,33 @@ function straightLeg(side: -1 | 1, length: number, look: Look) {
   return leg;
 }
 
+function csaTee(torso: Grid, height: number, ink: Color) {
+  const z = 3;
+  torso.text("CSA", -5, height - 7, z, ink);
+  const cats: [number, number, string[]][] = [
+    [0, height - 8, ["...##..", ".##..#.", "#.###..", "..###..", ".#.##..", "..#..#."]],
+    [-5, height - 11, ["......#", ".....#.", ".#.#.#.", ".#####.", "#######", "..#.##."]],
+    [-2, height - 16, ["....#..", ".##..#.", "#..###.", "...###.", "..###.#", ".#.#..."]],
+  ];
+  cats.forEach(([left, top, pixels]) => pixels.forEach((row, dy) => [...row].forEach((pixel, dx) => {
+    const x = left + dx, y = top - dy;
+    if (pixel === "#" && torso.has(x, y, z)) torso.set(x, y, z, ink);
+  })));
+  for (const [x, y] of [[-4, height - 9], [4, height - 14], [-3, height - 17]]) {
+    if (torso.has(x, y, z)) torso.set(x, y, z, 0x9e90a6);
+  }
+}
+
 export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "top" | "topDark"> & { skin?: Color; skinDark?: Color }): AvatarParts {
   const look = { ...LOOKS[outfit], ...palette };
   const skin = palette?.skin ?? SKIN, skinDark = palette?.skinDark ?? SKIN_DARK;
   const western = outfit === "western";
+  const csa = outfit === "csa", adult = western || csa;
   const H = avatarHeight(age), t = (Math.min(18, Math.max(7, age)) - 7) / 11;
-  const headH = !western && age >= 13 ? 8 : 7;
+  const headH = !adult && age >= 13 ? 8 : 7;
   const legs = Math.round((H - headH) * (0.5 + 0.06 * t));
   const torsoH = H - headH - legs;
-  const W = !western && age >= 14 ? 8 : 6, hw = W / 2, D = 4, armW = 2;
+  const W = !adult && age >= 14 ? 8 : 6, hw = W / 2, D = 4, armW = 2;
   const head = new Grid(), torso = new Grid(), armL = new Grid(), armR = new Grid(), legL = new Grid(), legR = new Grid();
 
   // Head, built from its base (neck) upward.
@@ -97,7 +116,7 @@ export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "t
   head.box(-4, headH - 3, 3, 8, 1, 1, HAIR).box(-3, headH - 4, 3, 2, 1, 1, HAIR);
   const eyeY = headH - 5;
   head.set(-2, eyeY, 3, EYE).set(1, eyeY, 3, EYE).set(-2, eyeY + 1, 3, EYE).set(1, eyeY + 1, 3, EYE);
-  if (!western) head.set(-3, eyeY - 1, 3, 0xf3a9a0).set(2, eyeY - 1, 3, 0xf3a9a0);
+  if (!adult) head.set(-3, eyeY - 1, 3, 0xf3a9a0).set(2, eyeY - 1, 3, 0xf3a9a0);
   head.set(-1, eyeY - 2, 3, 0xc46b5a).set(0, eyeY - 2, 3, 0xc46b5a);
   let propeller: Grid | undefined;
   if (outfit === "kid") {
@@ -130,6 +149,11 @@ export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "t
     const x = side < 0 ? -armW : 0;
     arm.box(x, -armLen + 2, -1, armW, armLen - 2, 2, look.top).box(x, -armLen, -1, armW, 2, 2, skin);
     if (outfit === "kid") arm.box(x, -armLen + 2, -1, armW, armLen - 5, 2, skin);
+    else if (csa) {
+      const sleeve = Math.max(2, Math.floor(armLen / 3));
+      arm.box(x, -armLen, -1, armW, armLen - sleeve, 2, skin)
+        .box(x, -sleeve, -1, armW, 1, 2, look.topDark);
+    }
     else arm.box(x, -armLen + 2, -1, armW, 1, 2, look.topDark);
   }
   if (outfit === "kid") {
@@ -165,6 +189,7 @@ export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "t
   const fineTorso = finePart(torso, look.top, look.topDark);
   const fineArmL = finePart(armL, look.top, look.topDark), fineArmR = finePart(armR, look.top, look.topDark);
   if (!western && look.hood) fullerHoodie(fineHead, fineTorso, fineArmL, fineArmR, W, torsoH, armLen, look);
+  if (csa) csaTee(fineTorso, torsoH * 2, look.accent);
   return {
     height: H, hip: legs, shoulder: legs + torsoH - 1, shoulderX: hw, hipX: 0,
     head: fineHead, torso: fineTorso, armL: fineArmL, armR: fineArmR,

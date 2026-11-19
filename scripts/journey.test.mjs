@@ -22,12 +22,14 @@ function load(file) {
 }
 const { CHAPTERS, ALL_ITEMS } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
-const { AVATAR_SKIN, AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
+const { AVATAR_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
+const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
+const { Group, Mesh, MeshBasicMaterial, Vector3 } = require('three');
 
 test('every item is written out, linked properly and has a model', () => {
   const ids = new Set();
@@ -508,29 +510,32 @@ test('the Western avatar grows taller without widening the Grade 5 face or shoul
   assert.match(CHAPTERS.at(-1).outfitLabel, /UGGs/);
 });
 
-test('Richard sits on the second bed in shorts with a milk carton', () => {
-  const room = CHAPTERS.at(-1), index = CHAPTERS.length - 1;
+test('Richard starts on the second bed in shorts and blue Crocs', () => {
+  const room = CHAPTERS.at(-1);
   const beds = room.items.filter(item => item.model.startsWith('bed-'));
   assert.equal(beds.length, 2);
   const bed = beds.find(item => item.id === 'richards-bed'), box = W.placementBox(bed), at = room.roommate;
-  assert.equal(bed.title, at.name);
   assert.ok(at.x > box.minX && at.x <= box.maxX && at.z > box.minZ && at.z < box.maxZ);
   assert.equal(buildModel(bed.model).get(7, R.ROOMMATE_SEAT - 1, 0) >= 0, true);
-  assert.ok(W.blocked(index, at.x + 5, at.z, 1), 'the aisle collision includes his knees');
-  assert.ok(!W.blocked(index, at.x + 11, at.z, 2), 'there is still room to walk up');
-  const { seated, forearm, carton } = R.buildRoommate();
-  assert.equal(seated.get(-5, -1, 4), 0x384351, 'shorts');
-  assert.equal(seated.get(-5, -6, 10), AVATAR_SKIN, 'bare shins match the avatar skin tone');
-  assert.ok(forearm.size > 0 && carton.size > 0);
+  const { legL, legR, head } = R.buildRoommate();
+  for (const [leg, x] of [[legL, -6], [legR, 1]]) {
+    assert.ok(leg.has(x, -8, -2) && !leg.has(x, -18, -2), 'shorts end above the bare legs');
+    assert.equal(leg.get(x + 1, -20, 0), head.get(0, 4, 6), 'bare shins and face match');
+    assert.equal(leg.get(x + 2, -27, 1), 0x418fdd, 'blue clog');
+    assert.equal(leg.get(x + 1, -27, 2), 0x215a93, 'vent');
+    assert.equal(leg.get(x, -27, -1), 0x2264a4, 'heel strap rivet');
+  }
 });
 
-test('Richard shares the Western avatar face and fit, with a backward black cap', () => {
-  const avatar = buildAvatar(18, 'western'), { head, torso, headHeight } = R.buildRoommate();
+test('Richard shares the Western avatar fit, with a subtle tan and backward black cap', () => {
+  const avatar = buildAvatar(18, 'western'), { head, torso, shoulder, hip } = R.buildRoommate();
   assert.deepEqual(torso.bounds(), avatar.torso.bounds());
-  assert.equal(headHeight, avatar.shoulder - avatar.hip + 2);
+  assert.equal(shoulder - hip, avatar.shoulder - avatar.hip);
   assert.ok((torso.get(0, 14, 0) >> 16) >= 0xcc, 'white fleece');
+  const skin = avatar.head.get(0, 4, 6), tan = head.get(0, 4, 6);
+  assert.ok(tan < skin && (skin >> 16) - (tan >> 16) < 18, 'slightly darker skin tone');
   avatar.head.forEach((x, y, z, color) => {
-    if (z >= 0 && y < 12) assert.equal(head.get(x, y, z), color, 'same face and fringe');
+    if (z >= 0 && y < 12) assert.equal(head.get(x, y, z), color === skin ? tan : color, 'same face and fringe');
   });
   assert.ok(head.bounds().maxY > avatar.head.bounds().maxY, 'cap crown wraps his hair');
   assert.ok(head.bounds().minZ < -12 && head.bounds().maxZ < 10, 'the bill extends only behind the head');
@@ -551,24 +556,174 @@ test('the hoodie crest fits the chest and arcs RANGERS over a centered maple lea
   for (const [x, y] of [[0, 10], [-6, 5], [6, 5], [0, 0]]) assert.equal(crest.get(x, y, 0), 0xc52636, 'the leaf has a tip, lobes and a centered stem');
 });
 
-test('the milk sip plays once per approach, with a still pose for reduced motion', () => {
-  const state = { near: false, elapsed: R.SIP_DURATION };
-  R.stepRoommate(state, 12, 0.1);
-  assert.equal(state.elapsed, R.SIP_DURATION);
-  R.stepRoommate(state, 10, 0.9);
-  assert.equal(state.near, true);
-  for (const reduced of [false, true]) {
-    const pose = R.sipPose(state.elapsed, reduced);
-    assert.ok(pose.arm < -1 && pose.carton > 0.7 && pose.head < 0);
-    assert.ok(pose.armYaw < 0.01 && R.sipPose(0, reduced).armYaw > 0.5, 'the carton rests away from the crest and swings in to sip');
-    assert.deepEqual(R.sipPose(R.SIP_DURATION, reduced), R.sipPose(0, reduced));
+const dorm = CHAPTERS.at(-1), npcItem = dorm.items.find(item => item.id === dorm.roommate.id);
+const npcFridge = dorm.items.find(item => item.id === dorm.roommate.fridge), npcPad = dorm.items.find(item => item.id === dorm.roommate.pad);
+const routine = R.buildRoommateRoutine(dorm.roommate, npcFridge, npcPad);
+const beatAt = (action, proportion) => {
+  const { start, end } = routine.beats.find(beat => beat.action === action);
+  return R.sampleRoommate(routine, start + (end - start) * proportion);
+};
+
+test('Richard’s LinkedIn is available in the object browser and follows him around the dorm', () => {
+  assert.equal(npcItem.title, 'Richard Su');
+  assert.equal(npcItem.links[0].href, 'https://www.linkedin.com/in/richard-su-7377542b9/');
+  const pose = beatAt('practice', 0.5), player = { x: pose.x - 6, z: pose.z };
+  const index = CHAPTERS.length - 1;
+  assert.ok(!W.nearbyItems(index, player).some(item => item.id === npcItem.id));
+  assert.ok(W.nearbyItems(index, player, 3, 7, new Map([[npcItem.id, pose]])).some(item => item.id === npcItem.id));
+});
+
+test('Richard walks a furniture-free route, yields to the player and returns to his bed', () => {
+  const index = CHAPTERS.length - 1;
+  for (const beat of routine.beats.filter(b => b.action === 'walk')) {
+    for (let t = beat.start; t < beat.end; t += 0.02) {
+      const pose = R.sampleRoommate(routine, t);
+      assert.ok(!W.blocked(index, pose.x, pose.z, R.ROOMMATE_RADIUS), `blocked at ${pose.x}, ${pose.z}`);
+    }
   }
-  R.stepRoommate(state, 12, R.SIP_DURATION);
-  R.stepRoommate(state, 10, 0.05);
-  assert.equal(state.elapsed, R.SIP_DURATION, 'staying nearby does not replay');
-  R.stepRoommate(state, 15, 0.05);
-  R.stepRoommate(state, 10, 0.05);
-  assert.ok(state.elapsed < 0.1, 'walking back retriggers the sip');
+  const walk = routine.beats.find(beat => beat.action === 'walk');
+  const t = walk.start + 0.2;
+  const next = R.sampleRoommate(routine, t + 0.08);
+  assert.equal(R.advanceRoommate(routine, t, 0.06, next, 2.38), t, 'waits instead of walking through the player');
+  assert.equal(R.advanceRoommate(routine, t, 0.06, { x: -50, z: 40 }, 2.38), t + 0.06);
+  const seat = R.sampleRoommate(routine, routine.total);
+  assert.deepEqual(seat, R.sampleRoommate(routine, 0), 'the loop resets to its seated, stationary pose');
+  assert.equal(seat.sit, 1);
+  const { view } = roommateScene();
+  const inside = { x: 44.9, z: 32 };
+  const pose = beatAt('take', 0.5);
+  view.apply(pose, pose.yaw);
+  const fromSouth = { x: inside.x, z: inside.z + 11 };
+  const movement = W.step(index, fromSouth, 0, -13, 2.38, (from, to, r) => view.blocks(from, to, r, pose));
+  assert.ok(movement.z > inside.z + 4, 'player cannot walk through the open door and Richard');
+});
+
+test('the fridge door pauses before it swings into a stationary visitor', () => {
+  const player = { x: 44.8, z: 38.1 }, radius = 2.38;
+  assert.ok(!W.blocked(CHAPTERS.length - 1, player.x, player.z, radius), 'the visitor can stand in the aisle');
+  for (const action of ['open', 'shut']) {
+    const { start, end } = routine.beats.find(b => b.action === action);
+    let time = start, hit = false;
+    const visitor = action === 'open' ? player : { x: 44.8, z: 32.1 };
+    for (let i = 0; i < 100 && time < end; i++) {
+      const next = R.advanceRoommate(routine, time, 0.016, visitor, radius);
+      if (next === time) { hit = true; break; }
+      time = next;
+    }
+    assert.ok(hit, `door pauses while trying to ${action}`);
+    assert.ok(R.advanceRoommate(routine, time, 0.016, { x: 8, z: 18 }, radius) > time, 'door resumes when clear');
+  }
+});
+
+test('the fridge door collision follows the protruding handle', () => {
+  const { fridge, view } = roommateScene();
+  const pose = beatAt('take', 0.5);
+  view.apply(pose, pose.yaw);
+  const door = fridge.getObjectByName('Fridge door');
+  const p = door.localToWorld(new Vector3(-9, 11.6, 1.5 + 2.2));
+  assert.ok(R.fridgeDoorDistance(npcFridge, pose.door, p) < 2.38, 'the handle reaches a visitor outside the door slab');
+});
+
+test('the animated fridge opens, hands off the carton, closes and returns it after a sip', () => {
+  const { fridge, view } = roommateScene();
+  const door = fridge.getObjectByName('Fridge door'), carton = view.group.getObjectByName('Milk carton');
+  const onShelf = carton.position.clone();
+  const apply = (action, u) => { const pose = beatAt(action, u); view.apply(pose, pose.yaw); };
+  assert.equal(door.rotation.y, 0);
+  apply('open', 0.85);
+  assert.ok(door.rotation.y > 0.7);
+  apply('take', 0.44);
+  assert.ok(carton.position.distanceTo(onShelf) < 0.01);
+  apply('take', 0.46);
+  assert.ok(carton.position.distanceTo(onShelf) < 0.2, 'the carton transfers at the shelf, without jumping');
+  apply('close', 0.95);
+  assert.equal(door.rotation.y, 0);
+  assert.ok(carton.position.distanceTo(onShelf) > 2);
+  apply('sip', 0.5);
+  assert.ok(carton.rotation.x < -0.9 && carton.position.y > 17);
+  apply('replace', 0.54);
+  assert.ok(carton.position.distanceTo(onShelf) < 0.2, 'it reaches the shelf before release');
+  apply('shut', 0.95);
+  assert.equal(door.rotation.y, 0);
+  assert.ok(carton.position.distanceTo(onShelf) < 0.01);
+});
+
+function roommateScene() {
+  const material = new MeshBasicMaterial(), fridge = new Group();
+  fridge.position.set(npcFridge.x, npcFridge.y ?? 0, npcFridge.z);
+  fridge.rotation.y = npcFridge.rot * Math.PI / 2;
+  const view = makeRoommateView(dorm.roommate, npcFridge, npcPad, fridge, material, material,
+    (grid, size) => new Mesh(gridGeometry(grid, [0, 0, 0], 0, size), material));
+  return { view, fridge };
+}
+
+test('the volleyball bounces off Richard in both his seated and moving poses', () => {
+  const { view } = roommateScene();
+  const field = W.buildBallField(CHAPTERS.length - 1);
+  field.blocks.push(view.ballBlock);
+  const checkBounce = () => {
+    const { maxX, minZ, maxZ } = view.ballBlock, z = (minZ + maxZ) / 2;
+    const ball = V.makeBall(maxX + 2.4, 0, z, 1.3);
+    V.launchBall(ball, { x: -19, y: 0, z: 0 });
+    V.stepBall(ball, field, 0.14);
+    assert.ok(ball.vx > 0 && ball.x > maxX + ball.radius, 'the ball bounces before entering his model');
+  };
+  const seatedMaxX = view.ballBlock.maxX;
+  checkBounce();
+  const walking = R.sampleRoommate(routine, routine.beats.find(b => b.action === 'walk').end - 0.1);
+  view.apply(walking, walking.yaw);
+  assert.ok(view.ballBlock.minX > seatedMaxX, 'the collider leaves the bed with Richard');
+  checkBounce();
+});
+
+test('a moving Richard displaces a loose volleyball and does not leave it in midair', () => {
+  const { view } = roommateScene(), field = W.buildBallField(CHAPTERS.length - 1);
+  const block = view.ballBlock;
+  field.blocks.push(block);
+  const practice = beatAt('practice', 0.5), seat = beatAt('seat', 0);
+  view.apply(practice, practice.yaw);
+  const loose = V.makeBall(block.maxX + 0.8, 0, practice.z, 1.3);
+  const startX = loose.x;
+  V.pushBallFromMovingBlock(loose, field, block);
+  assert.ok(Math.hypot(loose.vx, loose.vz) >= 6, 'the ball rolls out from under him');
+  assert.ok(loose.x > startX);
+  const balanced = V.makeBall(practice.x, block.top, practice.z, 1.3);
+  V.stepBall(balanced, field, 0.1);
+  assert.ok(balanced.grounded && balanced.y > balanced.radius);
+  view.apply(seat, seat.yaw);
+  V.stepBall(balanced, field, 0.1);
+  assert.ok(!balanced.grounded && balanced.vy < 0, 'gravity resumes once Richard moves underneath it');
+});
+
+test('a volleyball pinned between Richard and furniture does not jump through him', () => {
+  const actor = { minX: 0, maxX: 4, minZ: -2, maxZ: 2, bottom: 0, top: 10 };
+  const furniture = { minX: -4, maxX: -1.3, minZ: -2, maxZ: 2, bottom: 0, top: 5 };
+  const field = { minX: -10, maxX: 10, minZ: -10, maxZ: 10, ceiling: 20, blocks: [actor, furniture] };
+  const ball = V.makeBall(-0.2, 0, 0, 1);
+  V.pushBallFromMovingBlock(ball, field, actor);
+  assert.equal(ball.x, -0.2);
+  assert.equal(ball.z, 0);
+  assert.equal(ball.vx, 0);
+  assert.equal(ball.vz, 0);
+});
+
+test('Richard stickhandles with a grounded blade and keeps the puck on the pad', () => {
+  const { view } = roommateScene();
+  const stick = view.group.getObjectByName('Hockey stick'), puck = view.group.getObjectByName('Puck');
+  const rack = stick.position.clone(), xs = [];
+  const box = W.placementBox(npcPad);
+  for (let u = 0.01; u < 1; u += 0.025) {
+    const pose = beatAt('practice', u);
+    view.apply(pose, pose.yaw);
+    assert.ok(puck.position.x > box.minX && puck.position.x < box.maxX && puck.position.z > box.minZ && puck.position.z < box.maxZ);
+    const blade = stick.localToWorld(new Vector3(0, -36 * 0.31, 0));
+    assert.ok(Math.abs(blade.y - puck.position.y) < 0.25, 'the shaft reaches the synthetic ice');
+    xs.push(puck.position.x);
+  }
+  assert.ok(Math.max(...xs) - Math.min(...xs) > 8, 'the puck moves with repeated side-to-side sweeps');
+  const pose = beatAt('rack', 1);
+  view.apply(pose, pose.yaw);
+  assert.ok(stick.position.distanceTo(rack) < 0.01, 'the stick goes back to its stand');
 });
 
 test('the Western dorm keeps small props and signs proportional to the furniture', () => {

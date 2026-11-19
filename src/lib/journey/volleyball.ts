@@ -34,6 +34,23 @@ function ballSpace(field: BallField, r: number, x: number, y: number, z: number)
     !field.blocks.some(block => y - r < block.top - 0.001 && y + r > block.bottom && overlaps(block, x, z, r));
 }
 
+export function pushBallFromMovingBlock(ball: Ball, field: BallField, block: BallBlock) {
+  const { x, y, z, radius } = ball;
+  if (y - radius >= block.top - 0.001 || y + radius <= block.bottom || !overlaps(block, x, z, radius)) return;
+  const gap = radius + 0.01;
+  const exits = [
+    { x: block.minX - gap, z }, { x: block.maxX + gap, z },
+    { x, z: block.minZ - gap }, { x, z: block.maxZ + gap },
+  ];
+  const distance = (p: Vec) => Math.abs(p.x - x) + Math.abs(p.z - z);
+  const exit = exits.reduce((nearest, p) => distance(p) < distance(nearest) ? p : nearest);
+  // Leave a pinned ball in place rather than snapping it through the actor.
+  if (distance(exit) > gap || !ballSpace(field, radius, exit.x, y, exit.z)) return;
+  ball.x = exit.x; ball.z = exit.z;
+  if (exit.x !== x) ball.vx = Math.sign(exit.x - x) * Math.max(6, Math.abs(ball.vx));
+  if (exit.z !== z) ball.vz = Math.sign(exit.z - z) * Math.max(6, Math.abs(ball.vz));
+}
+
 /** Move a held ball toward the hands without sliding it through props. */
 export function liftBall(ball: Ball, target: Point, field: BallField) {
   const dx = target.x - ball.x, dy = target.y - ball.y, dz = target.z - ball.z, r = ball.radius;

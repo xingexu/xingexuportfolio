@@ -15,6 +15,8 @@ export type JourneyItem = Placement & {
 };
 export type Outfit = "kid" | "starwars" | "essentials" | "western";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate";
+export type Roommate = { id: string; x: number; z: number; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
+type Vec2 = { x: number; z: number };
 export type Chapter = {
   id: string;
   number: string;
@@ -39,7 +41,7 @@ export type Chapter = {
   stopNote?: string;
   items: JourneyItem[];
   decor: Placement[];
-  roommate?: { name: string; x: number; z: number };
+  roommate?: Roommate;
 };
 
 const gh = (repo: string, label = `View ${repo} on GitHub`): JourneyLink => ({ href: `${LINKS.github}/${repo}`, label });
@@ -214,7 +216,11 @@ const ROOMS: Chapter[] = [
         description: "I’m a director on the Projects team.",
         links: [{ href: "https://linktr.ee/westernfoundersnetwork", label: "Western Founders Network" }, { href: "https://www.instagram.com/westernfoundersnetwork/", label: "@westernfoundersnetwork" }] },
       { id: "ohall-bed", model: "bed-western", x: 24, z: 36, rot: 3, label: "Blue and beige bed", title: "My bed in Ontario Hall" },
-      { id: "richards-bed", model: "bed-roommate", x: 24, z: -43, rot: 2, label: "Richard’s bed", title: "Richard Su", description: "My roommate in Ontario Hall." },
+      { id: "richards-bed", model: "bed-roommate", x: 24, z: -43, rot: 2, label: "Richard’s bed", title: "Richard’s bed" },
+      { id: "richard", model: "roommate-portrait", x: 32, z: -41, solid: false, label: "Richard Su", title: "Richard Su",
+        description: "My roommate in Ontario Hall.", links: [{ href: "https://www.linkedin.com/in/richard-su-7377542b9/", label: "Richard’s LinkedIn" }] },
+      { id: "hockey-pad", model: "hockey-pad", x: -27, z: -34, solid: false, label: "Hockey practice pad", title: "Synthetic ice pad",
+        description: "Richard uses it to practice stickhandling." },
       { id: "jellycat", model: "jellycat-frog", x: 23, z: 40, y: 7, rot: 3, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog",
         description: "My Jellycat frog." },
       { id: "standing-desk", model: "standing-desk", x: 24, z: 10, label: "My standing desk", title: "My standing desk",
@@ -242,7 +248,8 @@ const ROOMS: Chapter[] = [
       { model: "monitor", x: 24, z: -9, y: 17, rot: 2, solid: false },
       { model: "rug-western", x: 24, z: 22, solid: false }, { model: "nightstand", x: 23, z: 51, rot: 2 },
     ],
-    roommate: { name: "Richard Su", x: 32, z: -41 },
+    roommate: { id: "richard", x: 32, z: -41, fridge: "mini-fridge", pad: "hockey-pad",
+      via: [{ x: 47, z: -41 }, { x: 47, z: 22 }, { x: 47, z: -22 }, { x: 5, z: -22 }] },
   },
 ];
 

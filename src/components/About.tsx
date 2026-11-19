@@ -166,9 +166,8 @@ export default function About() {
         {!moved && !near && !status.volley && <p className="journey-touch-note">Drag anywhere in the scene or use the joystick. Tap an object to inspect it.</p>}
       </>}
 
-      {!intro && !opened && !transition && (near || status.volley || status.roommate) && (
+      {!intro && !opened && !transition && (near || status.volley) && (
         <div className="journey-prompts">
-          {!near && !status.volley && status.roommate && <span className="journey-companion">{status.roommate}</span>}
           {near && <button type="button" className="journey-prompt" onClick={() => openItem(near.id)} aria-keyshortcuts="E">
             <kbd aria-hidden="true">E</kbd><span>{near.label}</span>
           </button>}

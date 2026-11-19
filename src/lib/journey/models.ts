@@ -1,5 +1,6 @@
 import { Grid, hash3, shade, textWidth, type Color } from "./voxel";
 import { LOGOS, type PixelLogo } from "./logos";
+import { buildFridgeCabinet, buildFridgeDoor, buildRoommatePreview, FRIDGE_HINGE, FRIDGE_VOXEL_SIZE } from "./roommate";
 
 /* Every prop is authored facing +z with y = 0 on the floor. */
 type Painter = (i: number, j: number) => Color | null;
@@ -313,7 +314,7 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 const GLASS = 0x9dd8e4;
 const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn"]);
 const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog"]);
-export const modelVoxelSize = (id: string) => id === "chess-table" ? 0.125 : DETAIL_VOXELS.has(id) || id.startsWith("plaque-") ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") ? 0.5 : 1;
+export const modelVoxelSize = (id: string) => id === "chess-table" ? 0.125 : id === "mini-fridge" ? FRIDGE_VOXEL_SIZE : DETAIL_VOXELS.has(id) || id.startsWith("plaque-") ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") || id === "hockey-pad" || id === "roommate-portrait" ? 0.5 : 1;
 
 type ChessMan = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
 
@@ -766,7 +767,22 @@ const MODELS: Record<string, (g: Grid) => void> = {
   },
   monitor: g => monitor(g, -7, 3, 0, 14, 10, code(17)),
   "desk-lamp": g => { g.box(-1, 0, -1, 3, 1, 3, BLACK).box(0, 1, 0, 1, 7, 1, BLACK).box(0, 8, 0, 1, 1, 4, BLACK).box(-1, 6, 3, 3, 2, 2, BLACK).box(-1, 6, 3, 3, 1, 2, 0xffe9a8); },
-  "mini-fridge": g => { g.box(-5, 0, -4, 10, 13, 8, 0x2a2c30).box(-5, 0, 4, 10, 13, 1, 0x34373c).box(3, 4, 5, 1, 6, 1, METAL).box(-5, 9, 4, 10, 1, 1, 0x1e2024); },
+  "mini-fridge": g => {
+    buildFridgeCabinet(g);
+    const door = new Grid();
+    buildFridgeDoor(door);
+    door.forEach((x, y, z, color) => g.set(x + FRIDGE_HINGE.x / FRIDGE_VOXEL_SIZE, y, z + FRIDGE_HINGE.z / FRIDGE_VOXEL_SIZE, color));
+  },
+  "roommate-portrait": buildRoommatePreview,
+  "hockey-pad": g => g.box(-26, 0, -20, 52, 1, 40, (x, _y, z) => {
+    const ax = Math.abs(x + 0.5), az = Math.abs(z + 0.5), d = Math.hypot(x + 0.5, z + 0.5);
+    if (ax > 24 || az > 18) return 0x567c9b;
+    if (ax === 23.5 || az === 17.5 || (d >= 6.5 && d < 7.6)) return 0x96bbd9;
+    if (Math.abs(z + 0.5) === 0.5 && d > 7.6) return 0xba8597;
+    if ((x + 26) % 13 === 0 || (z + 20) % 10 === 0) return 0xd0e2ee;
+    if ((x * 2 + z * 5) % 37 === 0) return 0xc6dfed;
+    return shade(0xddeef7, 0.96 + hash3(x, z, 29) * 0.075);
+  }),
   fragrances: g => {
     const bottles: [number, number, Color, Color][] = [[-4, 5, 0xe6a64c, GOLD], [-1, 6, 0xdbe7ee, 0x1a1a1a], [2, 4, 0x1e1e22, 0xb5b5b5], [4, 5, 0x6b3f8f, GOLD]];
     for (const [x, h, c, cap] of bottles) g.box(x, 0, -1, 2, h, 2, c).box(x, h, -1, 2, 1, 2, cap);

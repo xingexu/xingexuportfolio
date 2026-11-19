@@ -119,19 +119,11 @@ const CUSTOM_BLOCKS: Record<string, Box[]> = {
 
 export function chapterObstacles(index: number): Box[] {
   const chapter = CHAPTERS[index];
-  const blocks = [...chapter.items, ...chapter.decor].flatMap(p => {
+  return [...chapter.items, ...chapter.decor].flatMap(p => {
     if (p.solid === false || p.bump || p.ball) return [];
     if ("id" in p && CUSTOM_BLOCKS[(p as JourneyItem).id]) return CUSTOM_BLOCKS[(p as JourneyItem).id];
     return [placementBox(p)];
   });
-  const seated = roommateFootprint(chapter);
-  if (seated) blocks.push(seated);
-  return blocks;
-}
-
-function roommateFootprint(chapter: Chapter): Box | undefined {
-  const at = chapter.roommate;
-  return at && { minX: at.x - 2, maxX: at.x + 8, minZ: at.z - 4, maxZ: at.z + 4 };
 }
 
 export function buildBallField(index: number): BallField {
@@ -149,8 +141,6 @@ export function buildBallField(index: number): BallField {
     }
     return [{ ...box, bottom, top: bottom + modelFootprint(p.model).height }];
   });
-  const seated = roommateFootprint(chapter);
-  if (seated) blocks.push({ ...seated, bottom: 0, top: 22 });
   return { ...interior(chapter), ceiling: WALL_HEIGHT, blocks, net };
 }
 
@@ -212,12 +202,13 @@ export function settleBump(index: number, prop: BumpProp, dt: number, reducedMot
 
 export type StepResult = Vec & { exit: "next" | "prev" | null };
 /** Moves one axis at a time so the player slides along walls and furniture. */
-export function step(index: number, pos: Vec, dx: number, dz: number, r: number): StepResult {
+export function step(index: number, pos: Vec, dx: number, dz: number, r: number, dynamicBlocked?: (from: Vec, to: Vec, radius: number) => boolean): StepResult {
   let { x, z } = pos;
   const sub = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.5));
+  const free = (nx: number, nz: number) => !blocked(index, nx, nz, r) && !dynamicBlocked?.({ x, z }, { x: nx, z: nz }, r);
   for (let i = 0; i < sub; i++) {
-    if (!blocked(index, x + dx / sub, z, r)) x += dx / sub;
-    if (!blocked(index, x, z + dz / sub, r)) z += dz / sub;
+    if (free(x + dx / sub, z)) x += dx / sub;
+    if (free(x, z + dz / sub)) z += dz / sub;
   }
   const chapter = CHAPTERS[index], room = interior(chapter);
   const exit = z < room.minZ - 1 ? "next" : index > 0 && z > room.maxZ + 1 ? "prev" : null;

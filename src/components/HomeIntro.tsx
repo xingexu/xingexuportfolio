@@ -20,7 +20,7 @@ const DURATION_MS = 900;
  * The hero's own entrance animations shouldn't start until the reveal is
  * done, so its subtree is unmounted while the intro plays and mounted fresh
  * afterwards. The inline script in layout.tsx decides whether to play (full
- * page loads of "/" only, never for reduced-motion users) by setting
+ * page loads of "/home" only, never for reduced-motion users) by setting
  * data-intro on <html> before first paint; CSS keys the white cover off it.
  * Returns children directly, so it adds no wrapper element.
  */

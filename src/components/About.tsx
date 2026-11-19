@@ -138,7 +138,7 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={CHAPTERS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move, tap or click to inspect, or use Objects to browse without walking.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move, tap or click to inspect, or use Objects to browse without walking.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
@@ -161,6 +161,7 @@ export default function About() {
           <span><kbd>W</kbd><kbd>S</kbd><kbd>↑</kbd><kbd>↓</kbd> Walk</span>
           <span><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> Turn</span>
           <span><kbd>E</kbd> Inspect</span>
+          <span><kbd>Space</kbd> Jump</span>
         </aside>
         {!moved && !near && !status.volley && <p className="journey-touch-note">Drag anywhere in the scene or use the joystick. Tap an object to inspect it.</p>}
       </>}
@@ -178,17 +179,20 @@ export default function About() {
       )}
 
       {(intro || transition) && (
-        <button type="button" className="journey-skip" onClick={() => controls.current?.skip()} aria-keyshortcuts="Escape">Skip <kbd aria-hidden="true">Esc</kbd></button>
+        <button type="button" className="journey-skip" onClick={() => { controls.current?.skip(); controls.current?.focus(); }} aria-keyshortcuts="Escape">
+          {intro ? "Skip intro" : "Skip transition"} <kbd aria-hidden="true">Esc</kbd>
+        </button>
       )}
 
       {!intro && !transition && <Joystick controls={controls} />}
+      {!intro && !transition && !opened && <button type="button" className="journey-jump" onClick={() => controls.current?.jump()} aria-keyshortcuts="Space">Jump <span aria-hidden="true">↑</span></button>}
       {!intro && !transition && <div className="journey-tools" role="group" aria-label="Camera and objects">
         <button type="button" onClick={() => controls.current?.toggleCamera("tilt")} aria-pressed={camera.tilt} aria-keyshortcuts="Q">Tilt up <kbd aria-hidden="true">Q</kbd></button>
         <button type="button" title="See yourself from the front (F)" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
         <button type="button" onClick={() => browse(status.chapter)} aria-haspopup="dialog">Objects</button>
       </div>}
       {MUSIC_URL && <JourneyMusic src={MUSIC_URL} />}
-      <TransitionLink href="/" className="journey-back" aria-label="Go back to the home page"><span aria-hidden="true">←</span> Back</TransitionLink>
+      <TransitionLink href="/home" replace className="journey-back">Skip to portfolio <span aria-hidden="true">→</span></TransitionLink>
 
       <dialog ref={dialog} className="journey-dialog" aria-labelledby="journey-dialog-title"
         onCancel={(event) => { event.preventDefault(); close(); }}
@@ -237,6 +241,7 @@ export default function About() {
       <noscript>
         <div className="journey-nojs">
           <h2>Age 7 to 18.</h2>
+          <a href="/home">Skip to portfolio</a>
           {CHAPTERS.map(entry => (
             <section key={entry.id}>
               <h3>{entry.place} · age {ageLabel(entry)}</h3>

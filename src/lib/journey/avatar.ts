@@ -59,72 +59,6 @@ function fullerHoodie(head: Grid, torso: Grid, armL: Grid, armR: Grid, W: number
   head.box(-6, 3, -12, 12, 1, 1, seam);
 }
 
-function sweptHair(head: Grid, height: number) {
-  for (let z = -6; z <= 7; z++) for (let x = -7; x < 7; x++) {
-    const side = Math.abs(x + 0.5);
-    const d = (side / 7.4) ** 2 + ((z - 0.5) / 8) ** 2;
-    if (d >= 1) {
-      if (side < 6 && z < 6) head.set(x, height - 1, z, HAIR);
-      continue;
-    }
-    const sweep = x - z * 0.64;
-    const lock = Math.cos(sweep * 0.86 + 0.25 * Math.sin(z * 0.6));
-    const curl = lock * (z > 2 ? 0.85 : 0.45);
-    const crown = height + Math.floor(0.3 + 3 * (1 - d) ** 0.55 + curl);
-    const fringe = z >= 5 && x >= -3 && x < 3 ? Math.round(2.4 + lock * 0.7) : 1;
-    const base = z < -4 ? height - 4 : side > 5 ? height - 2 : z >= 4 ? height - 2 - fringe : height - 3;
-    for (let y = base; y < crown; y++) {
-      const strand = 1.08 + 0.16 * lock + 0.06 * hash3(x, y, z);
-      head.set(x, y, z, shade(HAIR, strand + (y === crown - 1 ? 0.15 : 0)));
-    }
-  }
-}
-
-function westernHead(height: number) {
-  const head = new Grid();
-  head.box(-4, 0, -4, 8, height, 9, SKIN).box(-5, 2, -6, 10, height - 2, 12, SKIN);
-  head.box(-6, 3, -4, 12, height - 4, 8, SKIN);
-  head.box(-3, 1, 5, 6, 1, 1, shade(SKIN, 0.96)).box(-1, 3, 6, 2, 2, 1, shade(SKIN, 0.98));
-  for (const x of [-7, 6]) head.box(x, 3, 0, 1, 3, 2, shade(SKIN, 0.95));
-  for (const x of [-4, 2]) {
-    head.box(x, 5, 5, 2, 1, 1, EYE);
-    head.box(x, 7, 5, 2, 1, 1, shade(HAIR, 1.37));
-  }
-  head.box(-1, 2, 5, 2, 1, 1, 0xa17e70);
-  sweptHair(head, height);
-  return head;
-}
-
-function regularHoodie(torso: Grid, armL: Grid, armR: Grid, W: number, H: number, armLen: number, look: Look) {
-  const fleece = fabric(look.top), rib = fabric(look.topDark, 1.2), stitch = fabric(look.top, 1.36);
-  torso.box(-W, 0, -4, W * 2, H, 8, -1);
-  for (let y = 0; y < H; y++) {
-    const half = W - (y >= H - 9 && y < H - 1 ? 1 : 2);
-    const depth = y < 5 || y >= H - 2 ? 3 : 4;
-    const cloth = y < 2 ? rib : fleece;
-    torso.box(-half + 1, y, -depth, half * 2 - 2, 1, depth * 2, cloth);
-    torso.box(-half, y, -depth + 1, half * 2, 1, depth * 2 - 2, cloth);
-  }
-  for (let y = 2; y < 5; y++) {
-    const edge = W - 3 - (y - 2);
-    torso.set(-edge, y, 2, stitch(-edge, y, 2)).set(edge - 1, y, 2, stitch(edge - 1, y, 2));
-  }
-  for (const x of [-2, 1]) torso.box(x, H - 6, 3, 1, 4, 1, stitch);
-  torso.box(-4, H - 5, -5, 8, 3, 1, rib).box(-3, H - 3, -5, 6, 1, 1, stitch);
-
-  for (const [arm, side] of [[armL, -1], [armR, 1]] as const) {
-    const hand = -armLen * 2;
-    arm.box(side < 0 ? -4 : 0, hand + 4, -2, 4, -hand - 4, 4, -1);
-    for (let y = hand + 4; y < 0; y++) {
-      const cuff = y < hand + 6;
-      const width = y < hand / 2 ? 4 : 5;
-      const x = side < 0 ? 1 - width : -1;
-      arm.box(x, y, -2, width, 1, 4, cuff ? rib : fleece);
-      if (!cuff) arm.set(x + (side < 0 ? 1 : width - 2), y, 1, stitch(x, y, 1));
-    }
-  }
-}
-
 function straightLeg(side: -1 | 1, length: number, look: Look) {
   const leg = new Grid(), bottom = -length * 2;
   const fleece = fabric(look.pants), fold = fabric(look.pants, 1.28);
@@ -150,22 +84,20 @@ export function buildAvatar(age: number, outfit: Outfit): AvatarParts {
   const look = LOOKS[outfit];
   const western = outfit === "western";
   const H = avatarHeight(age), t = (Math.min(18, Math.max(7, age)) - 7) / 11;
-  const headH = western ? 6 : age >= 13 ? 8 : 7;
+  const headH = !western && age >= 13 ? 8 : 7;
   const legs = Math.round((H - headH) * (0.5 + 0.06 * t));
   const torsoH = H - headH - legs;
-  const W = age >= 14 ? 8 : 6, hw = W / 2, D = 4, armW = 2;
+  const W = !western && age >= 14 ? 8 : 6, hw = W / 2, D = 4, armW = 2;
   const head = new Grid(), torso = new Grid(), armL = new Grid(), armR = new Grid(), legL = new Grid(), legR = new Grid();
 
   // Head, built from its base (neck) upward.
-  if (!western) {
-    head.box(-4, 0, -4, 8, headH, 8, SKIN)
-      .box(-4, headH - 2, -4, 8, 2, 8, HAIR).box(-4, 0, -4, 8, headH, 2, HAIR).box(-4, 2, -4, 1, headH - 2, 6, HAIR).box(3, 2, -4, 1, headH - 2, 6, HAIR);
-    head.box(-4, headH - 3, 3, 8, 1, 1, HAIR).box(-3, headH - 4, 3, 2, 1, 1, HAIR);
-    const eyeY = headH - 5;
-    head.set(-2, eyeY, 3, EYE).set(1, eyeY, 3, EYE).set(-2, eyeY + 1, 3, EYE).set(1, eyeY + 1, 3, EYE);
-    head.set(-3, eyeY - 1, 3, 0xf3a9a0).set(2, eyeY - 1, 3, 0xf3a9a0);
-    head.set(-1, eyeY - 2, 3, 0xc46b5a).set(0, eyeY - 2, 3, 0xc46b5a);
-  }
+  head.box(-4, 0, -4, 8, headH, 8, SKIN)
+    .box(-4, headH - 2, -4, 8, 2, 8, HAIR).box(-4, 0, -4, 8, headH, 2, HAIR).box(-4, 2, -4, 1, headH - 2, 6, HAIR).box(3, 2, -4, 1, headH - 2, 6, HAIR);
+  head.box(-4, headH - 3, 3, 8, 1, 1, HAIR).box(-3, headH - 4, 3, 2, 1, 1, HAIR);
+  const eyeY = headH - 5;
+  head.set(-2, eyeY, 3, EYE).set(1, eyeY, 3, EYE).set(-2, eyeY + 1, 3, EYE).set(1, eyeY + 1, 3, EYE);
+  if (!western) head.set(-3, eyeY - 1, 3, 0xf3a9a0).set(2, eyeY - 1, 3, 0xf3a9a0);
+  head.set(-1, eyeY - 2, 3, 0xc46b5a).set(0, eyeY - 2, 3, 0xc46b5a);
   let propeller: Grid | undefined;
   if (outfit === "kid") {
     const panels = [0xe53935, 0xfbc02d, 0x1e88e5, 0x43a047];
@@ -173,7 +105,7 @@ export function buildAvatar(age: number, outfit: Outfit): AvatarParts {
     head.box(-4, headH - 1, 3, 8, 1, 2, 0xe53935).box(-1, headH + 2, -1, 2, 1, 2, 0xfbc02d);
     propeller = new Grid().box(-5, 0, 0, 10, 1, 1, 0xe53935).box(0, 0, -5, 1, 1, 10, 0x1e88e5).set(0, 1, 0, 0xfbc02d);
   }
-  if (look.hood && !western) head.box(-4, 0, -5, 8, Math.min(4, headH - 2), 1, look.topDark);
+  if (look.hood) head.box(-4, 0, -5, 8, Math.min(4, headH - 2), 1, look.topDark);
 
   // Torso from the hip (y = 0) to the shoulders.
   torso.box(-hw, 0, -D / 2, W, torsoH, D, look.top);
@@ -228,13 +160,12 @@ export function buildAvatar(age: number, outfit: Outfit): AvatarParts {
     }
   }
 
-  const fineHead = western ? westernHead(headH * 2) : finePart(head);
+  const fineHead = finePart(head);
   const fineTorso = finePart(torso, look.top, look.topDark);
   const fineArmL = finePart(armL, look.top, look.topDark), fineArmR = finePart(armR, look.top, look.topDark);
-  if (western) regularHoodie(fineTorso, fineArmL, fineArmR, W, torsoH * 2, armLen, look);
-  else if (look.hood) fullerHoodie(fineHead, fineTorso, fineArmL, fineArmR, W, torsoH, armLen, look);
+  if (!western && look.hood) fullerHoodie(fineHead, fineTorso, fineArmL, fineArmR, W, torsoH, armLen, look);
   return {
-    height: H, hip: legs, shoulder: legs + torsoH - 1, shoulderX: western ? hw - 0.5 : hw, hipX: 0,
+    height: H, hip: legs, shoulder: legs + torsoH - 1, shoulderX: hw, hipX: 0,
     head: fineHead, torso: fineTorso, armL: fineArmL, armR: fineArmR,
     legL: western ? straightLeg(-1, legs, look) : finePart(legL, look.pants),
     legR: western ? straightLeg(1, legs, look) : finePart(legR, look.pants),

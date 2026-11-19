@@ -425,14 +425,43 @@ test('render pixels use half the old pitch at desktop and phone sizes', () => {
   }
 });
 
-test('front and tilt camera modes keep the full avatar inside the vertical field of view', () => {
+test('the exterior lawn texture is opaque, varied and green', () => {
+  const pixels = W.buildGrassTile();
+  assert.equal(pixels.length, W.GRASS_TILE_SIZE ** 2 * 4);
+  const colors = new Set();
+  for (let i = 0; i < pixels.length; i += 4) {
+    const [r, g, b, a] = pixels.subarray(i, i + 4);
+    assert.ok(g > r && g > b && a === 255);
+    colors.add((r << 16) | (g << 8) | b);
+  }
+  assert.ok(colors.size > 40, 'the lawn has patches and fine-grained variation');
+});
+
+test('the jump lifts off, peaks and lands without a negative height', () => {
+  const duration = W.JUMP_DURATION, early = W.jumpHeight(duration / 4);
+  assert.equal(W.jumpHeight(0), 0);
+  assert.ok(early > 0 && early < W.JUMP_HEIGHT);
+  assert.equal(W.jumpHeight(duration / 2), W.JUMP_HEIGHT);
+  assert.ok(Math.abs(W.jumpHeight(duration * 0.75) - early) < 1e-9);
+  assert.equal(W.jumpHeight(duration), 0);
+  assert.equal(W.jumpHeight(duration * 2), 0);
+});
+
+test('walking is a little faster at every age', () => {
+  for (const age of [7, 18]) {
+    const height = avatarHeight(age) * W.AVATAR_SCALE, previous = 18 + height * 0.55;
+    assert.ok(W.walkSpeed(height) > previous * 1.05 && W.walkSpeed(height) < previous * 1.15);
+  }
+});
+
+test('front and tilt camera modes keep the full avatar in frame, even at the jump apex', () => {
   for (const age of [7, 18]) for (const aspect of [0.46, 16 / 9]) {
     const height = avatarHeight(age) * W.AVATAR_SCALE;
     for (const front of [0, 0.5, 1]) for (const tilt of [0, 0.5, 1]) {
       const view = W.cameraOffsets(height, aspect, front, tilt);
       const lookAngle = Math.atan2(view.lookHeight - view.rise, view.distance + view.lead);
-      for (const depth of [-6, 6]) for (const y of [-1, height + 4 * W.AVATAR_SCALE]) {
-        const angle = Math.atan2(y - view.rise, view.distance + depth);
+      for (const depth of [-6, 6]) for (const lift of [0, W.JUMP_HEIGHT]) for (const y of [-1, height + 4 * W.AVATAR_SCALE]) {
+        const angle = Math.atan2(y + lift - view.rise, view.distance + depth);
         const screenY = Math.tan(angle - lookAngle) / Math.tan(24 * Math.PI / 180);
         assert.ok(Math.abs(screenY) < (tilt === 1 ? 0.78 : 0.96), `age ${age}, aspect ${aspect}, front ${front}, tilt ${tilt}: ${screenY}`);
       }
@@ -455,41 +484,27 @@ test('hoodies keep the avatar scale while adding depth, cuffs and fabric shading
   }
 });
 
-test('the Western avatar has regular-fit clothes, smaller facial proportions and UGGs', () => {
-  const current = buildAvatar(18, 'western');
-  const width = grid => grid.bounds().maxX - grid.bounds().minX + 1;
-  const spanAt = (grid, layer) => {
-    const xs = [], zs = [];
-    grid.forEach((x, y, z) => { if (y === layer) { xs.push(x); zs.push(z); } });
-    return [Math.max(...xs) - Math.min(...xs) + 1, Math.max(...zs) - Math.min(...zs) + 1];
-  };
-  assert.ok(width(current.torso) <= 14 && width(current.armL) <= 5);
-  assert.deepEqual(spanAt(current.torso, 3), [12, 6], 'the waist is fitted');
-  assert.equal(current.torso.bounds().minY, 0, 'the hoodie ends at the hip');
-  assert.equal(current.armL.bounds().maxZ - current.armL.bounds().minZ + 1, 4, 'the sleeves have no extra bulk');
-  assert.ok(width(current.head) <= 14 && current.head.bounds().maxY <= 15);
+test('the Western avatar grows taller without widening the Grade 5 face or shoulders', () => {
+  const earlyRoom = CHAPTERS.find(room => room.id === 'school');
+  const early = buildAvatar(earlyRoom.ageFrom, earlyRoom.outfit), current = buildAvatar(18, 'western');
   assert.equal(current.height, avatarHeight(18));
+  assert.ok(current.height > early.height && current.hip > early.hip && current.shoulder > early.shoulder);
+  assert.equal(current.shoulderX, early.shoulderX);
+  for (let x = -8; x < 8; x++) for (let y = 0; y < 14; y++) for (let z = 0; z < 8; z++) {
+    const reference = early.head.get(x, y, z);
+    const color = current.head.get(x, y, z);
+    if (reference === 0xf3a9a0) assert.notEqual(color, 0xf3a9a0);
+    else assert.equal(color, reference);
+  }
+  for (let x = -8; x < 8; x++) for (let y = 10; y < 14; y++) for (let z = -8; z < 0; z++) {
+    assert.equal(current.head.get(x, y, z), early.head.get(x, y, z));
+  }
   for (const side of ['legL', 'legR']) {
     const leg = current[side], bounds = leg.bounds();
-    assert.ok(width(leg) <= 7);
-    assert.deepEqual(spanAt(leg, bounds.minY + 9), [6, 6]);
-    assert.deepEqual(spanAt(leg, -9), [6, 6], 'straight cut from calf to thigh');
     assert.equal(bounds.minY * AVATAR_VOXEL_SIZE, -current.hip);
     assert.equal(bounds.maxZ, 6, 'boot toe extends forward of the pants');
     assert.ok(leg.has(side === 'legL' ? -4 : 3, bounds.minY + 6, -3), 'ankle shaft rises above the toe box');
   }
-  const heights = new Set(), strandColors = new Set();
-  current.head.forEach((_x, y, _z, color) => {
-    assert.notEqual(color, 0xf3a9a0);
-    if (y >= 11) {
-      heights.add(y);
-      strandColors.add(color);
-    }
-  });
-  assert.ok(heights.size >= 4 && strandColors.size >= 8);
-  assert.ok(spanAt(current.head, 12).every(span => span >= 10), 'texture covers the crown');
-  const fringe = current.head.get(1, 9, 6);
-  assert.ok(fringe !== undefined && fringe < 0x302a26 && !current.head.has(-7, 9, 6), 'the fringe leaves the temples uncovered');
   assert.match(CHAPTERS.at(-1).outfitLabel, /UGGs/);
 });
 

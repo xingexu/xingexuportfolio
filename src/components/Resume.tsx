@@ -18,7 +18,7 @@ export default function Resume() {
     <div className="resume-page">
       <div className="resume-stage">
         <Link
-          href="/"
+          href="/home"
           className="resume-side-back"
           aria-label="Back home"
           title="Back home"

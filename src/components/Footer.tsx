@@ -15,7 +15,7 @@ export default function Footer() {
       <div className="site-footer-inner">
         <span className="site-footer-copyright">© {year} xinge xu</span>
 
-        {pathname !== "/" && <SocialLinks />}
+        {pathname !== "/home" && <SocialLinks />}
       </div>
     </footer>
   );

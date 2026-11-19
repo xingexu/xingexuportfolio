@@ -9,6 +9,7 @@ export type AvatarParts = {
   shoulderX: number;
   hipX: number;
   head: Grid; torso: Grid; armL: Grid; armR: Grid; legL: Grid; legR: Grid;
+  shirtPrint?: Grid;
   propeller?: Grid;
   propellerY?: number;
 };
@@ -17,6 +18,7 @@ const SKIN = 0xf8e1d0, SKIN_DARK = 0xecc9b4, HAIR = 0x1d1714, EYE = 0x15161a;
 const HEIGHTS: Record<number, number> = { 7: 20, 8: 21, 9: 22, 10: 23, 11: 24, 12: 26, 13: 27, 14: 29, 15: 30, 16: 31, 17: 32, 18: 34 };
 export const avatarHeight = (age: number) => HEIGHTS[Math.max(7, Math.min(18, Math.round(age)))];
 export const AVATAR_VOXEL_SIZE = 0.5;
+export const SHIRT_PRINT_VOXEL_SIZE = 0.125;
 
 type Look = { top: Color; topDark: Color; pants: Color; shoe: Color; sole: Color; accent: Color; hood: boolean; shorts: boolean; slides: boolean };
 const LOOKS: Record<Outfit, Look> = {
@@ -113,26 +115,45 @@ function straightLeg(side: -1 | 1, length: number, look: Look) {
   return leg;
 }
 
-function csaTee(torso: Grid, height: number, ink: Color) {
-  const z = 3;
-  torso.text("CSA", -5, height - 7, z, ink);
-  const cats: [number, number, string[]][] = [
-    [0, height - 8, ["...##..", ".##..#.", "#.###..", "..###..", ".#.##..", "..#..#."]],
-    [-5, height - 11, ["......#", ".....#.", ".#.#.#.", ".#####.", "#######", "..#.##."]],
-    [-2, height - 16, ["....#..", ".##..#.", "#..###.", "...###.", "..###.#", ".#.#..."]],
+function csaTee(height: number, ink: Color) {
+  const print = new Grid(), back = new Grid(), top = height - 10;
+  const wordmark = [
+    ".## .## .## #.# #...# .#.",
+    "#.. ##. ..# #.# #.#.# #.#",
+    "#.. .## ### #.# #.#.# #.#",
+    ".## ##. .## .## .#.#. .#.",
   ];
-  cats.forEach(([left, top, pixels]) => pixels.forEach((row, dy) => [...row].forEach((pixel, dx) => {
-    const x = left + dx, y = top - dy;
-    if (pixel === "#" && torso.has(x, y, z)) torso.set(x, y, z, ink);
-  })));
-  for (const [x, y] of [[-4, height - 9], [4, height - 14], [-3, height - 17]]) {
-    if (torso.has(x, y, z)) torso.set(x, y, z, 0x9e90a6);
+  wordmark.forEach((row, dy) => [...row].forEach((pixel, x) => {
+    if (pixel === "#") print.set(x - 1, top - dy, 16, ink);
+  }));
+  back.text("CSA AT", -19, top - 4, 0, ink);
+  back.text("WESTERN", -19, top - 10, 0, ink);
+  const cat = (x: number, y: number, flip = false) => {
+    const rows = [
+      "..........##....", "..........##....", "...........##...", "...........###..",
+      "#...#.......##..", "##.##......###..", "#####....#####..", "#.#.##########..",
+      "#############...", ".######.####....", "...####...###...", "..##.##....###..",
+    ];
+    rows.forEach((row, dy) => [...row].forEach((pixel, dx) => {
+      if (pixel === "#") back.set(x + (flip ? row.length - dx - 1 : dx), y - dy, 0, ink);
+    }));
+  };
+  cat(5, top - 7, true);
+  cat(-5, top - 20);
+  cat(-19, top - 32, true);
+  for (const [x, y, radius] of [[-13, top - 19, 5], [16, top - 24, 3], [3, top - 42, 4], [-19, top - 28, 2], [18, top - 39, 3]]) {
+    back.box(x - radius, y, 0, radius * 2 + 1, 1, 1, 0xcfc4d6)
+      .box(x, y - radius, 0, 1, radius * 2 + 1, 1, 0xcfc4d6).set(x, y, 0, ink);
+    if (radius > 3) for (const dx of [-2, 2]) for (const dy of [-2, 2]) back.set(x + dx, y + dy, 0, 0xa493a9);
   }
+  back.forEach((x, y, _z, color) => { if (y > 4) print.set(-x - 1, y, -17, color); });
+  return print;
 }
 
-export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "top" | "topDark"> & { skin?: Color; skinDark?: Color }): AvatarParts {
-  const look = { ...LOOKS[outfit], ...palette };
-  const skin = palette?.skin ?? SKIN, skinDark = palette?.skinDark ?? SKIN_DARK;
+export function buildAvatar(age: number, outfit: Outfit, style?: Partial<Pick<Look, "top" | "topDark" | "shorts">> & { skin?: Color; skinDark?: Color; hair?: Color }): AvatarParts {
+  const look = { ...LOOKS[outfit], ...style };
+  const skin = style?.skin ?? SKIN, skinDark = style?.skinDark ?? SKIN_DARK;
+  const hair = style?.hair ?? HAIR;
   const western = outfit === "western";
   const csa = outfit === "csa", adult = western || csa;
   const H = avatarHeight(age), t = (Math.min(18, Math.max(7, age)) - 7) / 11;
@@ -144,8 +165,8 @@ export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "t
 
   // Head, built from its base (neck) upward.
   head.box(-4, 0, -4, 8, headH, 8, skin)
-    .box(-4, headH - 2, -4, 8, 2, 8, HAIR).box(-4, 0, -4, 8, headH, 2, HAIR).box(-4, 2, -4, 1, headH - 2, 6, HAIR).box(3, 2, -4, 1, headH - 2, 6, HAIR);
-  head.box(-4, headH - 3, 3, 8, 1, 1, HAIR).box(-3, headH - 4, 3, 2, 1, 1, HAIR);
+    .box(-4, headH - 2, -4, 8, 2, 8, hair).box(-4, 0, -4, 8, headH, 2, hair).box(-4, 2, -4, 1, headH - 2, 6, hair).box(3, 2, -4, 1, headH - 2, 6, hair);
+  head.box(-4, headH - 3, 3, 8, 1, 1, hair).box(-3, headH - 4, 3, 2, 1, 1, hair);
   const eyeY = headH - 5;
   head.set(-2, eyeY, 3, EYE).set(1, eyeY, 3, EYE).set(-2, eyeY + 1, 3, EYE).set(1, eyeY + 1, 3, EYE);
   if (!adult) head.set(-3, eyeY - 1, 3, 0xf3a9a0).set(2, eyeY - 1, 3, 0xf3a9a0);
@@ -196,7 +217,7 @@ export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "t
     if (look.shorts) {
       leg.box(x, -Math.round(legs * 0.45), -D / 2, w, Math.round(legs * 0.45), D, look.pants);
       leg.box(x, -legs + footH, -1, w, legs - footH - Math.round(legs * 0.45), 2, skin);
-      leg.box(x, -legs + footH, -1, w, 1, 2, 0xf4f4f4);
+      leg.box(x, -legs + footH, -1, w, 1, 2, csa ? look.shoe : 0xf4f4f4);
     } else {
       leg.box(x, -legs + footH, -D / 2, w, legs - footH, D, look.pants);
     }
@@ -222,10 +243,10 @@ export function buildAvatar(age: number, outfit: Outfit, palette?: Pick<Look, "t
     cuffSweats(fineLegL, -1, W, legs, look);
     cuffSweats(fineLegR, 1, W, legs, look);
   }
-  if (csa) csaTee(fineTorso, torsoH * 2, look.accent);
   return {
     height: H, hip: legs, shoulder: legs + torsoH - 1, shoulderX: hw, hipX: 0,
     head: fineHead, torso: fineTorso, armL: fineArmL, armR: fineArmR,
+    shirtPrint: csa ? csaTee(torsoH * 8, look.accent) : undefined,
     legL: fineLegL, legR: fineLegR,
     propeller: propeller && finePart(propeller), propellerY: headH + 3,
   };

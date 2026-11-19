@@ -259,16 +259,24 @@ export const CHAPTERS = ROOMS.map(chapter => chapter.outdoor || chapter.id === "
 export const WESTERN_INDEX = CHAPTERS.findIndex(chapter => chapter.id === "western");
 export const CSA_POSTER_ID = "csa";
 export const CSA_ROOM_INDEX = CHAPTERS.length;
+export const CSA_STAGE_Z = -54;
+export const CSA_DJ_LINK: JourneyLink = { href: "https://wewantdrought.me", label: "Rain Li’s website" };
 export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
   id: "csa-after-hours", stop: "CSA After Hours", number: "", place: "CSA After Hours", location: "Western University",
   heading: "CSA After Hours", intro: "A party hidden behind the CSA poster.", stopNote: "Behind the poster · Western University",
   ageFrom: 18, ageTo: 18, outfit: "csa", outfitLabel: "Black CSA tee · black pants",
-  width: 96, depth: 84, floor: "dance", wall: 0x251e36, trim: 0x563951, background: 0x171221,
+  width: 180, depth: 148, floor: "dance", wall: 0x251e36, trim: 0x563951, background: 0x171221,
   doorLabel: "DORM", items: [],
   decor: [
-    { model: "csa-dj-booth", x: 0, z: -26 },
-    { model: "csa-speaker", x: -22, z: -28 },
-    { model: "csa-speaker", x: 22, z: -28 },
+    { model: "csa-dj-booth", x: 0, z: CSA_STAGE_Z },
+    { model: "csa-speaker", x: -38, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: -27, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: 27, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: 38, z: CSA_STAGE_Z - 3 },
+    { model: "csa-stage-logo", x: 0, z: CSA_STAGE_Z - 16, y: 20, solid: false },
+    { model: "csa-bubble-tea", x: -63, z: 7, rot: 1 },
+    { model: "csa-sushi", x: 63, z: -18, rot: 3 },
+    { model: "csa-desserts", x: 63, z: 32, rot: 3 },
   ],
 }];
 const CHAPTER_ACCENTS = [0x89cced, 0xffcf79, 0x80ddc5, 0xfaac96, 0x91b8f3, 0xc4a2ff];

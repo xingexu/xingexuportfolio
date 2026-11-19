@@ -98,6 +98,7 @@
 .journey-item-nav button:hover, .journey-finale-actions button:hover { border-color: #aaa; }
 .journey-continue { display: block; margin: 22px 0 0 auto; background: #f2d24b; color: #111; border: none; padding: 10px 16px; font-size: 12px; cursor: pointer; box-shadow: 3px 3px 0 #000; }
 .journey-csa-action { color: #ffe8de; background: #302137; border: 1px solid #ff9b79; }
+a.journey-csa-action { text-decoration: none; }
 .journey-csa-action:hover, .journey-csa-action:focus-visible { color: #fff; background: #583248; }
 .journey-finale-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
 .journey-index { list-style: none; display: flex; flex-direction: column; }

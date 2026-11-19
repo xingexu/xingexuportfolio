@@ -313,7 +313,7 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 
 const GLASS = 0x9dd8e4;
 const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn"]);
-const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog"]);
+const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo"]);
 export const modelVoxelSize = (id: string) => id === "chess-table" ? 0.125 : id === "mini-fridge" ? FRIDGE_VOXEL_SIZE : DETAIL_VOXELS.has(id) || id.startsWith("plaque-") ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") || id === "hockey-pad" || id === "roommate-portrait" ? 0.5 : 1;
 
 type ChessMan = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
@@ -413,7 +413,66 @@ function macbook(g: Grid) {
   mark.forEach((row, i) => [...row].forEach((c, x) => { if (c === "#") g.set(x - 4, 21 - i, -15, 0xe8edf4); }));
 }
 
+function csaBadge(g: Grid) {
+  badge(g, 9, 0xc0473a, 0xe5e7eb, pen => {
+    [[-1, 7, -6, -3], [-6, -3, 0, -3], [0, -3, 2, 1], [-1, 7, 2, 1], [2, 1, -2, -7], [4, 1, 2, -3], [2, -3, 6, -3], [6, -3, 4, 1]]
+      .forEach(([x0, y0, x1, y1]) => line(pen, x0, y0, x1, y1, 0xfafafa));
+  });
+}
+
+function csaCounter(g: Grid, name: string, accent: Color) {
+  const dark = 0x302436;
+  g.box(-20, 0, -5, 40, 2, 10, 0x1d1726).box(-19, 2, -4, 38, 9, 8, dark)
+    .box(-20, 11, -5, 40, 2, 10, 0x7f6072).box(-18, 3, 4, 36, 7, 1, 0x422e46)
+    .box(-19, 2, 5, 38, 1, 1, accent).box(-19, 10, 5, 38, 1, 1, accent);
+  centeredText(g, name, 4, 5, 0xffeee4);
+  for (const x of [-19, 18]) g.box(x, 13, -5, 1, 12, 1, accent);
+  g.box(-19, 24, -5, 38, 1, 4, 0x3e3048).box(-20, 23, -1, 40, 2, 1, accent);
+}
+
 const MODELS: Record<string, (g: Grid) => void> = {
+  "csa-stage-logo": csaBadge,
+  "csa-bubble-tea": g => {
+    csaCounter(g, "BOBA BAR", 0xef9fb7);
+    const drinks = [0xcb9b78, 0xaaa0d7, 0x92ad74, 0xe4a5a3];
+    drinks.forEach((color, i) => {
+      const x = -14 + i * 9, z = i % 2;
+      for (let y = 13; y < 20; y++) {
+        disc(g, x, y, z, y < 15 ? 2 : 2.7, (dx, dz) => y <= 15 && (dx - dz + y) % 3 === 0 ? 0x3d2839 : shade(color, 0.9 + (dx + 3) * 0.04));
+      }
+      disc(g, x, 20, z, 2.8, () => 0xf7e6da);
+      g.box(x + 1, 20, z, 1, 3, 1, i % 2 ? 0xff9b68 : 0xcf9fed);
+    });
+  },
+  "csa-sushi": g => {
+    csaCounter(g, "SUSHI", 0x9cdcc6);
+    for (const x of [-12, 1, 13]) g.box(x - 5, 13, -4, 10, 1, 8, 0x1b2831);
+    for (const x of [-15, -10, -1, 4]) for (const z of [-2, 2]) {
+      disc(g, x, 14, z, 1.8, () => 0x334842);
+      disc(g, x, 15, z, 1.8, (dx, dz) => dx === 0 && dz === 0 ? (x < -5 ? 0xf39d8f : 0x93c286) : 0xf6ebd7);
+    }
+    for (const z of [-2, 2]) {
+      g.box(10, 14, z - 1, 6, 2, 3, 0xf7eadb).box(10, 16, z - 1, 6, 1, 3, 0xf58e7e);
+      for (const x of [11, 13, 15]) g.set(x, 16, z, 0xffc1a8);
+    }
+    g.box(10, 14, 4, 8, 1, 1, 0xb07756);
+  },
+  "csa-desserts": g => {
+    csaCounter(g, "DESSERTS", 0xceadf6);
+    for (const x of [-13, 0, 13]) disc(g, x, 13, 0, 4.3, () => 0xe4d9e6);
+    for (const [x, z, color] of [[-15, -1, 0xf4b5c5], [-11, -1, 0xb6c995], [-13, 2, 0xe4c1f4]]) {
+      disc(g, x, 14, z, 1.8, () => color);
+      disc(g, x, 15, z, 1.4, () => shade(color, 1.09));
+    }
+    for (const x of [-2, 2]) {
+      g.box(x - 1, 14, -2, 3, 2, 4, 0xb97c46).box(x - 1, 16, -2, 3, 1, 4, 0xffd870);
+      g.box(x, 16, -1, 1, 1, 2, 0xffeaa2);
+    }
+    for (const [x, z] of [[11, 1], [15, -1]]) {
+      g.box(x - 1, 14, z - 1, 3, 3, 3, 0xd3a477).box(x - 1, 17, z - 1, 3, 1, 3, 0xe2c595);
+      g.box(x - 1, 15, z - 1, 3, 1, 3, 0xd87f8e).set(x, 18, z, 0xe77078);
+    }
+  },
   "csa-dj-booth": g => {
     g.box(-11, 0, -4, 22, 2, 8, 0x19151f)
       .box(-10, 2, -3, 20, 9, 6, 0x2c2439)
@@ -730,10 +789,7 @@ const MODELS: Record<string, (g: Grid) => void> = {
     centeredText(g, "GO", 9, 1, 0xd7beff);
     centeredText(g, "MUSTANGS", 3, 1, 0xf7eee6);
   },
-  "poster-csa": g => badge(g, 9, 0xc0473a, 0xe5e7eb, pen => {
-    [[-1, 7, -6, -3], [-6, -3, 0, -3], [0, -3, 2, 1], [-1, 7, 2, 1], [2, 1, -2, -7], [4, 1, 2, -3], [2, -3, 6, -3], [6, -3, 4, 1]]
-      .forEach(([x0, y0, x1, y1]) => line(pen, x0, y0, x1, y1, 0xfafafa));
-  }),
+  "poster-csa": csaBadge,
   "poster-wds": g => badge(g, 10, 0xfafafa, 0xd1d5db, pen => {
     const navy = 0x1b2a4e, t = new Grid();
     t.text("WDS", -12, -4, 0, navy, 2);

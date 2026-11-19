@@ -1,21 +1,81 @@
-import { BoxGeometry, CanvasTexture, Group, Mesh, MeshBasicMaterial, NearestFilter, Sprite, SpriteMaterial, type BufferGeometry } from "three";
-import { AVATAR_VOXEL_SIZE, buildAvatar } from "./avatar";
+import { CanvasTexture, Group, Mesh, NearestFilter, Sprite, SpriteMaterial, type MeshBasicMaterial, type BufferGeometry, type Object3D } from "three";
+import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar } from "./avatar";
+import { CSA_STAGE_Z } from "./data";
 import { gridGeometry } from "./mesh";
-import { Grid } from "./voxel";
+import { Grid, hash3, shade, type Color } from "./voxel";
 import { AVATAR_SCALE, type Vec } from "./world";
 
-type Guest = Vec & { name: string; yaw: number; scale: number; dj?: boolean; longHair?: boolean };
+type Hairstyle = "curtains" | "tousled" | "straight" | "waves" | "side-part" | "cropped-fringe";
+type Guest = Vec & {
+  name: string; yaw: number; scale: number; dj?: boolean; hair?: Hairstyle; hairColor?: Color;
+  skin?: Color; chain?: boolean; shorts?: boolean;
+};
 
 export const CSA_GUESTS: readonly Guest[] = [
-  { name: "Jason Zhuang", x: -13, z: -6, yaw: 0.35, scale: 1 },
-  { name: "Rain Li", x: 0, z: -34, yaw: 0, scale: 1, dj: true },
-  { name: "Amelie Hu", x: -24, z: 3, yaw: 1.15, scale: 0.91, longHair: true },
-  { name: "Lydia Zheng", x: 15, z: 4, yaw: -0.6, scale: 0.93, longHair: true },
-  { name: "Daniel Su", x: 23, z: -12, yaw: -0.8, scale: 1 },
-  { name: "Lucas Xue", x: 25, z: 18, yaw: -1.9, scale: 1 },
-  { name: "Jeffrey Ban", x: -22, z: 17, yaw: 1.7, scale: 1 },
-  { name: "William Wang", x: 8, z: -9, yaw: -0.25, scale: 1 },
+  { name: "Jason Zhuang", x: -19, z: -14, yaw: 0.35, scale: 1, hair: "curtains", hairColor: 0x302722 },
+  { name: "Rain Li", x: 0, z: CSA_STAGE_Z - 8, yaw: 0, scale: 1, dj: true },
+  { name: "Amelie Hu", x: -34, z: 5, yaw: 1.15, scale: 0.91, hair: "waves", hairColor: 0x382821 },
+  { name: "Lydia Zheng", x: 23, z: 8, yaw: -0.6, scale: 0.93, hair: "straight", hairColor: 0x453128 },
+  { name: "Daniel Su", x: 35, z: -22, yaw: -0.8, scale: 1, hair: "side-part", hairColor: 0x2b2420, skin: 0xefd2ba },
+  { name: "Lucas Xue", x: 36, z: 27, yaw: -1.9, scale: 1.06, hair: "cropped-fringe", hairColor: 0x201e1e, skin: 0xe6c7ab, shorts: true },
+  { name: "Jeffrey Ban", x: -31, z: 25, yaw: 1.7, scale: 1 },
+  { name: "William Wang", x: 12, z: -18, yaw: -0.25, scale: 1, hair: "tousled", hairColor: 0x252020, chain: true },
 ];
+
+export function buildCsaGuest(guest: Guest) {
+  const base = guest.hairColor ?? 0x242022;
+  const skin = guest.skin ?? 0xf8e1d0;
+  const parts = buildAvatar(18, "csa", { hair: base, skin: guest.skin, skinDark: guest.skin && shade(guest.skin, 0.91), shorts: guest.shorts ?? false });
+  const { head, torso } = parts;
+  const strand = (x: number, y: number, z: number) => shade(base, 0.81 + hash3(x, y, z) * 0.21 + ((x + z) % 3 === 0 ? 0.2 : 0));
+  const hair = guest.hair;
+  if (hair) {
+    const long = hair === "straight" || hair === "waves";
+    const sidePart = hair === "side-part", cropped = hair === "cropped-fringe";
+    const fringeLengths = [0, 1, 1, 2, 4, 2, 0, 1, 0, 2, 4, 1, 0, 1, 3, 2, 1, 0];
+    for (let x = -9; x < 9; x++) for (let z = -8; z <= 8; z++) {
+      const rim = (x + 0.5) ** 2 / (cropped ? 81 : 93) + (z + 0.5) ** 2 / 85;
+      if (rim > 1.13) continue;
+      const tuft = hair === "tousled" || cropped ? Math.floor(hash3(x, 17, z) * 3) : 0;
+      const part = hair !== "tousled" && !cropped && (sidePart ? x === 3 : x === -1 || x === 0) && z > -3;
+      const top = 14 + Math.round((1 - rim) * (long ? 3 : 4)) + tuft - (part ? 2 : 0);
+      const bang = long ? (Math.abs(x + 0.5) < 4 ? 12 : 8)
+        : sidePart ? 8 + Math.max(0, 5 - Math.abs(x - 2))
+        : cropped ? 9 + fringeLengths[x + 9]
+        : hair === "tousled" ? 9 + (x * x + 1) % 4 : 8 + Math.max(0, 4 - Math.abs(x));
+      const bottom = z > 5 ? bang : Math.abs(x + 0.5) > 7 && !cropped ? 8 : 12;
+      if (z >= 6 && bottom > 8) for (let y = 8; y < bottom; y++) {
+        if (head.get(x, y, z) === base) head.set(x, y, z, skin);
+      }
+      head.box(x, bottom, z, 1, Math.max(0, top - bottom + 1), 1, strand);
+    }
+    if (sidePart) {
+      for (const x of [-8, 7]) head.box(x, 0, 6, 1, 2, 2, -1);
+      head.box(-3, 0, 7, 6, 1, 1, 0xa75f53).set(-4, 1, 7, 0xa75f53).set(3, 1, 7, 0xa75f53);
+    }
+    if (long) {
+      const wavy = hair === "waves", length = wavy ? 16 : 20;
+      for (let y = -length; y < 13; y++) {
+        const tip = y + length, wave = wavy ? Math.round(Math.sin(y * 0.34) * 1.3) : 0;
+        const width = Math.min(15, 7 + tip * 2);
+        head.box(-Math.floor(width / 2), y, -9, width, 1, y > 0 ? 5 : 3, strand);
+        for (const side of [-1, 1]) {
+          const trim = side < 0 && wavy ? 2 : 0;
+          if (tip >= trim + 1) {
+            const x = side * (7 + wave) - (side < 0 ? 2 : 0);
+            head.box(x, y, -5, tip < 5 ? 2 : 3, 1, tip < 5 ? 7 : 10, strand);
+          }
+        }
+      }
+    }
+  }
+  if (guest.chain) {
+    const high = (parts.shoulder - parts.hip) * 2;
+    for (let x = -4; x <= 3; x++) torso.set(x, high - 2 + Math.floor(Math.abs(x + 0.5) / 2), 3, x % 2 ? 0xbfc0c7 : 0xe1ded7);
+  }
+  if (guest.dj) csaHeadphones(head);
+  return parts;
+}
 
 export function sampleCsaGuest(guest: Guest, index: number, time: number, reduced: boolean) {
   const phase = time * 3.6 + index * 1.81;
@@ -43,24 +103,30 @@ export function csaHeadphones(head: Grid) {
 
 const APRICOT = 0xff986e, LAVENDER = 0xc8a3ff, PINK = 0xff90bb;
 
-function stageBackdrop() {
-  const g = new Grid();
-  g.box(-32, 5, -39, 64, 31, 1, 0x392745).box(-30, 7, -38, 60, 27, 1, 0x231b32);
-  g.box(-32, 35, -37, 64, 1, 1, APRICOT).box(-32, 5, -37, 64, 1, 1, 0x956285);
-  g.text("CSA", -16, 18, -37, 0xffeddb, 3);
-  g.text("AFTER HOURS", -21, 10, -37, 0xfda3ad);
-  for (const x of [-29, 28]) {
+function stageScenery() {
+  const g = new Grid(), floor = new Grid();
+  const wall = CSA_STAGE_Z - 17;
+  g.box(-51, 4, wall - 1, 102, 38, 1, 0x392745).box(-48, 6, wall, 96, 34, 1, 0x211a2f);
+  g.box(-50, 41, wall, 100, 1, 1, APRICOT).box(-50, 4, wall, 100, 1, 1, 0x956285);
+  g.text("CSA", -37, 24, wall + 1, 0xffeddb, 2);
+  g.text("WESTERN", -41, 17, wall + 1, 0xfda3ad);
+  g.text("AFTER", 20, 24, wall + 1, 0xffeddb);
+  g.text("HOURS", 20, 17, wall + 1, 0xfda3ad);
+  for (const x of [-47, 46]) {
     const color = x < 0 ? APRICOT : LAVENDER;
-    for (let y = 8; y < 34; y += 4) g.box(x, y, -37, 1, 3, 1, color);
-    g.box(x, 0, -36, 1, 1, 12, color);
+    for (let y = 8; y < 40; y += 4) g.box(x, y, wall + 1, 1, 3, 1, color);
+    floor.box(x, 0, wall + 2, 1, 1, 25, color);
   }
-  for (const [x, y] of [[-24, 28], [23, 28], [-21, 16], [21, 17]]) {
-    g.box(x - 1, y, -37, 3, 1, 1, PINK).box(x, y - 1, -37, 1, 3, 1, PINK);
+  for (const [x, y] of [[-40, 34], [39, 34], [-18, 13], [18, 11], [-13, 32], [14, 34]]) {
+    g.box(x - 1, y, wall + 1, 3, 1, 1, PINK).box(x, y - 1, wall + 1, 1, 3, 1, PINK);
   }
-  for (const x of [-32, 31]) for (let z = -19; z < 23; z += 6) {
-    g.box(x, 0, z, 1, 1, 3, x < 0 ? 0x9d5662 : 0x7d649f);
+  for (const x of [-48, 47]) for (let z = -36; z <= 38; z += 6) {
+    floor.box(x, 0, z, 1, 1, 3, x < 0 ? 0xb86c7a : 0x9d81c5);
   }
-  return g;
+  floor.box(-47, 0, -39, 94, 1, 1, 0xb87692);
+  floor.box(-47, 0, 41, 38, 1, 1, 0x906ca9).box(9, 0, 41, 38, 1, 1, 0x906ca9);
+  for (const x of [-8, 7]) for (let z = 43; z < 68; z += 6) floor.box(x, 0, z, 1, 1, 3, 0x9b81b7);
+  return { backdrop: g, floor };
 }
 
 function makeNameTag(guest: Guest) {
@@ -84,21 +150,19 @@ function makeNameTag(guest: Guest) {
   return { sprite, dispose: () => { material.dispose(); texture.dispose(); } };
 }
 
-export function makeCsaParty(material: MeshBasicMaterial) {
-  const group = new Group(), geometries: BufferGeometry[] = [];
-  const mesh = (grid: Grid, size = 1) => {
+export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial) {
+  const group = new Group(), stageWall = new Group(), geometries: BufferGeometry[] = [];
+  const mesh = (grid: Grid, size = 1, paint = material) => {
     const geometry = gridGeometry(grid, [0, 0, 0], 0.02, size);
     geometries.push(geometry);
-    return new Mesh(geometry, material);
+    return new Mesh(geometry, paint);
   };
-  group.add(mesh(stageBackdrop()));
+  const { backdrop, floor } = stageScenery();
+  group.add(mesh(floor));
+  stageWall.add(mesh(backdrop, 1, wallMaterial));
+  const djPickables: Object3D[] = [];
   const guests = CSA_GUESTS.map(guest => {
-    const parts = buildAvatar(18, "csa");
-    if (guest.longHair) {
-      parts.head.box(-8, -3, -8, 2, 12, 4, 0x25201f).box(6, -3, -8, 2, 12, 4, 0x25201f);
-      parts.head.box(-7, -4, -9, 14, 12, 3, 0x211c1d).box(-5, -3, -10, 10, 10, 1, 0x2c2424);
-    }
-    if (guest.dj) csaHeadphones(parts.head);
+    const parts = buildCsaGuest(guest);
     const holder = new Group(), body = new Group();
     holder.add(body);
     body.scale.setScalar(AVATAR_SCALE * guest.scale);
@@ -110,7 +174,8 @@ export function makeCsaParty(material: MeshBasicMaterial) {
       body.add(object);
       return object;
     };
-    part(parts.torso, 0, parts.hip);
+    const torso = part(parts.torso, 0, parts.hip);
+    if (parts.shirtPrint) torso.add(mesh(parts.shirtPrint, SHIRT_PRINT_VOXEL_SIZE));
     const head = part(parts.head, 0, parts.shoulder + 2);
     const left = part(parts.armL, -parts.shoulderX, parts.shoulder + 1), right = part(parts.armR, parts.shoulderX, parts.shoulder + 1);
     const legL = part(parts.legL, 0, parts.hip), legR = part(parts.legR, 0, parts.hip);
@@ -119,21 +184,28 @@ export function makeCsaParty(material: MeshBasicMaterial) {
       tag.sprite.position.y = parts.height * AVATAR_SCALE * guest.scale + 2.2;
       holder.add(tag.sprite);
     }
+    if (guest.dj) holder.traverse(object => {
+      if (object instanceof Mesh || object instanceof Sprite) {
+        object.userData.csaDj = true;
+        djPickables.push(object);
+      }
+    });
     return { guest, holder, body, head, left, right, legL, legR, tag };
   });
-  const barShape = new BoxGeometry(1, 1, 0.8).translate(0, 0.5, 0);
-  geometries.push(barShape);
-  const lightMaterials = [APRICOT, PINK, LAVENDER].map(color => new MeshBasicMaterial({ color }));
-  const bars = Array.from({ length: 10 }, (_, i) => {
-    const bar = new Mesh(barShape, lightMaterials[i % lightMaterials.length]);
-    bar.position.set(i < 5 ? -27 + i * 1.65 : 20 + (i - 5) * 1.65, 7, -35.8);
-    group.add(bar);
+  const barShapes = [APRICOT, PINK, LAVENDER].map(color => mesh(new Grid().set(0, 0, 0, color)).geometry);
+  const bars = Array.from({ length: 16 }, (_, i) => {
+    const bar = new Mesh(barShapes[i % barShapes.length], wallMaterial);
+    bar.position.set(i < 8 ? -41 + i * 1.8 : 28 + (i - 8) * 1.8, 8, CSA_STAGE_Z - 16);
+    stageWall.add(bar);
     return bar;
   });
 
   let time = 0;
   return {
-    group,
+    group, stageWall, djPickables,
+    nearDj(player: Vec) {
+      return Math.hypot(player.x, player.z - (CSA_STAGE_Z - 8)) <= 23;
+    },
     blocks(from: Vec, to: Vec, radius: number) {
       return guests.some(({ holder }) => {
         const { x, z } = holder.position, next = Math.hypot(to.x - x, to.z - z);
@@ -156,13 +228,12 @@ export function makeCsaParty(material: MeshBasicMaterial) {
         right.rotation.set(pose.right, 0, guest.dj ? 0.32 : 0.24 - pose.roll);
         legL.rotation.x = pose.step; legR.rotation.x = -pose.step;
         head.rotation.x = pose.nod;
-        if (tag) tag.sprite.visible = gap < (guest.dj ? 49 : 25);
+        if (tag) tag.sprite.visible = gap < (guest.dj ? 65 : 26);
       }
       bars.forEach((bar, i) => { bar.scale.y = (reduced ? 2 : 2 + Math.sin(time * 4.3 + i * 1.47)) + i % 3; });
     },
     dispose() {
       geometries.forEach(geometry => geometry.dispose());
-      lightMaterials.forEach(light => light.dispose());
       guests.forEach(guest => guest.tag?.dispose());
     },
   };

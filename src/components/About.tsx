@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { CHAPTERS, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
+import { CHAPTERS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
 import { CSA_GUESTS } from "@/lib/journey/csaParty";
 import { LINKS } from "@/app/data";
 import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
@@ -174,6 +174,9 @@ export default function About() {
       {!intro && !opened && !transition && (near || status.volley || inParty) && (
         <div className="journey-prompts">
           {inParty && <button type="button" className="journey-prompt journey-csa-action" onClick={() => { controls.current?.leaveCsa(); controls.current?.focus(); }}>← Return to dorm</button>}
+          {status.csaDjNearby && <a className="journey-prompt journey-csa-action" href={CSA_DJ_LINK.href} target="_blank" rel="noopener noreferrer" aria-keyshortcuts="E">
+            <kbd aria-hidden="true">E</kbd><span>{CSA_DJ_LINK.label} ↗</span><span className="sr-only"> (opens in a new tab)</span>
+          </a>}
           {near && <button type="button" className="journey-prompt" onClick={() => openItem(near.id)} aria-keyshortcuts="E">
             <kbd aria-hidden="true">E</kbd><span>{near.label}</span>
           </button>}
@@ -240,6 +243,7 @@ export default function About() {
           <p className="journey-eyebrow">Western University · Secret room</p>
           <h2 id="journey-dialog-title">CSA After Hours</h2>
           <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}{guest.dj && <span>DJ</span>}</li>)}</ul>
+          <div className="journey-links"><StoryLink link={CSA_DJ_LINK} /></div>
         </>}
         {opened?.kind === "finale" && <>
           <p className="journey-eyebrow">Age 18 · today</p>

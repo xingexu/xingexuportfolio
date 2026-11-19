@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { Box3, Color, DataTexture, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, NearestMipmapLinearFilter, PerspectiveCamera, PlaneGeometry, Ray, Raycaster, RepeatWrapping, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
-import { CHAPTERS, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
+import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
 import { CSA_GUESTS, makeCsaParty } from "@/lib/journey/csaParty";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
-import { AVATAR_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
+import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
 import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
@@ -26,7 +26,7 @@ export type JourneyControls = {
   toggleCamera: (mode: keyof CameraMode) => void;
 };
 export type CameraMode = { front: boolean; tilt: boolean };
-export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction };
+export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; csaDjNearby?: boolean };
 export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" | "portal" };
 type Props = {
   controls: RefObject<JourneyControls | null>;
@@ -249,8 +249,12 @@ export default function JourneyWorld(props: Props) {
         group.add(exitArrow);
         route.push(exitArrow);
       }
-      const party = isParty ? makeCsaParty(baseMaterial) : undefined;
-      if (party) group.add(party.group);
+      const party = isParty ? makeCsaParty(baseMaterial, walls.front.material) : undefined;
+      if (party) {
+        group.add(party.group);
+        walls.front.group.add(party.stageWall);
+        pickables.push(...party.djPickables);
+      }
       const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party };
       rooms.set(index, view);
       return view;
@@ -282,9 +286,10 @@ export default function JourneyWorld(props: Props) {
       body.children.filter(child => !Object.values(limbs).includes(child as Group)).forEach(child => body.remove(child));
       const next = buildAvatar(age, outfit);
       parts = next;
-      const mesh = (grid: Grid) => { const g = gridGeometry(grid, [0, 0, 0], 0.02, AVATAR_VOXEL_SIZE); avatarGeometries.push(g); return new Mesh(g, baseMaterial); };
+      const mesh = (grid: Grid, size = AVATAR_VOXEL_SIZE) => { const g = gridGeometry(grid, [0, 0, 0], 0.02, size); avatarGeometries.push(g); return new Mesh(g, baseMaterial); };
       const torsoTop = next.shoulder + 1;
       const torso = mesh(next.torso); torso.position.y = next.hip; body.add(torso);
+      if (next.shirtPrint) torso.add(mesh(next.shirtPrint, SHIRT_PRINT_VOXEL_SIZE));
       limbs.legL.add(mesh(next.legL)); limbs.legL.position.set(0, next.hip, 0);
       limbs.legR.add(mesh(next.legR)); limbs.legR.position.set(0, next.hip, 0);
       for (const [limb, elbow, grid, side] of [[limbs.armL, elbowL, next.armL, -1], [limbs.armR, elbowR, next.armR, 1]] as const) {
@@ -555,7 +560,10 @@ export default function JourneyWorld(props: Props) {
     function interact() {
       if (transition || intro || live.current.blocked) return;
       if (nearby) live.current.onOpen(nearby);
+      else if (room(chapter).party?.nearDj(player)) openCsaDj();
     }
+
+    function openCsaDj() { window.open(CSA_DJ_LINK.href, "_blank", "noopener,noreferrer"); }
 
     function jump() {
       if (transition || intro || live.current.blocked || volley || jumpElapsed !== null) return;
@@ -624,14 +632,14 @@ export default function JourneyWorld(props: Props) {
       pointerDirty = true;
       tooltip.style.transform = `translate(${event.clientX - region.getBoundingClientRect().left + 14}px, ${event.clientY - region.getBoundingClientRect().top + 14}px)`;
     }
-    function pick(): string | null {
+    function pick(): Object3D | undefined {
       camera.updateMatrixWorld();
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObjects(room(chapter).pickables, false).find(({ object }) => {
         for (let node: Object3D | null = object; node; node = node.parent) if (!node.visible || node.userData.faded) return false;
         return true;
       });
-      return (hit?.object.userData.itemId as string | undefined) ?? null;
+      return hit?.object;
     }
     function onPointerDown(event: PointerEvent) {
       if (drag || event.button !== 0 || transition || intro || live.current.blocked) return;
@@ -661,8 +669,9 @@ export default function JourneyWorld(props: Props) {
       region.style.cursor = "";
       if (wasTap && !transition && !intro && !live.current.blocked) {
         setPointer(event);
-        const id = pick();
-        if (id) live.current.onOpen(id);
+        const hit = pick();
+        if (hit?.userData.csaDj) openCsaDj();
+        else if (hit?.userData.itemId) live.current.onOpen(hit.userData.itemId);
       }
     }
     function onPointerLeave() { pointerInside = false; hovered = null; tooltip.hidden = true; region.style.cursor = ""; }
@@ -858,11 +867,12 @@ export default function JourneyWorld(props: Props) {
       const near = nearList[0] ?? null;
       if (pointerDirty && pointerInside && !intro && !transition) {
         pointerDirty = false;
-        hovered = pick();
-        region.style.cursor = hovered ? "pointer" : "";
-        const item = hovered ? current.items.find(i => i.id === hovered) : null;
-        tooltip.hidden = !item;
-        if (item) tooltip.textContent = item.label;
+        const hit = pick();
+        hovered = hit?.userData.itemId ?? null;
+        const label = hit?.userData.csaDj ? CSA_DJ_LINK.label : current.items.find(i => i.id === hovered)?.label;
+        region.style.cursor = label ? "pointer" : "";
+        tooltip.hidden = !label;
+        if (label) tooltip.textContent = label;
       }
       nearby = near;
       const visited = live.current.visited;
@@ -879,8 +889,9 @@ export default function JourneyWorld(props: Props) {
         item.marker.rotation.y = motion.matches ? 0.6 : time * 1.6;
         item.marker.scale.setScalar(0.65);
       }
-      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}`;
-      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action }); }
+      const csaDjNearby = activeRoom.party?.nearDj(player);
+      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}|${csaDjNearby ?? ""}`;
+      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action, csaDjNearby }); }
 
       renderer.render(scene, camera);
       // Show the avatar through foreground props without drawing it solidly in front of them.
@@ -948,6 +959,7 @@ export default function JourneyWorld(props: Props) {
         <section>
           <h2>CSA After Hours</h2>
           <p>A hidden dance room behind the CSA poster. Rain Li DJs for {CSA_GUESTS.filter(guest => !guest.dj).map(guest => guest.name).join(", ")}.</p>
+          <a href={CSA_DJ_LINK.href} target="_blank" rel="noopener noreferrer">{CSA_DJ_LINK.label} ↗</a>
         </section>
       </div>
     </div>

@@ -21,7 +21,7 @@ function load(file) {
   return result.exports;
 }
 const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, JOURNEY_START_INDEX, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID } = load('src/lib/journey/data.ts');
-const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
+const { buildDormCabinetParts, buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const { bedsidePosition, sampleBedSleep } = load('src/lib/journey/bedSleep.ts');
@@ -29,6 +29,7 @@ const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
 const { makeDormLighting } = load('src/lib/journey/dormLighting.ts');
+const { makeDormCabinetView } = load('src/lib/journey/dormCabinetView.ts');
 const { makeWuzuFanView } = load('src/lib/journey/wuzuFanView.ts');
 const { CSA_GUESTS, buildCsaDiscoBall, buildCsaGuest, csaActivityLabel, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { BOULDER_CYCLE, BOULDER_LANES, BOULDER_TOP_TIME, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, buildBoulderingWall, sampleBouldering } = load('src/lib/journey/csaClimb.ts');
@@ -574,6 +575,17 @@ test('Richard starts on the second bed in shorts and blue Crocs', () => {
   }
 });
 
+test('Richard’s taller bed keeps the raised mattress under his seat and holds five overlapping pillows', () => {
+  const model = buildModel('bed-roommate'), lift = R.ROOMMATE_BED_LIFT;
+  assert.ok(lift >= 3 && model.has(-8, lift + 2, 12), 'the higher frame has full-length legs');
+  assert.ok(!model.has(2, lift + 2, 7), 'the extra height is open under the bed');
+  assert.ok(model.has(7, R.ROOMMATE_SEAT - 1, 0));
+  for (const [x, y, z] of [[-5, 9, -11], [5, 9, -11], [-6, 10, -5], [6, 10, -5], [0, 12, -7]]) {
+    assert.ok(model.has(x, y + lift, z), 'each large pillow has a visible crest');
+  }
+  assert.ok(model.has(-3, 9 + lift, -7) && model.has(3, 9 + lift, -7), 'the center pillow overlaps the side layers');
+});
+
 test('Richard shares the Western avatar fit, with a subtle tan and backward black cap', () => {
   const avatar = buildAvatar(18, 'western'), { head, torso, shoulder, hip } = R.buildRoommate();
   assert.deepEqual(torso.bounds(), avatar.torso.bounds());
@@ -765,8 +777,8 @@ test('the volleyball bounces off Richard in both his seated and moving poses', (
   const field = W.buildBallField(CHAPTERS.length - 1);
   field.blocks.push(view.ballBlock);
   const checkBounce = () => {
-    const { minX, maxX, minZ } = view.ballBlock, x = (minX + maxX) / 2;
-    const ball = V.makeBall(x, 0, minZ - 2.4, 1.3);
+    const { minX, maxX, minZ, bottom } = view.ballBlock, x = (minX + maxX) / 2;
+    const ball = V.makeBall(x, Math.max(0, bottom), minZ - 2.4, 1.3);
     V.launchBall(ball, { x: 0, y: 0, z: 19 });
     V.stepBall(ball, field, 0.14);
     assert.ok(ball.vz < 0 && ball.z < minZ - ball.radius, 'the ball bounces before entering his model');
@@ -897,7 +909,7 @@ test('Richard’s nightstand is against the corner side wall next to his bed', (
   assert.ok(table.maxX < bed.maxX, 'the nightstand leaves the foot of the bed clear');
 });
 
-test('sleep is reachable at the bedside and lies the avatar lengthwise above the duvet', () => {
+test('the rendered sleeping head rests on the navy pillow and clears the headboard and wall throughout the transfer', () => {
   const bed = dorm.items.find(item => item.id === 'ohall-bed'), box = W.placementBox(bed);
   const start = { x: box.maxX + 4, z: bed.z + 2 };
   assert.ok(reachable(WESTERN_INDEX, W.spawn(WESTERN_INDEX, 'start')).some(p => p.x === start.x && p.z === start.z));
@@ -907,11 +919,30 @@ test('sleep is reachable at the bedside and lies the avatar lengthwise above the
   assert.equal(bedsidePosition(bed, { x: box.maxX + 10, z: bed.z }), null);
   const mount = sampleBedSleep(bed, start, 0, 0, false), sleep = sampleBedSleep(bed, start, 1, 0, true);
   assert.deepEqual([mount.x, mount.y, mount.z, Math.abs(mount.pitch)], [start.x, 0, start.z, 0]);
-  assert.equal(sleep.pitch, -Math.PI / 2);
+  assert.ok(sleep.pitch < -1.3 && sleep.pitch > -Math.PI / 2, 'the pillow end lifts slightly');
   assert.equal(sleep.x, bed.x);
-  const headZ = sleep.z - avatarHeight(18) * W.AVATAR_SCALE;
-  assert.ok(headZ > box.minZ && headZ < bed.z - 6 && sleep.z < box.maxZ);
-  assert.ok(sleep.y - 2 > 9.5, 'the body rests above the cover');
+  const geometry = gridGeometry(buildAvatar(18, 'western').head, [0, 0, 0], 0.02, AVATAR_VOXEL_SIZE);
+  const root = new Group(), head = new Mesh(geometry);
+  root.scale.setScalar(W.AVATAR_SCALE);
+  head.position.y = buildAvatar(18, 'western').shoulder + 2;
+  root.add(head);
+  const wall = W.interior(dorm).minZ + 2;
+  for (const entry of [atFoot, start, { x: box.maxX + 4, z: bed.z - 4 }, { x: box.minX - 4, z: bed.z - 4 }]) {
+    const yaw = Math.atan2(sleep.x - entry.x, sleep.z - entry.z);
+    for (let i = 0; i <= 80; i++) {
+      const pose = sampleBedSleep(bed, entry, i / 80, 0, true);
+      root.position.set(pose.x, pose.y, pose.z);
+      root.rotation.set(pose.pitch, yaw * (1 - pose.turn), 0, 'YXZ');
+      root.updateMatrixWorld(true);
+      const bounds = new Box3().setFromObject(head, true);
+      assert.ok(bounds.min.z > wall, `head stays away from the headboard at ${i}/80: ${bounds.min.z}`);
+      if (i === 80) {
+        assert.ok(bounds.min.z >= bed.z - 13 && bounds.max.z < bed.z - 3, 'the whole head fits over the pillow');
+        assert.ok(bounds.min.y > 11 && bounds.min.y < 12.6, 'the head rests on the pillow instead of floating or sinking');
+      }
+    }
+  }
+  geometry.dispose();
   assert.deepEqual(sampleBedSleep(bed, start, 1, 3, true), sleep);
   assert.notEqual(sampleBedSleep(bed, start, 1, 3, false).y, sleep.y);
 });
@@ -931,23 +962,27 @@ test('Richard can pass the bedside while the player sleeps, and blocks getting u
   assert.fail('Richard walks past the bedside');
 });
 
-test('the textured beige bedding drapes to both sides under a black throw with a tiny top-facing Capco stitch', () => {
+test('navy sheets and a thick navy pillow stay exposed above the small Capco throw', () => {
   const bed = dorm.items.find(item => item.id === 'ohall-bed');
-  const blanket = dorm.decor.find(p => p.model === 'western-bedding'), stitch = dorm.decor.find(p => p.model === 'capco-stitch');
+  const blanket = dorm.decor.find(p => p.model === 'capco-throw'), stitch = dorm.decor.find(p => p.model === 'capco-stitch');
   const bedBox = W.placementBox(bed), blanketBox = W.placementBox(blanket), logoBox = W.placementBox(stitch);
-  assert.deepEqual([blanketBox.minX, blanketBox.maxX, blanketBox.maxZ], [bedBox.minX, bedBox.maxX, bedBox.maxZ]);
-  assert.ok(blanketBox.minZ - bedBox.minZ <= 2, 'the duvet extends up beneath the pillows');
+  assert.ok(blanketBox.minZ > bed.z + 7 && blanketBox.maxZ > bedBox.maxZ - 1, 'the throw covers only the foot');
+  assert.ok(blanketBox.maxZ - blanketBox.minZ < (bedBox.maxZ - bedBox.minZ) / 3);
+  const navy = color => (color & 255) > ((color >> 8) & 255) * 1.5 && (color & 255) < 100;
+  const bedGrid = buildModel(bed.model);
+  assert.ok(navy(bedGrid.get(0, 6, 0)) && navy(bedGrid.get(0, 5, 14)), 'the sheet is navy on top and at the foot');
+  for (const x of [-4, 0, 4]) assert.ok(navy(bedGrid.get(x, 11, -8)), 'the wide pillow is five voxels thick and navy');
   const grid = buildModel(blanket.model), swatches = new Set();
-  for (let x = -17; x < 17; x++) swatches.add(grid.get(x, 9, 8));
+  for (let x = -14; x < 14; x++) swatches.add(grid.get(x, 7, 0));
   assert.ok(swatches.size > 5, 'the weave is not a flat color');
-  assert.ok(grid.get(-18, 3, 2) || grid.get(17, 3, 2), 'fabric hangs lower at the edges');
+  assert.ok(grid.has(0, 0, 6) && !grid.has(0, 0, 1), 'fabric hangs off the foot edge');
   const ink = buildModel(stitch.model).bounds();
   assert.equal(ink.minY, ink.maxY, 'the stitching is horizontal');
   assert.ok(logoBox.minX > bed.x && logoBox.maxX < bedBox.maxX && logoBox.maxZ < bedBox.maxZ);
   assert.ok(logoBox.maxX - logoBox.minX < 2.5, 'the wordmark is small');
-  for (let x = 8; x <= 13; x++) {
-    const top = grid.get(x, 12, 21);
-    assert.ok(top && top < 0x444444 && !grid.has(x, 13, 21), 'the stitching sits on the black fabric');
+  for (let x = 6; x <= 11; x++) {
+    const top = grid.get(x, 8, 3);
+    assert.ok(top && top < 0x444444 && !grid.has(x, 9, 3), 'the stitching sits on the black fabric');
   }
 });
 
@@ -984,7 +1019,7 @@ test('charging outlets are wall-mounted, face into the room and do not block mov
 
 test('the WOOZOO fan spins and sends airflow out its moving grille without capturing clicks', () => {
   const prop = dorm.items.find(p => p.id === 'fan');
-  const cabinet = dorm.decor.find(p => p.model === 'dorm-cabinet');
+  const cabinet = dorm.items.find(p => p.id === 'dorm-cabinet');
   const holder = new Group(), material = new MeshBasicMaterial();
   holder.position.set(prop.x, prop.y, prop.z);
   holder.rotation.y = prop.rot * Math.PI / 2;
@@ -1034,7 +1069,7 @@ test('the offset entry, door animation, and threshold use the same opening', () 
 });
 
 test('the double closet, low cabinet and standing desk line the right wall in entry order', () => {
-  const closet = dorm.items.find(item => item.id === 'closet'), cabinet = dorm.decor.find(p => p.model === 'dorm-cabinet');
+  const closet = dorm.items.find(item => item.id === 'closet'), cabinet = dorm.items.find(p => p.id === 'dorm-cabinet');
   const desk = dorm.items.find(item => item.id === 'standing-desk');
   const bounds = W.interior(dorm), cells = reachable(WESTERN_INDEX, W.spawn(WESTERN_INDEX, 'start'));
   for (const prop of [closet, cabinet, desk]) {
@@ -1050,6 +1085,45 @@ test('the double closet, low cabinet and standing desk line the right wall in en
   assert.ok(boxes[0].minX - doorRight >= 0 && boxes[0].minX - doorRight <= 4, 'the closet begins at the right jamb');
   for (let i = 1; i < boxes.length; i++) assert.ok(boxes[i - 1].minZ - boxes[i].maxZ <= 5 && boxes[i - 1].minZ >= boxes[i].maxZ);
   assert.ok(modelFootprint(cabinet.model).height < modelFootprint(desk.model).height / 2);
+});
+
+test('the cabinet slides folded clothes into view and stops short of an occupied aisle', () => {
+  const prop = dorm.items.find(item => item.id === 'dorm-cabinet'), { shell, drawers } = buildDormCabinetParts();
+  const viewHolder = new Group();
+  viewHolder.position.set(prop.x, 0, prop.z);
+  viewHolder.rotation.y = prop.rot * Math.PI / 2;
+  const view = makeDormCabinetView(prop, viewHolder, part => new Mesh(gridGeometry(part, [0, 0, -1])));
+  const stand = d => R.placementPoint(prop, 0, d), near = stand(11.5), clear = stand(16);
+  assert.ok(view.near(near), 'the front of the cabinet offers the action');
+  assert.ok(!view.near(R.placementPoint(prop, 0, -9)), 'no action behind the cabinet');
+  assert.equal(view.open, false);
+  assert.equal(viewHolder.children.length, 3);
+  assert.equal(drawers.length, 2);
+  for (const [i, drawer] of drawers.entries()) {
+    const y = i * 5 + 1;
+    assert.ok(drawer.has(-4, y + 3, 7), 'closed drawer has a wooden front');
+    assert.ok(!shell.has(0, y + 2, 5), 'shell leaves room for the drawer');
+    assert.notEqual(drawer.get(-2, y + 2, 5), drawer.get(1, y + 2, 5), 'folded fabrics differ visibly');
+  }
+  view.toggle();
+  assert.equal(view.open, true);
+  assert.equal(view.update(0.016, true, near, 2.38), false, 'reduced motion must not snap a drawer through the player');
+  assert.equal(view.update(0.016, false, clear, 2.38), true);
+  const bottom = viewHolder.children[1], top = viewHolder.children[2];
+  assert.ok(bottom.position.z > 0 && bottom.position.z < 1, 'normal motion slides incrementally');
+  assert.ok(view.update(0.016, true, clear, 2.38));
+  assert.ok(bottom.position.z > top.position.z && top.position.z + 5 > 7, 'both folded stacks are carried out of the cabinet');
+  assert.ok(view.blocksMove(clear, stand(13), 2.38));
+  assert.ok(!view.blocksMove(stand(13), clear, 2.38));
+  for (const beat of routine.beats.filter(b => b.action === 'walk')) {
+    for (let t = beat.start; t < beat.end; t += 0.05) {
+      assert.ok(!view.blocks(R.sampleRoommate(routine, t), R.ROOMMATE_RADIUS), 'Richard’s routine clears the open drawer');
+    }
+  }
+  view.toggle();
+  assert.ok(view.update(0.016, true, clear, 2.38));
+  assert.equal(top.position.z, 0);
+  viewHolder.children.forEach(mesh => mesh.geometry.dispose());
 });
 
 test('my bed is on my desk’s side of the divider with a clear aisle', () => {
@@ -1075,10 +1149,10 @@ test('my bed is on my desk’s side of the divider with a clear aisle', () => {
 
 test('the headphones, figurines and snack collection sit on reachable furniture', () => {
   const item = id => dorm.items.find(p => p.id === id);
-  const cabinet = dorm.decor.find(p => p.model === 'dorm-cabinet');
+  const cabinet = item('dorm-cabinet');
   const desk = item('standing-desk'), nightstand = item('richards-nightstand');
   for (const [prop, furniture, y] of [
-    [item('dorm-headphones'), desk, 18], [item('smiskis'), desk, 18], [item('dorm-snacks'), cabinet, 12],
+    [item('dorm-headphones'), desk, 18], [item('smiskis'), desk, 32], [item('dorm-snacks'), cabinet, 12],
     ...dorm.decor.filter(p => p.model === 'dorm-snacks').map(p => [p, p.y === 32 ? desk : nightstand, p.y]),
   ]) {
     const box = W.placementBox(prop), surface = W.placementBox(furniture);
@@ -1088,6 +1162,18 @@ test('the headphones, figurines and snack collection sit on reachable furniture'
     assert.ok(box.minX >= surface.minX && box.maxX <= surface.maxX && box.minZ >= surface.minZ && box.maxZ <= surface.maxZ, prop.model);
   }
   assert.equal(modelFootprint(nightstand.model).height, 10);
+});
+
+test('the upper shelf holds eight mini Smiskis with clear space between poses', () => {
+  const smiskis = dorm.items.find(p => p.id === 'smiskis'), desk = dorm.items.find(p => p.id === 'standing-desk');
+  const figurines = buildModel(smiskis.model), shelf = buildModel(desk.model), footprint = W.placementBox(smiskis);
+  assert.ok(modelFootprint(smiskis.model).height < 2);
+  const columns = new Set();
+  figurines.forEach(x => columns.add(x));
+  assert.equal([...columns].filter(x => !columns.has(x - 1)).length, 8);
+  for (const x of [footprint.minX, footprint.maxX - 0.1]) for (const z of [footprint.minZ, footprint.maxZ - 0.1]) {
+    assert.ok(shelf.has(Math.floor(z - desk.z), smiskis.y - 1, Math.floor(desk.x - x)), 'the upper shelf supports the figurines');
+  }
 });
 
 test('the Western wardrobes have closed wooden doors over drawers', () => {

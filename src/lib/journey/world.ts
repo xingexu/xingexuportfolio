@@ -253,7 +253,7 @@ export function boxDistance(box: Box, p: Vec) {
 export function nearbyItems(index: number, p: Vec, limit = 3, range = INTERACT_RANGE, positions?: ReadonlyMap<string, Vec>): JourneyItem[] {
   return JOURNEY_ROOMS[index].items
     .map(item => {
-      const moved = positions?.get(item.id);
+      const moved = positions?.get(item.id) ?? item.interactionAnchor;
       const boxes = CUSTOM_BLOCKS[item.id] ?? [placementBox(moved ? { ...item, x: moved.x, z: moved.z } : item)];
       const distance = Math.min(...boxes.map(box => boxDistance(box, p)));
       return { item, distance, score: distance - (item.y ? 2.5 : 0), reach: range + (item.y ? 3 : 0) };

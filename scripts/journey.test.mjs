@@ -20,7 +20,7 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(req, result, result.exports);
   return result.exports;
 }
-const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID } = load('src/lib/journey/data.ts');
+const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, JOURNEY_START_INDEX, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
@@ -33,6 +33,16 @@ const { BOULDER_CYCLE, BOULDER_LANES, BOULDER_TOP_TIME, CLIMBER_NAMES, MAT_VOXEL
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 const { Box3, Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
+
+test('About starts at the Western dorm entrance as the age-18 avatar', () => {
+  const chapter = JOURNEY_ROOMS[JOURNEY_START_INDEX];
+  const entrance = W.spawn(JOURNEY_START_INDEX, 'start');
+  assert.equal(chapter.id, 'western');
+  assert.equal(chapter.outfit, 'western');
+  assert.equal(W.ageAt(chapter, entrance.z), 18);
+  assert.deepEqual(entrance, W.spawn(WESTERN_INDEX, 'forward'));
+  assert.ok(!W.blocked(JOURNEY_START_INDEX, entrance.x, entrance.z, 3.5 * W.AVATAR_SCALE));
+});
 
 test('every item is written out, linked properly and has a model', () => {
   const ids = new Set();

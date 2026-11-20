@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { CHAPTERS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
+import { CHAPTERS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, JOURNEY_START_INDEX, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
 import { CSA_GUESTS, csaActivityLabel } from "@/lib/journey/csaParty";
 import { LINKS } from "@/app/data";
 import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
@@ -99,11 +99,10 @@ export default function About() {
   const controls = useRef<JourneyControls | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
-  const [status, setStatus] = useState<JourneyStatus>({ chapter: 0, age: 7, nearby: [] });
+  const [status, setStatus] = useState<JourneyStatus>({ chapter: JOURNEY_START_INDEX, age: JOURNEY_ROOMS[JOURNEY_START_INDEX].ageFrom, nearby: [] });
   const [opened, setOpened] = useState<Opened>(null);
   const [visited, setVisited] = useState<Set<string>>(() => new Set());
   const [transition, setTransition] = useState<TransitionInfo | null>(null);
-  const [intro, setIntro] = useState(false);
   const [moved, setMoved] = useState(false);
   const [camera, setCamera] = useState<CameraMode>({ front: false, tilt: false });
   const near = status.nearby.map(id => itemById(id)).find(Boolean) ?? null;
@@ -134,6 +133,7 @@ export default function About() {
   }, [dialogPage]);
 
   const inParty = status.chapter === CSA_ROOM_INDEX;
+  const roomHint = status.chapter === WESTERN_INDEX ? "Open Objects to visit earlier rooms." : "Follow the floating arrows to the next door.";
   const secretTransition = transition?.direction === "portal";
   const target = transition ? JOURNEY_ROOMS[transition.to] : null;
   const transitionTitle = target && (secretTransition && transition?.to !== CSA_ROOM_INDEX ? target.place : target.stop);
@@ -145,9 +145,7 @@ export default function About() {
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
       <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows through the center aisle to the far door, or use Objects to switch rooms without walking."} Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. {status.chapter === WESTERN_INDEX && "Press E near the lamp switch beside the entry to toggle both desk lamps. "}Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
-        onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
-
-      {intro && <div className="journey-intro" role="status"><Typed text="Welcome to Canada." delay={300} /></div>}
+        onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
       {target && transition && transitionTitle && (
         <div className="journey-card" key={transition.to} style={{ "--journey-accent": `#${chapterAccent(transition.to).toString(16).padStart(6, "0")}` } as CSSProperties}>
@@ -161,18 +159,18 @@ export default function About() {
         </div>
       )}
 
-      {!intro && !transition && !opened && <>
+      {!transition && !opened && <>
         <aside className="journey-keys" aria-label="Keyboard shortcuts">
           <span><kbd>W</kbd><kbd>S</kbd><kbd>↑</kbd><kbd>↓</kbd> Walk</span>
           <span><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> Turn</span>
           <span><kbd>E</kbd> Inspect</span>
           <span><kbd>Space</kbd> Jump</span>
-          {!moved && !inParty && <span>Follow the floating arrows to the next door.</span>}
+          {!moved && !inParty && <span>{roomHint}</span>}
         </aside>
-        {!moved && !inParty && !near && !status.volley && <p className="journey-touch-note">Drag the scene or use the joystick. Follow the floating arrows to the next door.</p>}
+        {!moved && !inParty && !near && !status.volley && <p className="journey-touch-note">Drag the scene or use the joystick. {roomHint}</p>}
       </>}
 
-      {!intro && !opened && !transition && (near || status.volley || inParty) && (
+      {!opened && !transition && (near || status.volley || inParty) && (
         <div className="journey-prompts">
           {inParty && <button type="button" className="journey-prompt journey-csa-action" onClick={() => { controls.current?.leaveCsa(); controls.current?.focus(); }}>← Return to dorm</button>}
           {status.csaDjNearby && <a className="journey-prompt journey-csa-action" href={CSA_DJ_LINK.href} target="_blank" rel="noopener noreferrer" aria-keyshortcuts="E">
@@ -190,15 +188,15 @@ export default function About() {
         </div>
       )}
 
-      {(intro || transition) && (
+      {transition && (
         <button type="button" className="journey-skip" onClick={() => { controls.current?.skip(); controls.current?.focus(); }} aria-keyshortcuts="Escape">
-          {intro ? "Skip intro" : "Skip transition"} <kbd aria-hidden="true">Esc</kbd>
+          Skip transition <kbd aria-hidden="true">Esc</kbd>
         </button>
       )}
 
-      {!intro && !transition && <Joystick controls={controls} />}
-      {!intro && !transition && !opened && <button type="button" className="journey-jump" onClick={() => controls.current?.jump()} aria-keyshortcuts="Space">Jump <span aria-hidden="true">↑</span></button>}
-      {!intro && !transition && <div className="journey-tools" role="group" aria-label="Camera and objects">
+      {!transition && <Joystick controls={controls} />}
+      {!transition && !opened && <button type="button" className="journey-jump" onClick={() => controls.current?.jump()} aria-keyshortcuts="Space">Jump <span aria-hidden="true">↑</span></button>}
+      {!transition && <div className="journey-tools" role="group" aria-label="Camera and objects">
         <button type="button" onClick={() => controls.current?.toggleCamera("tilt")} aria-pressed={camera.tilt} aria-keyshortcuts="Q">Tilt up <kbd aria-hidden="true">Q</kbd></button>
         <button type="button" title="See yourself from the front (F)" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
         <button type="button" onClick={() => inParty ? setOpened({ kind: "party" }) : browse(status.chapter)} aria-haspopup="dialog">{inParty ? "Guests" : "Objects"}</button>

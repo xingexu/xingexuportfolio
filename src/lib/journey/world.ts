@@ -252,7 +252,6 @@ export function ageAt(chapter: Chapter, z: number) {
   return chapter.ageFrom + Math.floor(progress * (span + 1));
 }
 
-export const INTRO_END: Vec = { x: -1, z: -12 };
 export type RoomArrival = "start" | "forward" | "back" | "portal";
 export function spawn(index: number, from: RoomArrival): Vec & { yaw: number } {
   const room = interior(JOURNEY_ROOMS[index]);
@@ -261,7 +260,7 @@ export function spawn(index: number, from: RoomArrival): Vec & { yaw: number } {
     return { x: room.minX + 8, z: csaPoster.z, yaw: Math.PI / 2 };
   }
   if (from === "back") return { x: 0, z: room.minZ + 7, yaw: 0 };
-  if (index === 0) return { ...INTRO_END, yaw: Math.PI };
+  if (index === 0) return { x: -1, z: -12, yaw: Math.PI };
   return { x: 0, z: room.maxZ - 7, yaw: Math.PI };
 }
 

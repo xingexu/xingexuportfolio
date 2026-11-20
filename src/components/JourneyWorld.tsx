@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { Box3, Color, DataTexture, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, NearestMipmapLinearFilter, PerspectiveCamera, PlaneGeometry, Ray, Raycaster, RepeatWrapping, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
-import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
+import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, JOURNEY_START_INDEX, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
 import { makeCsaParty } from "@/lib/journey/csaParty";
 import { makeDormLighting } from "@/lib/journey/dormLighting";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
@@ -10,7 +10,7 @@ import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarPart
 import { gridGeometry } from "@/lib/journey/mesh";
 import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
-import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
+import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
@@ -37,7 +37,6 @@ type Props = {
   onStatus: (status: JourneyStatus) => void;
   onOpen: (id: string) => void;
   onTransition: (info: TransitionInfo | null) => void;
-  onIntro: (playing: boolean) => void;
   onFinale: () => void;
   onMove: () => void;
   onCameraChange: (mode: CameraMode) => void;
@@ -46,9 +45,8 @@ type Props = {
 const KEYS: Record<string, "up" | "down" | "left" | "right"> = {
   w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right",
 };
-const COVER = 0.6, HOLD = 1.9, REVEAL = 0.6, INTRO = 6, TURN_SPEED = 2.8;
+const COVER = 0.6, HOLD = 1.9, REVEAL = 0.6, TURN_SPEED = 2.8;
 const smooth = (t: number) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
-const stairHeight = (x: number) => x < -22 ? 8 : x < -6 ? 8 - Math.floor((x + 22) / 2) : 0;
 const transitionArrival = (direction: TransitionInfo["direction"]): RoomArrival =>
   direction === "back" || direction === "portal" ? direction : "forward";
 
@@ -317,14 +315,13 @@ export default function JourneyWorld(props: Props) {
     }
 
     // State
-    let chapter = 0, transition: (TransitionInfo & { t: number; switched: boolean }) | null = null;
-    const player = { x: INTRO_END.x, z: INTRO_END.z, y: 0, yaw: Math.PI, vx: 0, vz: 0, spin: 0, phase: 0, age: 7 };
-    let intro: { t: number } | null = motion.matches ? null : { t: 0 };
+    let chapter = JOURNEY_START_INDEX, transition: (TransitionInfo & { t: number; switched: boolean }) | null = null;
+    const player = { ...spawn(chapter, "start"), vx: 0, vz: 0, spin: 0, phase: 0, age: JOURNEY_ROOMS[chapter].ageFrom };
     const held = new Set<string>();
     const stick = { x: 0, y: 0 }, gesture = { x: 0, y: 0 };
     let nearby: string | null = null, hovered: string | null = null, lastStatus = "", moved = false, disposed = false, readySent = false;
     let volley: Volley | null = null, kickPose = 0, jumpElapsed: number | null = null;
-    const camAnchor = new Vector3(), camLook = new Vector3(), goalPos = new Vector3(), goalLook = new Vector3();
+    const camAnchor = new Vector3(), camLook = new Vector3();
     let camYaw = player.yaw;
     let cameraMode: CameraMode = { front: false, tilt: false };
     let frontBlend = 0, tiltBlend = 0;
@@ -342,7 +339,7 @@ export default function JourneyWorld(props: Props) {
       grass.visible = !current.outdoor;
       grass.material.color.setHex(index === WESTERN_INDEX || index === CSA_ROOM_INDEX ? 0x77889c : 0xffffff, LinearSRGBColorSpace);
       const at = spawn(index, from);
-      player.x = at.x; player.z = at.z; player.yaw = at.yaw; player.vx = 0; player.vz = 0; player.spin = 0; player.y = 0;
+      player.x = at.x; player.z = at.z; player.yaw = at.yaw; player.vx = 0; player.vz = 0; player.spin = 0;
       player.age = ageAt(current, player.z);
       setAvatar(player.age, current.outfit);
       nearby = null; hovered = null; tooltip.hidden = true;
@@ -363,7 +360,7 @@ export default function JourneyWorld(props: Props) {
       look.set(x + fx * lead, y + view.lookHeight, z + fz * lead);
     }
     function snapCamera() {
-      camAnchor.set(player.x, player.y, player.z);
+      camAnchor.set(player.x, 0, player.z);
       camYaw = player.yaw;
       frontBlend = Number(cameraMode.front);
       tiltBlend = Number(cameraMode.tilt);
@@ -425,7 +422,7 @@ export default function JourneyWorld(props: Props) {
     }
 
     function playVolley() {
-      if (intro || transition || live.current.blocked || !parts) return;
+      if (transition || live.current.blocked || !parts) return;
       const next = nextVolley(), field = room(chapter).field;
       if (!next || !field) return;
       const { state } = next.ball;
@@ -469,7 +466,7 @@ export default function JourneyWorld(props: Props) {
       for (let i = 0; i < sightlines.length; i++) {
         const ray = sightlines[i];
         ray.origin.copy(camera.position);
-        ray.direction.set(player.x, player.y + height * (0.1 + 0.4 * i), player.z).sub(ray.origin);
+        ray.direction.set(player.x, height * (0.1 + 0.4 * i), player.z).sub(ray.origin);
         sightDistances[i] = ray.direction.lengthSq();
         ray.direction.normalize();
       }
@@ -477,7 +474,7 @@ export default function JourneyWorld(props: Props) {
       const { props, walls } = room(chapter);
       for (const prop of props) {
         const { holder, bounds, material, glass, wall } = prop;
-        const obscures = !intro && !wall && (bounds.containsPoint(camera.position) ||
+        const obscures = !wall && (bounds.containsPoint(camera.position) ||
           sightlines.some((ray, i) => ray.intersectBox(bounds, hitPoint) && hitPoint.distanceToSquared(ray.origin) < sightDistances[i]));
         const target = obscures ? 0 : 1;
         const blended = prop.visibility + (target - prop.visibility) * ease;
@@ -542,7 +539,6 @@ export default function JourneyWorld(props: Props) {
     function startTransition(to: number, direction: TransitionInfo["direction"]) {
       if (transition || to < 0 || to >= JOURNEY_ROOMS.length) return;
       clearInput();
-      if (intro) finishIntro();
       transition = { to, direction, t: motion.matches ? COVER : 0, switched: false };
       live.current.onTransition({ to, direction });
     }
@@ -553,22 +549,14 @@ export default function JourneyWorld(props: Props) {
       drawCover(0);
       live.current.onTransition(null);
     }
-    function finishIntro() {
-      if (!intro) return;
-      intro = null;
-      player.x = INTRO_END.x; player.z = INTRO_END.z; player.y = 0; player.yaw = Math.PI;
-      snapCamera();
-      live.current.onIntro(false);
-    }
-
     function interact() {
-      if (transition || intro || live.current.blocked) return;
+      if (transition || live.current.blocked) return;
       if (nearby) activateItem(nearby);
       else if (room(chapter).party?.nearDj(player)) openCsaDj();
     }
 
     function toggleDormLamps() {
-      if (chapter === WESTERN_INDEX && !transition && !intro) room(chapter).dormLighting?.toggle();
+      if (chapter === WESTERN_INDEX && !transition) room(chapter).dormLighting?.toggle();
     }
 
     function activateItem(id: string) {
@@ -579,7 +567,7 @@ export default function JourneyWorld(props: Props) {
     function openCsaDj() { window.open(CSA_DJ_LINK.href, "_blank", "noopener,noreferrer"); }
 
     function jump() {
-      if (transition || intro || live.current.blocked || volley || jumpElapsed !== null) return;
+      if (transition || live.current.blocked || volley || jumpElapsed !== null) return;
       jumpElapsed = 0;
       kickPose = 0;
       if (!moved) { moved = true; live.current.onMove(); }
@@ -591,13 +579,13 @@ export default function JourneyWorld(props: Props) {
       toggleDormLamps,
       jump,
       volley: playVolley,
-      goTo: index => { if (index < CHAPTERS.length && (index !== chapter || intro)) startTransition(index, "jump"); },
+      goTo: index => { if (index < CHAPTERS.length && index !== chapter) startTransition(index, "jump"); },
       visitCsa: () => { if (chapter !== CSA_ROOM_INDEX) startTransition(CSA_ROOM_INDEX, "portal"); },
       leaveCsa: () => { if (chapter === CSA_ROOM_INDEX) startTransition(WESTERN_INDEX, "portal"); },
-      skip: () => { if (transition) finishTransition(); else if (intro) finishIntro(); },
+      skip: finishTransition,
       focus: () => region.focus({ preventScroll: true }),
       toggleCamera: mode => {
-        if (transition || intro || live.current.blocked) return;
+        if (transition || live.current.blocked) return;
         cameraMode = { ...cameraMode, [mode]: !cameraMode[mode] };
         live.current.onCameraChange(cameraMode);
         onPointerLeave();
@@ -615,7 +603,7 @@ export default function JourneyWorld(props: Props) {
       const key = event.key.toLowerCase();
       if (KEYS[key]) {
         if (key.startsWith("arrow")) event.preventDefault();
-        if (!transition && !intro) held.add(KEYS[key]);
+        if (!transition) held.add(KEYS[key]);
         return;
       }
       const onButton = (event.target as HTMLElement | null)?.closest?.("button, a");
@@ -629,7 +617,7 @@ export default function JourneyWorld(props: Props) {
         if (!event.repeat) jump();
       }
       if (key === "e" || (key === "enter" && !onButton)) { event.preventDefault(); interact(); }
-      if (key === "escape" && (transition || intro)) { event.preventDefault(); control.skip(); }
+      if (key === "escape" && transition) { event.preventDefault(); control.skip(); }
     }
     function onKeyUp(event: KeyboardEvent) { const key = KEYS[event.key.toLowerCase()]; if (key) held.delete(key); }
     function clearInput() {
@@ -656,7 +644,7 @@ export default function JourneyWorld(props: Props) {
       return hit?.object;
     }
     function onPointerDown(event: PointerEvent) {
-      if (drag || event.button !== 0 || transition || intro || live.current.blocked) return;
+      if (drag || event.button !== 0 || transition || live.current.blocked) return;
       region.focus({ preventScroll: true });
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
       region.setPointerCapture(event.pointerId);
@@ -668,7 +656,7 @@ export default function JourneyWorld(props: Props) {
       const dx = event.clientX - drag.x, dy = event.clientY - drag.y, distance = Math.hypot(dx, dy);
       const deadZone = event.pointerType === "touch" ? 12 : 9;
       if (distance > deadZone) drag.moved = true;
-      if (drag.moved && !transition && !intro && !live.current.blocked) {
+      if (drag.moved && !transition && !live.current.blocked) {
         onPointerLeave();
         region.style.cursor = "grabbing";
         const scale = Math.min(1, Math.max(0, (distance - deadZone) / 48)) / (distance || 1);
@@ -681,7 +669,7 @@ export default function JourneyWorld(props: Props) {
       gesture.x = 0; gesture.y = 0;
       drag = null;
       region.style.cursor = "";
-      if (wasTap && !transition && !intro && !live.current.blocked) {
+      if (wasTap && !transition && !live.current.blocked) {
         setPointer(event);
         const hit = pick();
         if (hit?.userData.csaDj) openCsaDj();
@@ -702,11 +690,7 @@ export default function JourneyWorld(props: Props) {
     const observer = new ResizeObserver(resize);
     observer.observe(region);
     resize();
-    enterRoom(0, "start");
-    if (intro) {
-      player.x = -24; player.y = 8; player.yaw = Math.PI / 2;
-      live.current.onIntro(true);
-    }
+    enterRoom(chapter, "start");
 
     let frame = 0, previous = performance.now(), time = 0;
     function tick(now: number) {
@@ -717,81 +701,64 @@ export default function JourneyWorld(props: Props) {
       time += dt;
       const current = JOURNEY_ROOMS[chapter];
       const blockedNow = live.current.blocked;
-      let speedNow = 0, jumpLift = 0;
+      let jumpLift = 0;
 
-      if (intro) {
-        intro.t += real;
-        const t = intro.t;
-        const walk = smooth((t - 1.6) / 3);
-        player.x = -24 + (INTRO_END.x + 24) * walk;
-        player.y = stairHeight(player.x);
-        player.yaw = t < 4.6 ? Math.PI / 2 : Math.PI / 2 + (Math.PI / 2) * smooth((t - 4.6) / 0.8);
-        speedNow = t > 1.6 && t < 4.6 ? 4 * walk * (1 - walk) : 0;
-        player.phase += dt * speedNow * 14;
-        cameraGoal(goalPos, goalLook, player.x, player.y, player.z, player.yaw);
-        const k = smooth((t - 1) / 4.4);
-        camera.position.set(-2 + (goalPos.x + 2) * k, 78 + (goalPos.y - 78) * k, 86 + (goalPos.z - 86) * k);
-        camLook.set(-26 + (goalLook.x + 26) * k, 6 + (goalLook.y - 6) * k, -2 + (goalLook.z + 2) * k);
-        camera.lookAt(camLook);
-        if (t >= INTRO) finishIntro();
-      } else {
-        if (jumpElapsed !== null) {
-          if (!blockedNow) jumpElapsed += dt;
-          jumpLift = jumpHeight(jumpElapsed);
-          if (jumpElapsed >= JUMP_DURATION) jumpElapsed = null;
-        }
-        // A/D turn, W/S walk along the way you face.
-        let turn = (held.has("right") ? 1 : 0) - (held.has("left") ? 1 : 0) + stick.x + gesture.x;
-        let move = (held.has("up") ? 1 : 0) - (held.has("down") ? 1 : 0) - stick.y - gesture.y;
-        if (transition || blockedNow || volley) {
-          turn = 0; move = 0;
-          player.vx = 0; player.vz = 0; player.spin = 0;
-        }
-        turn = Math.max(-1, Math.min(1, turn)); move = Math.max(-1, Math.min(1, move));
-        player.spin += (turn * TURN_SPEED - player.spin) * (1 - Math.exp(-dt * 10));
-        player.yaw -= player.spin * dt;
-        const height = parts?.height ?? 20, speed = walkSpeed(height * AVATAR_SCALE) * (move < 0 ? 0.65 : 1);
-        if (Math.abs(move) > 0.05 || Math.abs(turn) > 0.05) { if (!moved) { moved = true; live.current.onMove(); } }
-        if (Math.abs(move) > 0.05) {
-          const blend = 1 - Math.exp(-dt * 14), fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
-          player.vx += (fx * move * speed - player.vx) * blend; player.vz += (fz * move * speed - player.vz) * blend;
-        } else { const stop = Math.exp(-dt * 18); player.vx *= stop; player.vz *= stop; }
-        speedNow = Math.max(Math.hypot(player.vx, player.vz) / speed, Math.abs(turn) * 0.35);
-        if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
-        if (Math.hypot(player.vx, player.vz) > 0.02) {
-          const radius = (height >= 29 ? 3.5 : 3) * AVATAR_SCALE;
-          const { roommate: npc, party } = room(chapter);
-          const collider = npc ? (from: Vec, to: Vec, r: number) => npc.blocks(from, to, r, npc.pose) : party?.blocks;
-          const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, collider);
-          const movement = { x: result.x - player.x, z: result.z - player.z };
-          player.x = result.x; player.z = result.z;
-          for (const { state } of room(chapter).reactive) bumpProp(state, result, movement, radius, dt);
-          for (const ball of room(chapter).balls) {
-            if (jumpElapsed === null && volley?.ball !== ball && kickBall(ball.state, player, movement, radius, dt)) kickPose = 0.28;
-          }
-          player.phase += Math.hypot(movement.x, movement.z) * 0.45;
-          if (result.exit === "party") startTransition(CSA_ROOM_INDEX, "portal");
-          else if (result.exit === "next") {
-            if (chapter < CHAPTERS.length - 1) startTransition(chapter + 1, "forward");
-            else { player.z = interior(current).minZ + 5; player.vx = 0; player.vz = 0; held.clear(); live.current.onFinale(); }
-          } else if (result.exit === "prev") {
-            if (chapter === CSA_ROOM_INDEX) startTransition(WESTERN_INDEX, "portal");
-            else startTransition(chapter - 1, "back");
-          }
-          const age = ageAt(current, player.z);
-          if (age !== player.age) { player.age = age; setAvatar(age, current.outfit); }
-        }
-        const follow = motion.matches ? 1 : 1 - Math.exp(-dt * 12);
-        camAnchor.x += (player.x - camAnchor.x) * follow;
-        camAnchor.y += (player.y + (motion.matches ? 0 : jumpLift * 0.5) - camAnchor.y) * follow;
-        camAnchor.z += (player.z - camAnchor.z) * follow;
-        camYaw += (player.yaw - camYaw) * follow;
-        const orbitEase = motion.matches ? 1 : 1 - Math.exp(-dt * 9);
-        frontBlend += (Number(cameraMode.front) - frontBlend) * orbitEase;
-        tiltBlend += (Number(cameraMode.tilt) - tiltBlend) * follow;
-        cameraGoal(camera.position, camLook, camAnchor.x, camAnchor.y, camAnchor.z, camYaw);
-        camera.lookAt(camLook);
+      if (jumpElapsed !== null) {
+        if (!blockedNow) jumpElapsed += dt;
+        jumpLift = jumpHeight(jumpElapsed);
+        if (jumpElapsed >= JUMP_DURATION) jumpElapsed = null;
       }
+      // A/D turn, W/S walk along the way you face.
+      let turn = (held.has("right") ? 1 : 0) - (held.has("left") ? 1 : 0) + stick.x + gesture.x;
+      let move = (held.has("up") ? 1 : 0) - (held.has("down") ? 1 : 0) - stick.y - gesture.y;
+      if (transition || blockedNow || volley) {
+        turn = 0; move = 0;
+        player.vx = 0; player.vz = 0; player.spin = 0;
+      }
+      turn = Math.max(-1, Math.min(1, turn)); move = Math.max(-1, Math.min(1, move));
+      player.spin += (turn * TURN_SPEED - player.spin) * (1 - Math.exp(-dt * 10));
+      player.yaw -= player.spin * dt;
+      const height = parts?.height ?? 20, speed = walkSpeed(height * AVATAR_SCALE) * (move < 0 ? 0.65 : 1);
+      if (Math.abs(move) > 0.05 || Math.abs(turn) > 0.05) { if (!moved) { moved = true; live.current.onMove(); } }
+      if (Math.abs(move) > 0.05) {
+        const blend = 1 - Math.exp(-dt * 14), fx = Math.sin(player.yaw), fz = Math.cos(player.yaw);
+        player.vx += (fx * move * speed - player.vx) * blend; player.vz += (fz * move * speed - player.vz) * blend;
+      } else { const stop = Math.exp(-dt * 18); player.vx *= stop; player.vz *= stop; }
+      const speedNow = Math.max(Math.hypot(player.vx, player.vz) / speed, Math.abs(turn) * 0.35);
+      if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
+      if (Math.hypot(player.vx, player.vz) > 0.02) {
+        const radius = (height >= 29 ? 3.5 : 3) * AVATAR_SCALE;
+        const { roommate: npc, party } = room(chapter);
+        const collider = npc ? (from: Vec, to: Vec, r: number) => npc.blocks(from, to, r, npc.pose) : party?.blocks;
+        const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, collider);
+        const movement = { x: result.x - player.x, z: result.z - player.z };
+        player.x = result.x; player.z = result.z;
+        for (const { state } of room(chapter).reactive) bumpProp(state, result, movement, radius, dt);
+        for (const ball of room(chapter).balls) {
+          if (jumpElapsed === null && volley?.ball !== ball && kickBall(ball.state, player, movement, radius, dt)) kickPose = 0.28;
+        }
+        player.phase += Math.hypot(movement.x, movement.z) * 0.45;
+        if (result.exit === "party") startTransition(CSA_ROOM_INDEX, "portal");
+        else if (result.exit === "next") {
+          if (chapter < CHAPTERS.length - 1) startTransition(chapter + 1, "forward");
+          else { player.z = interior(current).minZ + 5; player.vx = 0; player.vz = 0; held.clear(); live.current.onFinale(); }
+        } else if (result.exit === "prev") {
+          if (chapter === CSA_ROOM_INDEX) startTransition(WESTERN_INDEX, "portal");
+          else startTransition(chapter - 1, "back");
+        }
+        const age = ageAt(current, player.z);
+        if (age !== player.age) { player.age = age; setAvatar(age, current.outfit); }
+      }
+      const follow = motion.matches ? 1 : 1 - Math.exp(-dt * 12);
+      camAnchor.x += (player.x - camAnchor.x) * follow;
+      camAnchor.y += ((motion.matches ? 0 : jumpLift * 0.5) - camAnchor.y) * follow;
+      camAnchor.z += (player.z - camAnchor.z) * follow;
+      camYaw += (player.yaw - camYaw) * follow;
+      const orbitEase = motion.matches ? 1 : 1 - Math.exp(-dt * 9);
+      frontBlend += (Number(cameraMode.front) - frontBlend) * orbitEase;
+      tiltBlend += (Number(cameraMode.tilt) - tiltBlend) * follow;
+      cameraGoal(camera.position, camLook, camAnchor.x, camAnchor.y, camAnchor.z, camYaw);
+      camera.lookAt(camLook);
 
       if (transition) {
         transition.t += real;
@@ -809,7 +776,7 @@ export default function JourneyWorld(props: Props) {
 
       const activeRoom = room(chapter);
       activeRoom.party?.update(!blockedNow && !transition ? dt : 0, motion.matches, player);
-      if (!transition && !blockedNow && !intro) {
+      if (!transition && !blockedNow) {
         kickPose = Math.max(0, kickPose - dt);
         const npc = activeRoom.roommate;
         if (npc && (!motion.matches || npc.time !== 0)) {
@@ -828,9 +795,9 @@ export default function JourneyWorld(props: Props) {
       }
 
       // Avatar pose
-      avatar.position.set(player.x, player.y + jumpLift, player.z);
+      avatar.position.set(player.x, jumpLift, player.z);
       avatar.rotation.y = player.yaw;
-      shadow.position.set(player.x, 0.02 + (intro ? stairHeight(player.x) : 0), player.z);
+      shadow.position.set(player.x, 0.02, player.z);
       shadow.rotation.y = player.yaw;
       const swing = Math.sin(player.phase) * 0.75 * Math.min(1, speedNow * 1.4);
       limbs.legL.rotation.x = swing; limbs.legR.rotation.x = -swing;
@@ -866,20 +833,20 @@ export default function JourneyWorld(props: Props) {
       fadeForeground(dt);
       activeRoom.route.forEach((arrow, i) => {
         const atDoor = i === activeRoom.route.length - 1;
-        arrow.visible = !intro && !transition && !blockedNow && arrow.position.z < player.z + (atDoor ? 3 : -1);
+        arrow.visible = !transition && !blockedNow && arrow.position.z < player.z + (atDoor ? 3 : -1);
         const y = atDoor ? 24 : 3.4;
         arrow.position.y = y + (motion.matches ? 0 : Math.sin(time * 3 - i * 0.75) * 0.55);
       });
 
       // Nearby + hover highlights
       const npc = activeRoom.roommate;
-      let nearList = intro || transition ? [] : nearbyItems(chapter, player, undefined, undefined, activeRoom.itemPositions).map(item => item.id);
-      if (!intro && !transition && npc && Math.hypot(player.x - npc.pose.x, player.z - npc.pose.z) <= 8) {
+      let nearList = transition ? [] : nearbyItems(chapter, player, undefined, undefined, activeRoom.itemPositions).map(item => item.id);
+      if (!transition && npc && Math.hypot(player.x - npc.pose.x, player.z - npc.pose.z) <= 8) {
         nearList = [npc.id, ...nearList.filter(id => id !== npc.id)].slice(0, 3);
       }
-      const action = intro || transition || blockedNow ? undefined : nextVolley()?.action;
+      const action = transition || blockedNow ? undefined : nextVolley()?.action;
       const near = nearList[0] ?? null;
-      if (pointerDirty && pointerInside && !intro && !transition) {
+      if (pointerDirty && pointerInside && !transition) {
         pointerDirty = false;
         const hit = pick();
         hovered = hit?.userData.itemId ?? null;

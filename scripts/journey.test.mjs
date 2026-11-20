@@ -1143,6 +1143,50 @@ test('Lucas keeps the moving clippers near Jason’s low fade', t => {
   }
 });
 
+test('Nuo alternates one limb at a time on a continuous wall-to-roof climb', () => {
+  const { CLIMB_STEPS, CLIMB_TIME, sampleNuoClimb, buildNuoWall } = load('src/lib/journey/csaClimb.ts');
+  const { grid, holds } = buildNuoWall();
+  const start = sampleNuoClimb(0, false), finish = sampleNuoClimb(CLIMB_TIME, false);
+  assert.equal(start.tilt, 0, 'starts upright on the wall');
+  assert.equal(finish.tilt, Math.PI / 2, 'finishes horizontal underneath the roof');
+  assert.ok(finish.hips.x < start.hips.x - 9 && finish.hips.y > start.hips.y + 20);
+  assert.ok(finish.grip.every(({ y }) => y === 35.2), 'both feet and both hands reach the roof');
+  assert.deepEqual(sampleNuoClimb(CLIMB_TIME * 2, false), start, 'returns to the start without a jump');
+  assert.deepEqual(sampleNuoClimb(0, true), sampleNuoClimb(60, true), 'reduced motion holds one stable pose');
+  assert.ok(grid.has(93, 8, 0) && grid.has(79, 36, 0), 'wall and roof surfaces are modeled');
+  for (let beat = 0; beat < CLIMB_STEPS; beat++) {
+    const time = CLIMB_TIME * beat / CLIMB_STEPS;
+    const before = sampleNuoClimb(time, false), mid = sampleNuoClimb(time + CLIMB_TIME / (2 * CLIMB_STEPS), false);
+    assert.equal(mid.grip.filter(({ x, y, z }, i) => Math.hypot(x - before.grip[i].x, y - before.grip[i].y, z - before.grip[i].z) > 0.01).length, 1);
+    for (const { x, y, z } of before.grip) assert.ok(holds.has(Math.floor(x * 2), Math.floor(y * 2), Math.floor(z * 2)));
+  }
+});
+
+test('Nuo’s rendered hands and feet reach their holds without blocking the floor', t => {
+  const { CLIMB_TIME, sampleNuoClimb } = load('src/lib/journey/csaClimb.ts');
+  const oldDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });
+  const material = new MeshBasicMaterial({ vertexColors: true }), party = makeCsaParty(material, material);
+  t.after(() => { party.dispose(); material.dispose(); });
+  const nuo = party.group.getObjectByName('Nuo'), viewer = { x: 72, z: 0 };
+  const limbs = ['Left forearm', 'Left shin', 'Right forearm', 'Right shin'].map(name => nuo.getObjectByName(name));
+  limbs.forEach(limb => limb.geometry.computeBoundingBox());
+  for (let frame = 0; frame <= 128; frame++) {
+    const time = frame * CLIMB_TIME / 128;
+    party.update(frame ? CLIMB_TIME / 128 : 0, false, viewer);
+    const pose = sampleNuoClimb(time, false);
+    limbs.forEach((limb, index) => {
+      const { x, y, z } = pose.grip[index];
+      const tip = limb.localToWorld(new Vector3(0, limb.geometry.boundingBox.min.y + AVATAR_VOXEL_SIZE, 0));
+      const distance = tip.distanceTo(new Vector3(x, y, z));
+      assert.ok(distance < 0.8, `${limb.name} misses its grip by ${distance.toFixed(2)} at ${time.toFixed(2)} s`);
+    });
+  }
+  assert.ok(nuo.position.y > 29 && !party.blocks({ x: 67, z: nuo.position.z }, { x: nuo.position.x, z: nuo.position.z }, 2));
+  assert.ok(!W.blocked(CSA_ROOM_INDEX, viewer.x, viewer.z, 2));
+});
+
 test('the floating arrows mark the walkable aisle from every spawn to its exit', () => {
   for (const [index, chapter] of CHAPTERS.entries()) {
     let p = W.spawn(index, 'forward');

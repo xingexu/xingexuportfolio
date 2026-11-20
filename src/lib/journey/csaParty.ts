@@ -2,6 +2,7 @@ import { CanvasTexture, Group, Mesh, NearestFilter, Sprite, SpriteMaterial, Vect
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar } from "./avatar";
 import { CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_STAGE_Z } from "./data";
 import { gridGeometry } from "./mesh";
+import { buildNuoWall, NUO_NAME, sampleNuoClimb } from "./csaClimb";
 import { Grid, hash3, shade, type Color } from "./voxel";
 import { AVATAR_SCALE, type Vec } from "./world";
 
@@ -266,12 +267,12 @@ function splitLimb(grid: Grid, hinge: number, center = 0) {
   return { upper, lower };
 }
 
-function aimArm(upper: Object3D, lower: Object3D, hand: Vector3, upperLength: number, lowerLength: number, side: number) {
+function aimArm(upper: Object3D, lower: Object3D, hand: Vector3, upperLength: number, lowerLength: number, side: number, poleZ = -0.3) {
   const forward = hand.clone().sub(upper.position);
   const reach = Math.min(forward.length(), upperLength + lowerLength - 0.03);
   forward.normalize();
   const bend = (upperLength ** 2 - lowerLength ** 2 + reach ** 2) / (2 * Math.max(0.05, reach));
-  const pole = new Vector3(side, -0.8, -0.3);
+  const pole = new Vector3(side, -0.8, poleZ);
   pole.addScaledVector(forward, -pole.dot(forward)).normalize();
   lower.position.copy(upper.position).addScaledVector(forward, bend)
     .addScaledVector(pole, Math.sqrt(Math.max(0, upperLength ** 2 - bend ** 2)));
@@ -317,7 +318,7 @@ function stageScenery() {
   return { backdrop: g, floor };
 }
 
-function makeNameTag(guest: Guest) {
+function makeNameTag(guest: Pick<Guest, "name" | "dj">) {
   const canvas = document.createElement("canvas");
   const text = guest.dj ? `${guest.name} · DJ` : guest.name;
   canvas.width = 180; canvas.height = 38;
@@ -338,6 +339,58 @@ function makeNameTag(guest: Guest) {
   return { sprite, dispose: () => { material.dispose(); texture.dispose(); } };
 }
 
+function makeNuo(mesh: (grid: Grid, size?: number) => Mesh) {
+  const group = new Group(), body = new Group();
+  group.name = NUO_NAME;
+  group.add(body);
+  const scale = AVATAR_SCALE * 0.94;
+  body.scale.setScalar(scale);
+  body.rotation.order = "YXZ";
+  body.rotation.y = Math.PI / 2;
+  const parts = buildCsaGuest({ name: NUO_NAME, x: 0, z: 0, yaw: 0, scale: 0.94, hair: "cropped-fringe", hairColor: 0x352933 });
+  parts.head.box(-2, 11, -12, 4, 3, 5, 0x352933).box(-2, 10, -12, 4, 4, 1, 0x987ba7).box(-3, 8, -15, 5, 6, 3, 0x3c303c)
+    .box(-4, 4, -16, 5, 6, 3, 0x352932).box(-5, 2, -15, 4, 3, 3, 0x2a222c);
+  const torso = mesh(parts.torso, AVATAR_VOXEL_SIZE), head = mesh(parts.head, AVATAR_VOXEL_SIZE);
+  if (parts.shirtPrint) torso.add(mesh(parts.shirtPrint, SHIRT_PRINT_VOXEL_SIZE));
+  torso.add(mesh(new Grid().box(-3, 1, -8, 6, 5, 4, 0x997189)
+    .box(-3, 5, -8, 6, 1, 4, 0x6f4f73).box(-2, 6, -7, 4, 1, 2, 0xcab8c9), AVATAR_VOXEL_SIZE));
+  head.name = "Head";
+  head.position.y = parts.shoulder + 2 - parts.hip;
+  body.add(torso, head);
+
+  const limb = (grid: Grid, side: -1 | 1, foot: boolean) => {
+    const { minX, maxX, minY } = grid.bounds(), hinge = Math.round(minY * 0.5), center = (minX + maxX + 1) / 2;
+    if (foot) grid.box(minX, minY, 2, maxX - minX + 1, 3, 3, 0x8bcec1).box(minX, minY, 4, maxX - minX + 1, 1, 2, 0x45364d);
+    const { upper, lower } = splitLimb(grid, hinge, center);
+    const joint = mesh(upper, AVATAR_VOXEL_SIZE), end = mesh(lower, AVATAR_VOXEL_SIZE);
+    joint.position.set(side * (foot ? 1.5 : parts.shoulderX + 1), foot ? 0 : parts.shoulder + 1 - parts.hip, 0);
+    end.name = `${side < 0 ? "Left" : "Right"} ${foot ? "shin" : "forearm"}`;
+    body.add(joint, end);
+    return (goal: Point) => {
+      const target = body.worldToLocal(new Vector3(goal.x, goal.y, goal.z));
+      aimArm(joint, end, target, -hinge * AVATAR_VOXEL_SIZE, (hinge - minY - 1) * AVATAR_VOXEL_SIZE, side, foot ? 0.9 : -0.3);
+    };
+  };
+  const reach = [limb(parts.armL, -1, false), limb(parts.legL, -1, true), limb(parts.armR, 1, false), limb(parts.legR, 1, true)];
+  const tag = makeNameTag({ name: NUO_NAME });
+  if (tag) group.add(tag.sprite);
+  return {
+    group,
+    update(time: number, reduced: boolean, player: Vec) {
+      const pose = sampleNuoClimb(time, reduced);
+      group.position.set(pose.hips.x, pose.hips.y, pose.hips.z);
+      body.rotation.x = -pose.tilt;
+      head.rotation.x = -0.15;
+      reach.forEach((set, index) => set(pose.grip[index]));
+      if (tag) {
+        tag.sprite.position.set(-1.4, 11 * Math.cos(pose.tilt) - 3 * Math.sin(pose.tilt), 0);
+        tag.sprite.visible = Math.hypot(group.position.x - player.x, group.position.z - player.z) < 64;
+      }
+    },
+    dispose: () => tag?.dispose(),
+  };
+}
+
 export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial) {
   const group = new Group(), stageWall = new Group(), geometries: BufferGeometry[] = [];
   const mesh = (grid: Grid, size = 1, paint = material) => {
@@ -348,6 +401,12 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
   const { backdrop, floor } = stageScenery();
   group.add(mesh(floor));
   stageWall.add(mesh(backdrop, 1, wallMaterial));
+  const climbingWall = buildNuoWall(), boulder = mesh(climbingWall.grid), mat = mesh(climbingWall.mat);
+  boulder.name = "Bouldering wall and roof";
+  mat.scale.y = 0.16;
+  const nuo = makeNuo(mesh);
+  group.add(boulder, mesh(climbingWall.holds, 0.5), mat, nuo.group);
+  nuo.update(0, false, { x: 0, z: 0 });
   const disco = new Group(), sphere = mesh(buildCsaDiscoBall(), 0.46);
   disco.name = "Disco ball";
   sphere.position.setScalar(-0.23);
@@ -476,6 +535,7 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
     },
     update(dt: number, reduced: boolean, player: Vec) {
       if (!reduced) time += dt;
+      nuo.update(time, reduced, player);
       const dj = sampleCsaDj(time, reduced), cut = sampleCsaCut(time, reduced);
       const spin = reduced ? 0 : time * 0.32;
       disco.rotation.y = spin;
@@ -526,6 +586,7 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
     dispose() {
       geometries.forEach(geometry => geometry.dispose());
       guests.forEach(guest => guest.tag?.dispose());
+      nuo.dispose();
     },
   };
 }

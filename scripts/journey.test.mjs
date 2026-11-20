@@ -27,7 +27,7 @@ const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
-const { CSA_GUESTS, buildCsaGuest, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
+const { CSA_GUESTS, buildCsaDiscoBall, buildCsaGuest, csaActivityLabel, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 const { Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
@@ -955,6 +955,8 @@ test('the auditorium has three rows, a clear center aisle, barber furniture, and
   assert.equal(buildModel(logo.model).size, buildModel('poster-csa').size);
   const rows = hall.decor.filter(prop => prop.model === 'csa-seat-row');
   assert.deepEqual([...new Set(rows.map(({ z }) => z))], [40, 55, 70]);
+  assert.equal(buildModel('csa-seat-row').get(0, 6, 0), 0xf5f0ec, 'white cushions');
+  assert.equal(buildModel('csa-seat-row').get(0, 13, -3), 0xfffcf5, 'white seat backs');
   for (const row of rows) {
     assert.equal(row.rot, 2, 'seats face the stage');
     assert.ok(W.blocked(CSA_ROOM_INDEX, row.x, row.z, radius));
@@ -972,26 +974,41 @@ test('the auditorium has three rows, a clear center aisle, barber furniture, and
   }
 });
 
-test('the five walkers face their movement and clear seats, stage, and one another', () => {
+test('the original guests and all listed execs have activities and clear one another', () => {
   assert.deepEqual(CSA_GUESTS.map(guest => guest.name), [
     'Jason Zhuang', 'Rain Li', 'Amelie Hu', 'Lydia Zheng', 'Daniel Su', 'Lucas Xue', 'Jeffrey Ban', 'William Wang',
+    'Kevin Li', 'Selina Lim', 'Gloria Huang', 'Cassidy Lee', 'Jessica Zhang', 'Callista Chan', 'Michael Tan',
+    'Harry Yang', 'Sarah Gao', 'Melissa Zhang', 'Tanya Mai', 'Ava Cheh', 'Aleena Liu', 'Kate Chen', 'Ray Shen',
   ]);
-  assert.deepEqual(CSA_GUESTS.filter(guest => guest.scale < 1).map(guest => guest.name), ['Amelie Hu', 'Lydia Zheng']);
+  assert.ok(CSA_GUESTS.find(guest => guest.name === 'Amelie Hu').scale < 0.85);
+  assert.ok(CSA_GUESTS.find(guest => guest.name === 'Lydia Zheng').scale < 0.82);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.dj).map(guest => guest.name), ['Rain Li']);
   const walkers = CSA_GUESTS.map((guest, i) => ({ guest, i })).filter(({ guest }) => guest.walk);
-  assert.equal(walkers.length, 5);
+  assert.equal(walkers.length, 20);
+  assert.equal(new Set(walkers.map(({ guest }) => csaActivityLabel(guest))).size, 9);
+  assert.equal(CSA_GUESTS.find(guest => guest.name === 'Kevin Li').activity, 'tablet');
   for (const [i, guest] of CSA_GUESTS.entries()) {
     assert.deepEqual(sampleCsaGuest(guest, i, 0, true), sampleCsaGuest(guest, i, 3, true));
   }
-  for (let time = 0; time < 44; time += 0.22) {
-    const positions = walkers.map(({ guest, i }) => {
+  walkers.forEach(({ guest }, index) => {
+    for (const { guest: other } of walkers.slice(index + 1)) {
+      const x = Math.max(0, Math.abs(guest.x - other.x) - guest.walk[0] - other.walk[0]);
+      const z = Math.max(0, Math.abs(guest.z - other.z) - guest.walk[1] - other.walk[1]);
+      assert.ok(Math.hypot(x, z) > 5, guest.name + ' and ' + other.name + ' have separate routes even if one yields');
+    }
+  });
+  for (const { guest, i } of walkers) {
+    let works = false, walks = false;
+    for (let time = 0; time < 30; time += 0.11) {
       const at = sampleCsaGuest(guest, i, time, false), next = sampleCsaGuest(guest, i, time + 0.01, false);
       assert.ok(!W.blocked(CSA_ROOM_INDEX, at.x, at.z, 2.5), guest.name);
-      assert.ok((next.x - at.x) * Math.sin(at.yaw) + (next.z - at.z) * Math.cos(at.yaw) > 0, guest.name + ' faces their stride');
-      return at;
-    });
-    positions.forEach((at, i) => positions.slice(i + 1).forEach(next =>
-      assert.ok(Math.hypot(at.x - next.x, at.z - next.z) > 5, 'walkers keep space')));
+      const dx = next.x - at.x, dz = next.z - at.z;
+      if (Math.hypot(dx, dz) > 0.004) {
+        walks = true;
+        assert.ok(dx * Math.sin(at.yaw) + dz * Math.cos(at.yaw) > 0, guest.name + ' faces their stride');
+      } else if (at.step === 0 && at.right < -0.45) works = true;
+    }
+    assert.ok(walks && works, guest.name + ' stops to perform a gesture');
   }
 });
 
@@ -1023,8 +1040,28 @@ test('reference-based hairstyles have distinct silhouettes', () => {
   assert.notEqual(jason.head.get(-8, 5, -4), jason.head.get(-8, 9, -4), 'the fade starts low near the ear');
   assert.ok(guest('Lydia Zheng').head.bounds().minY < guest('Amelie Hu').head.bounds().minY, 'Lydia has longer straight hair');
   assert.equal(william.torso.get(2, 21, 3), 0xe1ded7, 'the silver chain is on the chest');
+  const lydia = guest('Lydia Zheng').head.get(0, -14, -8);
+  assert.ok((lydia >> 16) > (lydia >> 8 & 255) * 1.5, 'Lydia has copper-orange hair');
   const { head } = guest('Rain Li');
-  assert.ok(head.has(-10, 8, 0) && head.has(9, 8, 0) && head.has(0, 15, 0));
+  assert.ok(head.has(0, 22, 5), 'fluffy fringe rises above the old crown');
+  assert.ok(head.has(-12, 8, 0) && head.has(11, 8, 0) && head.has(0, 27, 0), 'padded ear cups and arched band');
+});
+
+test('the DJ console holds a mixing-screen MacBook and is flanked by white twin-ring towers', () => {
+  const stage = JOURNEY_ROOMS[CSA_ROOM_INDEX].decor;
+  const laptop = stage.find(prop => prop.model === 'csa-dj-macbook');
+  const table = W.placementBox(stage.find(prop => prop.model === 'csa-dj-booth'));
+  const laptopBox = W.placementBox(laptop);
+  assert.equal(laptop.rot, 2, 'DJ sees the laptop display');
+  assert.equal(laptop.y, 13);
+  assert.ok(laptopBox.minX > table.minX && laptopBox.maxX < table.maxX);
+  assert.ok(laptopBox.minZ > table.minZ && laptopBox.maxZ < table.maxZ);
+  assert.equal(buildModel(laptop.model).get(-16, 21, -11), 0x79e3dc, 'waveform overlay');
+  assert.equal(stage.filter(prop => prop.model === 'csa-speaker').length, 4);
+  const speaker = buildModel('csa-speaker');
+  assert.equal(speaker.get(-10, 22, 2), 0xece9e7, 'white shell');
+  assert.equal(speaker.get(0, 22, 8), 0x88e7e5, 'lower light ring');
+  assert.equal(speaker.get(0, 44, 8), 0xaeb9fc, 'upper light ring');
 });
 
 test('Lucas wears black athletic shorts and Daniel has a swept side part, both with the CSA tee', () => {
@@ -1057,12 +1094,35 @@ test('the DJ meshes can be picked and the same URL is available by the booth', t
   assert.equal(CSA_DJ_LINK.href, 'https://wewantdrought.me');
 });
 
-test('Rain cues his headphones and Lucas keeps the moving clippers near Jason’s low fade', t => {
+test('Rain cues his headphones and works the mixer', () => {
   assert.deepEqual(sampleCsaDj(0, true), sampleCsaDj(6, true));
-  assert.deepEqual(sampleCsaCut(0, true), sampleCsaCut(6, true));
   assert.ok(sampleCsaDj(2.8, false).right.y > 21, 'Rain reaches for his headphones');
   assert.ok(sampleCsaDj(0.3, false).right.y < 17, 'Rain works the mixer');
   assert.notEqual(sampleCsaDj(0.3, false).vinyl, sampleCsaDj(0, false).vinyl);
+});
+
+test('Kevin carries a tablet and the disco lighting stays still in reduced motion', t => {
+  const oldDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });
+  const material = new MeshBasicMaterial({ vertexColors: true }), party = makeCsaParty(material, material);
+  t.after(() => { party.dispose(); material.dispose(); });
+  const kevin = party.group.getObjectByName('Kevin Li'), tablet = kevin.getObjectByName('Checks production cues');
+  assert.ok(tablet.isMesh && tablet.parent.isMesh, 'Kevin carries his tablet in his hand');
+  const disco = party.group.getObjectByName('Disco ball'), reflection = party.group.getObjectByName('Disco reflection');
+  assert.equal(buildCsaDiscoBall().bounds().maxY, 11);
+  assert.ok(disco.position.y > 32 && disco.position.z > CSA_STAGE_Z);
+  party.update(0, true, { x: 0, z: 80 });
+  const still = reflection.position.clone();
+  party.update(1, true, { x: 0, z: 80 });
+  assert.equal(disco.rotation.y, 0);
+  assert.ok(reflection.position.equals(still));
+  party.update(1, false, { x: 0, z: 80 });
+  assert.ok(disco.rotation.y > 0 && !reflection.position.equals(still));
+});
+
+test('Lucas keeps the moving clippers near Jason’s low fade', t => {
+  assert.deepEqual(sampleCsaCut(0, true), sampleCsaCut(6, true));
   const oldDocument = globalThis.document;
   globalThis.document = { createElement: () => ({ getContext: () => null }) };
   t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });

@@ -312,8 +312,8 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 }
 
 const GLASS = 0x9dd8e4;
-const DETAIL_VOXELS = new Set(["macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn"]);
-const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo", "csa-boba-cup", "csa-soda-cup", "csa-water-bottle"]);
+const DETAIL_VOXELS = new Set(["macbook", "csa-dj-macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn"]);
+const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo", "csa-boba-cup", "csa-soda-cup", "csa-water-bottle", "csa-speaker"]);
 export const modelVoxelSize = (id: string) => id === "chess-table" ? 0.125 : id === "mini-fridge" ? FRIDGE_VOXEL_SIZE : DETAIL_VOXELS.has(id) || id.startsWith("plaque-") ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") || id === "hockey-pad" || id === "roommate-portrait" ? 0.5 : 1;
 
 type ChessMan = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
@@ -398,7 +398,7 @@ function glassTrophy(g: Grid, place: string, metal: Color) {
   for (let i = 0; i < 8; i++) g.set(-13 + i, 41 - i, 1, 0xd8f4f7);
 }
 
-function macbook(g: Grid) {
+function macbook(g: Grid, display = code(9)) {
   const silver = 0xb5bfca, steel = 0x798694;
   g.box(-19, 0, -12, 38, 2, 24, steel).box(-18, 1, -12, 36, 1, 23, silver);
   g.box(-16, 2, -9, 32, 1, 11, 0x20232a);
@@ -406,11 +406,19 @@ function macbook(g: Grid) {
   g.box(-7, 2, 4, 14, 1, 6, 0x919da8).box(-6, 2, 5, 12, 1, 4, silver);
   g.box(-19, 2, -13, 38, 3, 2, BLACK);
   g.box(-19, 5, -14, 38, 24, 2, silver).box(-18, 6, -12, 36, 22, 1, BLACK);
-  panel(g, -16, 8, -11, 32, 18, code(9));
+  panel(g, -16, 8, -11, 32, 18, display);
   g.box(-2, 25, -11, 4, 1, 1, BLACK);
   centeredText(g, "MACBOOK", 1, 12, 0xedf2f6);
   const mark = [".....##.", "....##..", ".###....", "#######.", "######..", "######..", ".######.", "..####.."];
   mark.forEach((row, i) => [...row].forEach((c, x) => { if (c === "#") g.set(x - 4, 21 - i, -15, 0xe8edf4); }));
+}
+
+function csaMixerScreen(x: number, row: number) {
+  if (row === 0 || row === 9) return 0x4f4660;
+  const y = row - 4, wave = Math.max(1, Math.round(3 * hash3(x, 5, 0)));
+  if (row < 9 && Math.abs(y) <= wave) return x < 16 ? 0x79e3dc : 0xec91c1;
+  if (row > 10 && row > 16 - (x * 7 % 6) && x % 4 !== 3) return x % 8 < 4 ? 0xd2a6f6 : 0x76cfe3;
+  return x === 15 ? 0x7b606c : 0x24263a;
 }
 
 function csaBadge(g: Grid) {
@@ -429,6 +437,7 @@ function csaCup(g: Grid, drink: Color, straw: Color, boba: boolean) {
 
 const MODELS: Record<string, (g: Grid) => void> = {
   "csa-stage-logo": csaBadge,
+  "csa-dj-macbook": g => macbook(g, csaMixerScreen),
   "csa-boba-cup": g => csaCup(g, 0xc693af, 0xeb906e, true),
   "csa-soda-cup": g => csaCup(g, 0xd76851, 0xf1ce73, false),
   "csa-water-bottle": g => {
@@ -437,14 +446,14 @@ const MODELS: Record<string, (g: Grid) => void> = {
     disc(g, 0, 9, 0, 1.4, () => 0x5c81b3);
   },
   "csa-seat-row": g => {
-    const frame = 0x382b36, fabric = 0x713b50, piping = 0x9b5164;
-    g.box(-21, 0, -5, 42, 1, 10, 0x3d303d).box(-21, 1, -5, 42, 1, 1, 0x6c4853);
+    const frame = 0x83808c, fabric = 0xf5f0ec, piping = 0xfffcf5;
+    g.box(-21, 0, -5, 42, 1, 10, 0x686374).box(-21, 1, -5, 42, 1, 1, 0xa39aab);
     for (const x of [-16, -8, 0, 8, 16]) {
       g.box(x - 2, 1, -2, 5, 5, 5, frame).box(x - 3, 5, -3, 7, 2, 7, fabric);
       g.box(x - 3, 6, -4, 7, 7, 2, fabric).box(x - 2, 13, -4, 5, 1, 2, piping);
-      g.box(x - 3, 7, 2, 7, 1, 2, piping).box(x - 4, 8, -4, 1, 2, 8, frame)
-        .box(x + 4, 8, -4, 1, 2, 8, frame);
-      g.set(x, 10, -5, 0xd39470);
+      g.box(x - 3, 7, 2, 7, 1, 2, piping).box(x - 4, 8, -4, 1, 2, 8, 0xc9c5cf)
+        .box(x + 4, 8, -4, 1, 2, 8, 0xc9c5cf);
+      g.box(x - 1, 10, -5, 3, 1, 1, 0xab94a9);
     }
     for (const x of [-21, 20]) g.set(x, 2, 4, 0xffa874);
   },
@@ -468,29 +477,45 @@ const MODELS: Record<string, (g: Grid) => void> = {
     for (let y = 10; y < 23; y++) g.set(-11, y, 1, y % 6 < 3 ? 0xf4e3d6 : 0xb75c75);
   },
   "csa-dj-booth": g => {
-    g.box(-11, 0, -4, 22, 2, 8, 0x19151f)
-      .box(-10, 2, -3, 20, 9, 6, 0x2c2439)
-      .box(-11, 11, -4, 22, 2, 8, 0x50435b)
-      .box(-10, 2, 3, 20, 8, 1, 0x3b2b46);
-    g.box(-10, 2, 4, 20, 1, 1, 0xff936e).box(-10, 9, 4, 20, 1, 1, 0xc471bb);
-    centeredText(g, "CSA", 4, 4, 0xf5d9d0);
+    g.box(-17, 0, -5, 34, 2, 10, 0x221b2b)
+      .box(-16, 2, -4, 32, 9, 8, 0x372c43)
+      .box(-17, 11, -5, 34, 2, 10, 0x675870)
+      .box(-16, 3, 4, 32, 7, 1, 0x302638);
+    for (const x of [-16, -11, 9, 13]) for (let dx = 0; dx < 3; dx++) {
+      g.box(x + dx, 3, 4, 1, 7, 1, dx % 2 ? 0x997284 : 0x4f3b51);
+    }
+    g.box(-16, 2, 5, 32, 1, 1, 0xf3ab88).box(-16, 10, 5, 32, 1, 1, 0xe999c5);
+    centeredText(g, "CSA", 4, 5, 0xffeee0);
     for (const x of [-6, 6]) {
       g.box(x - 3, 13, -3, 6, 1, 6, 0x222028);
       disc(g, x, 14, 0, 2.3, (i, j) => (i + j) % 3 ? 0x393443 : 0x5e5269);
       g.set(x, 14, 0, 0xf2a98e).set(x - 2, 14, -2, 0xffa877).set(x + 2, 14, -2, 0xb9a0ee);
+      g.box(x + 2, 14, 1, 1, 1, 2, 0x908398).set(x + 1, 14, 2, 0xdcbfac);
     }
     g.box(-2, 13, -3, 4, 1, 6, 0x18141e);
-    for (const x of [-2, 0, 1]) for (const z of [-2, 0, 2]) g.set(x, 14, z, z === -2 ? 0x80d5c5 : 0xf79dbc);
+    for (const x of [-2, -1, 0, 1]) g.set(x, 14, -2, 0x80d5c5).set(x, 14, 0, 0x786880).set(x, 14, 2, x % 2 ? 0xf79dbc : 0xbaa7ee);
+    g.box(6, 13, -4, 8, 1, 1, 0x22202b).box(5, 13, -5, 2, 1, 2, 0x22202b);
+    g.box(-16, 13, -4, 4, 2, 3, 0x434257).set(-14, 15, -3, 0x91f0d6).set(-13, 15, -3, 0xf7b388);
   },
   "csa-speaker": g => {
-    g.box(-4, 0, -3, 8, 19, 6, 0x29232e).box(-3, 1, 3, 6, 17, 1, 0x17141c);
-    for (const y of [5, 13]) {
-      for (let x = -3; x <= 3; x++) for (let dy = -3; dy <= 3; dy++) {
+    const ice = 0xece9e7, rim = 0xbab7c4, grille = 0xb8b6c1;
+    g.box(-11, 2, -7, 22, 47, 13, ice).box(-10, 0, -6, 20, 3, 10, rim)
+      .box(-9, 48, -6, 18, 3, 11, 0xfaf7f3).box(-7, 49, -5, 14, 2, 3, 0x706779)
+      .box(-9, 3, 6, 18, 44, 2, rim).box(-8, 4, 7, 16, 42, 2, grille);
+    for (const x of [-9, 8]) g.box(x, 5, 7, 1, 40, 1, 0xe0dfe5)
+      .box(x, 0, -8, 2, 7, 3, 0x696879).set(x, 3, -8, 0xf7a16d);
+    for (const [y, bands] of [[14, [0x9cece6, 0x88e7e5, 0xa9ec86, 0xf0e799]], [36, [0x8adfed, 0xaeb9fc, 0xf0afd9, 0xadf2de]]] as const) {
+      for (let x = -8; x <= 8; x++) for (let dy = -8; dy <= 8; dy++) {
         const r = x * x + dy * dy;
-        if (r <= 11) g.set(x, y + dy, 4, r > 7 ? 0x746284 : r <= 2 ? 0x726376 : 0x3d3547);
+        const sector = dy > 0 ? (x < 0 ? 0 : 1) : (x >= 0 ? 2 : 3);
+        if (r <= 70) g.set(x, y + dy, 8, r >= 46 ? bands[sector] : (x + dy) % 2 ? 0xaaa2b0 : 0x918c9c);
+        if (r <= 13) g.set(x, y + dy, 9, 0xaba2b4);
       }
     }
-    g.set(2, 17, 4, 0xe193ae);
+    g.box(-7, 22, 9, 14, 6, 1, 0xcfc3ca);
+    centeredText(g, "JBL", 23, 10, 0xcc6b5b);
+    g.box(-5, 50, -1, 10, 1, 3, 0xd1c7d2);
+    for (const x of [-4, 0, 4]) g.set(x, 51, 0, x === 0 ? 0xf49d6e : 0x8b8296);
   },
   plane,
   airstairs,

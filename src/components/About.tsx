@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { CHAPTERS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
-import { CSA_GUESTS } from "@/lib/journey/csaParty";
+import { CSA_GUESTS, csaActivityLabel } from "@/lib/journey/csaParty";
 import { LINKS } from "@/app/data";
 import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
 import ObjectPreview from "./ObjectPreview";
@@ -242,7 +242,7 @@ export default function About() {
         {opened?.kind === "party" && <>
           <p className="journey-eyebrow">Western University · Secret room</p>
           <h2 id="journey-dialog-title">CSA After Hours</h2>
-          <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}{guest.dj && <span>DJ</span>}</li>)}</ul>
+          <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}<span>{csaActivityLabel(guest)}</span></li>)}</ul>
           <div className="journey-links"><StoryLink link={CSA_DJ_LINK} /></div>
         </>}
         {opened?.kind === "finale" && <>

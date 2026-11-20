@@ -3,7 +3,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { Box3, Color, DataTexture, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, NearestMipmapLinearFilter, PerspectiveCamera, PlaneGeometry, Ray, Raycaster, RepeatWrapping, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
 import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
-import { CSA_GUESTS, makeCsaParty } from "@/lib/journey/csaParty";
+import { makeCsaParty } from "@/lib/journey/csaParty";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
@@ -958,7 +958,7 @@ export default function JourneyWorld(props: Props) {
         ))}
         <section>
           <h2>CSA After Hours</h2>
-          <p>A hidden auditorium behind the CSA poster. Rain Li DJs, Lucas Xue gives Jason Zhuang a haircut, and {CSA_GUESTS.filter(guest => guest.walk).map(guest => guest.name).join(", ")} walk around.</p>
+          <p>A hidden auditorium behind the CSA poster. Rain Li DJs under a disco ball, Lucas Xue gives Jason Zhuang a haircut, and the CSA team runs the floor.</p>
           <a href={CSA_DJ_LINK.href} target="_blank" rel="noopener noreferrer">{CSA_DJ_LINK.label} ↗</a>
         </section>
       </div>

@@ -916,6 +916,21 @@ test('sleep is reachable at the bedside and lies the avatar lengthwise above the
   assert.notEqual(sampleBedSleep(bed, start, 1, 3, false).y, sleep.y);
 });
 
+test('Richard can pass the bedside while the player sleeps, and blocks getting up until he clears it', () => {
+  const bed = dorm.items.find(item => item.id === 'ohall-bed');
+  const beside = { x: W.placementBox(bed).maxX + 4, z: bed.z + 2 };
+  const asleep = sampleBedSleep(bed, beside, 1, 0, true), radius = 3.5 * W.AVATAR_SCALE;
+  const walk = routine.beats.find(b => b.action === 'walk' && b.from.x === 38 && b.to.x === 38 && b.to.z === -41);
+  for (let time = walk.start; time < walk.end - 0.04; time += 0.04) {
+    const pose = R.sampleRoommate(routine, time);
+    if (R.advanceRoommate(routine, time, 0.04, beside, radius) !== time) continue;
+    assert.ok(R.advanceRoommate(routine, time, 0.04, asleep, radius) > time, 'the empty aisle no longer blocks Richard');
+    assert.ok(R.overlapsOnMove(asleep, beside, pose, R.roommateGap(radius)), 'waking waits while Richard is still in the way');
+    return;
+  }
+  assert.fail('Richard walks past the bedside');
+});
+
 test('the textured beige bedding drapes to both sides under a black throw with a tiny top-facing Capco stitch', () => {
   const bed = dorm.items.find(item => item.id === 'ohall-bed');
   const blanket = dorm.decor.find(p => p.model === 'western-bedding'), stitch = dorm.decor.find(p => p.model === 'capco-stitch');

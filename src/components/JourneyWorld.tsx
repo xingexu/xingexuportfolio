@@ -9,7 +9,7 @@ import { makeDormLighting } from "@/lib/journey/dormLighting";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
-import { advanceRoommate, planRoommatePush, sampleRoommate, stepRoommatePush, PUSH_GESTURE_TIME, ROOMMATE_RADIUS } from "@/lib/journey/roommate";
+import { advanceRoommate, overlapsOnMove, planRoommatePush, roommateCenter, roommateGap, sampleRoommate, stepRoommatePush, PUSH_GESTURE_TIME, ROOMMATE_RADIUS } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
 import { ageAt, blocked, buildBallField, buildCutawayShell, buildDoorLeaf, buildDormEntryDoor, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
@@ -588,7 +588,15 @@ export default function JourneyWorld(props: Props) {
     }
 
     function canSleep() {
-      return westernBed && chapter === WESTERN_INDEX && !volley && !pushGesture && jumpElapsed === null && bedsidePosition(westernBed, player);
+      return westernBed && chapter === WESTERN_INDEX && !volley && !pushGesture && jumpElapsed === null &&
+        bedsidePosition(westernBed, player) && bedTransferClear(player, false);
+    }
+
+    function bedTransferClear(beside: Vec, waking: boolean) {
+      const npc = room(chapter).roommate;
+      if (!westernBed || !npc) return true;
+      const inBed = sampleBedSleep(westernBed, beside, 1, 0, true);
+      return !overlapsOnMove(waking ? inBed : beside, waking ? beside : inBed, roommateCenter(npc.pose, npc.yaw), roommateGap(3.5 * AVATAR_SCALE));
     }
 
     function getPush(npc: RoommateView | undefined) {
@@ -803,8 +811,12 @@ export default function JourneyWorld(props: Props) {
         if (age !== player.age) { player.age = age; setAvatar(age, current.outfit); }
       }
       if (sleep && !blockedNow && !transition) {
-        const amount = motion.matches ? 1 : dt / BED_SLEEP_DURATION;
-        sleep.progress = sleep.waking ? Math.max(0, sleep.progress - amount) : Math.min(1, sleep.progress + amount);
+        const transferring = sleep.progress > 0 && sleep.progress < 1;
+        const starting = sleep.progress === (sleep.waking ? 1 : 0);
+        if (transferring || (starting && bedTransferClear(sleep.start, sleep.waking))) {
+          const amount = motion.matches ? 1 : dt / BED_SLEEP_DURATION;
+          sleep.progress = sleep.waking ? Math.max(0, sleep.progress - amount) : Math.min(1, sleep.progress + amount);
+        }
         if (sleep.waking && sleep.progress === 0) sleep = null;
       }
       const sleepPose = sleep && westernBed && !transition ? sampleBedSleep(westernBed, sleep.start, sleep.progress, time, motion.matches) : null;
@@ -840,14 +852,16 @@ export default function JourneyWorld(props: Props) {
         kickPose = Math.max(0, kickPose - dt);
         const npc = activeRoom.roommate;
         pushGesture = Math.max(0, pushGesture - dt);
-        if (npc) {
+        // Keep a clear mount or dismount path clear until the transfer finishes.
+        if (npc && (!sleep || sleep.progress === 0 || sleep.progress === 1)) {
           const radius = 3.5 * AVATAR_SCALE;
-          const time = npc.push || motion.matches ? npc.time : advanceRoommate(npc.routine, npc.time, dt, player, radius);
+          const occupant = sleepPose ?? player;
+          const time = npc.push || motion.matches ? npc.time : advanceRoommate(npc.routine, npc.time, dt, occupant, radius);
           if (npc.push || time !== npc.time) {
             const previous = npc.pose;
             npc.time = time;
             if (npc.push) {
-              const next = stepRoommatePush(npc.push, dt, motion.matches, player, radius, canRichardStep);
+              const next = stepRoommatePush(npc.push, dt, motion.matches, occupant, radius, canRichardStep);
               npc.push = next.state;
               npc.pose = next.pose;
             } else npc.pose = sampleRoommate(npc.routine, time);

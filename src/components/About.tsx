@@ -246,6 +246,7 @@ export default function About() {
             <li key={guest.name}>{guest.name}<span>{guest.role ? `${guest.role} · ` : ""}{csaActivityLabel(guest)}</span></li>
           )}</ul>
           <div className="journey-links"><StoryLink link={CSA_DJ_LINK} /></div>
+          <p className="journey-copy">Nuo Zhang and William Wang boulder on the right wall, following one color at a time.</p>
         </>}
         {opened?.kind === "finale" && <>
           <p className="journey-eyebrow">Age 18 · today</p>

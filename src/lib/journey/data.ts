@@ -151,7 +151,7 @@ const ROOMS: Chapter[] = [
       { id: "volleyball", model: "volleyball", x: -17, z: 17, ball: "mikasa", label: "Mikasa volleyball", title: "Mikasa volleyball",
         description: "I started playing in high school. Press R or tap Spike near the ball.",
         links: [{ href: LINKS.volleyball, label: "Follow @ziggyvb" }] },
-      { id: "laptop", model: "macbook", x: 25, z: 6, y: 12, rot: 3, solid: false, label: "MacBook · competitive programming", title: "Competitive programming",
+      { id: "laptop", model: "macbook", x: 25, z: 6, y: 12, rot: 3, solid: false, label: "Laptop · competitive programming", title: "Competitive programming",
         description: "I practiced for the Canadian Computing Competition and solved LeetCode problems.",
         links: [gh("leetcode", "My LeetCode solutions"), gh("CCC", "My CCC practice")] },
       { id: "aime", model: "plaque-aime", x: 35, z: -28, y: 13, rot: 3, solid: false, label: "AIME qualifier · 2024 & 2025", title: "American Invitational Mathematics Examination",

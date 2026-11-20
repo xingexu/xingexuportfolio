@@ -28,9 +28,10 @@ const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
 const { CSA_GUESTS, buildCsaDiscoBall, buildCsaGuest, csaActivityLabel, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
+const { BOULDER_CYCLE, BOULDER_LANES, BOULDER_TOP_TIME, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, buildBoulderingWall, sampleBouldering } = load('src/lib/journey/csaClimb.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
-const { Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
+const { Box3, Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
 
 test('every item is written out, linked properly and has a model', () => {
   const ids = new Set();
@@ -979,7 +980,7 @@ test('the original guests, execs, and pictured advisors have space for their act
     'Jason Zhuang', 'Rain Li', 'Amelie Hu', 'Lydia Zheng', 'Daniel Su', 'Lucas Xue', 'Jeffrey Ban', 'William Wang',
     'Kevin Li', 'Selina Lim', 'Gloria Huang', 'Cassidy Lee', 'Jessica Zhang', 'Callista Chan', 'Michael Tan',
     'Harry Yang', 'Sarah Gao', 'Melissa Zhang', 'Tanya Mai', 'Ava Cheh', 'Aleena Liu', 'Kate Chen', 'Ray Shen',
-    'Luca Fukuyo', 'Vincent Zheng', 'Tony Zhang', 'Jiayi Hong', 'Austin Sun', 'Tiffany Zhao', 'Zong Xie',
+    'Luca Fukuyo', 'Vincent Zheng', 'Tony Zhang', 'Jiayi Hong', 'Austin Sun', 'Tiffany Zhao', 'Zong Xie', 'Nuo Zhang',
   ]);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.role === 'President').map(guest => guest.name), ['Selina Lim', 'Gloria Huang']);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.role === 'Senior advisor').map(guest => guest.name), [
@@ -989,7 +990,8 @@ test('the original guests, execs, and pictured advisors have space for their act
   assert.ok(CSA_GUESTS.find(guest => guest.name === 'Lydia Zheng').scale < 0.82);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.dj).map(guest => guest.name), ['Rain Li']);
   const walkers = CSA_GUESTS.map((guest, i) => ({ guest, i })).filter(({ guest }) => guest.walk);
-  assert.equal(walkers.length, 27);
+  assert.equal(walkers.length, 26);
+  assert.deepEqual(CSA_GUESTS.filter(guest => csaActivityLabel(guest) === 'Boulders').map(guest => guest.name).sort(), [...CLIMBER_NAMES].sort());
   assert.equal(new Set(walkers.map(({ guest }) => csaActivityLabel(guest))).size, 9);
   assert.equal(CSA_GUESTS.find(guest => guest.name === 'Kevin Li').activity, 'tablet');
   for (const [i, guest] of CSA_GUESTS.entries()) {
@@ -1061,7 +1063,7 @@ test('reference-based hairstyles have distinct silhouettes', () => {
   assert.ok(head.has(-12, 8, 0) && head.has(11, 8, 0) && head.has(0, 27, 0), 'padded ear cups and arched band');
 });
 
-test('the DJ console holds a mixing-screen MacBook and is flanked by white twin-ring towers', () => {
+test('the DJ console holds a mixing-screen laptop and is flanked by white twin-ring towers', () => {
   const stage = JOURNEY_ROOMS[CSA_ROOM_INDEX].decor;
   const laptop = stage.find(prop => prop.model === 'csa-dj-macbook');
   const table = W.placementBox(stage.find(prop => prop.model === 'csa-dj-booth'));
@@ -1076,6 +1078,16 @@ test('the DJ console holds a mixing-screen MacBook and is flanked by white twin-
   assert.equal(speaker.get(-10, 22, 2), 0xece9e7, 'white shell');
   assert.equal(speaker.get(0, 22, 8), 0x88e7e5, 'lower light ring');
   assert.equal(speaker.get(0, 44, 8), 0xaeb9fc, 'upper light ring');
+});
+
+test('neither laptop has MacBook lettering on its chassis or object label', () => {
+  const school = ALL_ITEMS.find(item => item.id === 'laptop');
+  const dj = JOURNEY_ROOMS[CSA_ROOM_INDEX].decor.find(prop => prop.model === 'csa-dj-macbook');
+  assert.doesNotMatch(school.label, /macbook/i);
+  for (const { model } of [school, dj]) {
+    const laptop = buildModel(model);
+    laptop.forEach((_x, _y, z) => assert.ok(z < 12, 'no lettering protrudes from the front lip'));
+  }
 });
 
 test('Lucas wears black athletic shorts and Daniel has a swept side part, both with the CSA tee', () => {
@@ -1157,6 +1169,80 @@ test('Lucas keeps the moving clippers near Jason’s low fade', t => {
     assert.ok(tip.distanceTo(head.getWorldPosition(new Vector3())) < 6.1);
     assert.ok(Math.abs(tip.x - CSA_BARBER_CHAIR.x) < 2);
   }
+});
+
+test('the vertical wall has four single-color routes above a shared crash mat', () => {
+  const { grid, holds, mat } = buildBoulderingWall();
+  const wallX = grid.bounds().minX;
+  assert.equal(wallX, grid.bounds().maxX, 'wall has no overhang');
+  assert.equal(new Set(BOULDER_LANES.flatMap(lane => lane.courses.map(course => course.color))).size, 4);
+  for (const lane of BOULDER_LANES) for (const course of lane.courses) {
+    const start = sampleBouldering(lane, course, 0, false), top = sampleBouldering(lane, course, BOULDER_TOP_TIME, false);
+    assert.ok(top.hips.y > start.hips.y + 18);
+    assert.equal(top.hips.z, start.hips.z, 'climbs in its own lane');
+    assert.deepEqual(sampleBouldering(lane, course, BOULDER_CYCLE, false), start, 'descends to the mat before another route');
+    assert.deepEqual(sampleBouldering(lane, course, 0, true), sampleBouldering(lane, course, 60, true));
+    for (const { x, y, z } of [start.grip[1], start.grip[3]]) {
+      assert.equal(y, (mat.bounds().maxY + 1) * MAT_VOXEL_HEIGHT);
+      assert.ok(mat.has(Math.floor(x), 2, Math.floor(z)));
+    }
+    const rocks = course.holds.flat();
+    for (const { x, y, z } of rocks) {
+      assert.equal(holds.get(Math.floor(x * 2), Math.floor(y * 2), Math.floor(z * 2)), course.color);
+    }
+    for (let time = 0; time <= BOULDER_TOP_TIME; time += 0.041) {
+      const { grip } = sampleBouldering(lane, course, time, false);
+      const moving = grip.filter(point => !rocks.some(({ x, y, z }) =>
+        Math.hypot(x - point.x, y - point.y, z - point.z) < 1e-6));
+      if (time > 3) assert.ok(moving.length <= 1, 'at least three limbs stay on their selected color');
+      assert.ok(grip.every(point => point.x < wallX));
+    }
+  }
+});
+
+test('both climbers reach their randomly selected holds without intersecting each other', t => {
+  const oldDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });
+  let draws = 0;
+  const material = new MeshBasicMaterial({ vertexColors: true });
+  const party = makeCsaParty(material, material, () => draws++ < 2 ? 0 : 0.99);
+  t.after(() => { party.dispose(); material.dispose(); });
+  const viewer = { x: 77, z: 0 };
+  const climbers = CLIMBER_NAMES.map(name => {
+    const avatar = party.group.getObjectByName(name);
+    const limbs = ['Left forearm', 'Left climbing shoe', 'Right forearm', 'Right climbing shoe'].map(name => avatar.getObjectByName(name));
+    limbs.forEach(limb => limb.geometry.computeBoundingBox());
+    return { avatar, limbs };
+  });
+  const bounds = [new Box3(), new Box3()];
+  const wallX = buildBoulderingWall().grid.bounds().minX;
+  const dt = BOULDER_CYCLE / 250;
+  for (let frame = 0; frame < 500; frame++) {
+    const time = frame * dt;
+    party.update(frame ? dt : 0, false, viewer);
+    climbers.forEach(({ avatar, limbs }, index) => {
+      const lane = BOULDER_LANES[index], elapsed = Math.max(0, time - lane.delay);
+      const course = lane.courses[Number(elapsed >= BOULDER_CYCLE)];
+      const pose = sampleBouldering(lane, course, elapsed % BOULDER_CYCLE, false);
+      assert.ok(Math.abs(avatar.position.y - pose.hips.y) < 1e-6 && avatar.children[0].rotation.x === 0);
+      limbs.forEach((limb, slot) => {
+        const { x, y, z } = pose.grip[slot];
+        const box = limb.geometry.boundingBox;
+        const tip = limb.localToWorld(slot % 2
+          ? new Vector3(0, box.min.y, box.max.z - AVATAR_VOXEL_SIZE / 2)
+          : new Vector3(0, box.min.y + AVATAR_VOXEL_SIZE, 0));
+        const distance = tip.distanceTo(new Vector3(x, y, z));
+        assert.ok(distance < 0.8, `${avatar.name} ${limb.name} misses its grip by ${distance.toFixed(2)} at ${time.toFixed(2)} s`);
+      });
+      bounds[index].setFromObject(avatar, true);
+      assert.ok(bounds[index].max.x <= wallX, `${avatar.name} clips the wall at ${time.toFixed(2)} s (x=${bounds[index].max.x.toFixed(2)})`);
+    });
+    assert.ok(!bounds[0].intersectsBox(bounds[1]), 'all rendered limbs stay in their own lane');
+  }
+  assert.equal(draws, 4, 'each climber reselects once while on the mat');
+  assert.equal(party.group.getObjectByName('Bouldering crash mat').scale.y, MAT_VOXEL_HEIGHT);
+  assert.ok(!W.blocked(CSA_ROOM_INDEX, viewer.x, viewer.z, 2));
 });
 
 test('the floating arrows mark the walkable aisle from every spawn to its exit', () => {

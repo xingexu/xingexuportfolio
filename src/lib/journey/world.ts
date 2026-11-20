@@ -323,14 +323,16 @@ function floorColor(chapter: Chapter, x: number, z: number): Color {
         if (line) c = 0x2a5db0; else if (attack) c = 0xd9534f;
       }
       const grain = hash3(x, 16, Math.floor(z / 4));
-      return shade(c, (0.94 + n * 0.04 + grain * 0.07) * (chapter.id === "western" ? 0.49 + 0.19 * Math.max(0, 1 - Math.hypot(x - 32, z + 12) / 36) : 1));
+      return shade(c, 0.94 + n * 0.04 + grain * 0.07);
     }
     case "tile": {
       if ((x + 512) % 8 === 0 || (z + 512) % 8 === 0) return 0xc9c1ad;
       const checker = (Math.floor((x + 512) / 8) + Math.floor((z + 512) / 8)) % 2;
       return n > 0.93 ? 0x9f9886 : checker ? 0xece6d6 : 0xd8d0bc;
     }
-    case "carpet": return shade(0x8d9aa8, 0.85 + n * 0.16 + ((x + z) % 2 === 0 ? 0.045 : 0));
+    case "carpet": return chapter.id === "western"
+      ? shade(0x918779, 0.94 + n * 0.12)
+      : shade(0x8d9aa8, 0.85 + n * 0.16 + ((x + z) % 2 === 0 ? 0.045 : 0));
     case "tarmac": {
       if (Math.abs(x) > chapter.width / 2 + 2) return shade(0x6aa84f, 0.92 + n * 0.14);
       if ((x === 0 || x === -1) && z > -chapter.depth / 2) return 0xf2c230;
@@ -349,7 +351,7 @@ const WINDOWS: Record<string, { side: "front" | "left" | "right"; center: number
   school: [{ side: "left", center: 0, width: 28, y: 18, height: 15, sky: 0xb5d7ea, ground: 0x718c63 }],
   elm: [{ side: "front", center: 20, width: 16, y: 19, height: 16, sky: 0xffd7ac, ground: 0x715e79 }],
   bayview: [-22, 22].map(center => ({ side: "front", center, width: 17, y: 25, height: 10, sky: 0xc4dfed, ground: 0x7c9ab3 })),
-  western: [{ side: "right", center: -16, width: 25, y: 17, height: 11, sky: 0x4f618e, ground: 0x333a56 }],
+  western: [-36, 35].map(center => ({ side: "right", center, width: 26, y: 15, height: 14, sky: 0x39445d, ground: 0x252a38 })),
 };
 
 function addWindow(grid: Grid, bounds: Box, chapter: Chapter, spec: (typeof WINDOWS)[string][number]) {
@@ -373,7 +375,15 @@ function addWindow(grid: Grid, bounds: Box, chapter: Chapter, spec: (typeof WIND
     paint(x, -1, depth, shade(chapter.trim, depth === 2 ? 1.22 : 1.14));
     paint(x, height, depth, shade(chapter.trim, depth === 2 ? 0.81 : 0.93));
   }
-  if (chapter.floor === "wood" || chapter.floor === "carpet" || chapter.id === "western") {
+  if (chapter.id === "western") {
+    for (let x = -2; x <= width + 1; x++) paint(x, height + 2, 2, 0x9d9486);
+    const panelWidth = center > 0 ? 12 : 7;
+    for (let x = -1; x <= width; x++) {
+      if (x >= panelWidth && x < width - panelWidth) continue;
+      const fold = ((x + 4) % 3) === 0;
+      for (let y = -2; y <= height + 1; y++) paint(x, y, 2, shade(0xcdb99d, fold ? 0.94 : 1.06));
+    }
+  } else if (chapter.floor === "wood" || chapter.floor === "carpet") {
     for (let x = 0; x < width; x++) {
       paint(x, height - 2, 2, shade(chapter.trim, 1.08));
       paint(x, height - 4, 2, shade(chapter.trim, 0.94));
@@ -383,7 +393,7 @@ function addWindow(grid: Grid, bounds: Box, chapter: Chapter, spec: (typeof WIND
 }
 
 function addInteriorTrim(g: Grid, room: Box, chapter: Chapter) {
-  const dark = chapter.id === "western";
+  if (chapter.id === "western") return;
   for (const side of ["left", "right", "front", "back"] as const) {
     const acrossX = side === "front" || side === "back";
     const start = acrossX ? room.minX : room.minZ, end = acrossX ? room.maxX : room.maxZ;
@@ -412,7 +422,6 @@ function addInteriorTrim(g: Grid, room: Box, chapter: Chapter) {
           paint(at, 34, 1, fixture === 0 || fixture === 8 ? 0x414752 : 0xe5ddbd);
         }
       }
-      if (dark && side === "right" && at > -34 && at < 11) paint(at, 3, 0, 0x574282);
     }
   }
 }
@@ -462,6 +471,10 @@ export function buildRoomShell(index: number): Grid {
   }
   const wallColor = (x: number, y: number, z: number) => {
     const n = hash3(x, y, z);
+    if (chapter.id === "western") {
+      const color = z >= nearZ && x < -DOOR_HALF ? 0xd8e3e0 : chapter.wall;
+      return shade(color, y >= WALL_HEIGHT - 4 ? 0.93 : 0.98 + 0.035 * n);
+    }
     if (y < 2) return chapter.trim;
     if (y === WALL_HEIGHT - 1) return shade(chapter.trim, 0.9);
     if (!chapter.outdoor) {

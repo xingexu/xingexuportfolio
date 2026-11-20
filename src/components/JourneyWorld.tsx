@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { Box3, Color, DataTexture, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, NearestMipmapLinearFilter, PerspectiveCamera, PlaneGeometry, Ray, Raycaster, RepeatWrapping, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
-import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
+import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
 import { makeCsaParty } from "@/lib/journey/csaParty";
+import { makeDormLighting } from "@/lib/journey/dormLighting";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
@@ -16,6 +17,7 @@ import { Grid, hash3 } from "@/lib/journey/voxel";
 export type JourneyControls = {
   setStick: (x: number, y: number) => void;
   interact: () => void;
+  toggleDormLamps: () => void;
   jump: () => void;
   volley: () => void;
   goTo: (index: number) => void;
@@ -26,7 +28,7 @@ export type JourneyControls = {
   toggleCamera: (mode: keyof CameraMode) => void;
 };
 export type CameraMode = { front: boolean; tilt: boolean };
-export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; csaDjNearby?: boolean };
+export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; csaDjNearby?: boolean; dormLampsOn?: boolean };
 export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" | "portal" };
 type Props = {
   controls: RefObject<JourneyControls | null>;
@@ -131,7 +133,7 @@ export default function JourneyWorld(props: Props) {
     type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
     type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty> };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty>; dormLighting?: ReturnType<typeof makeDormLighting> };
     const rooms = new Map<number, RoomView>();
     function setOpacity(material: MeshBasicMaterial, opacity: number) {
       material.opacity = opacity;
@@ -148,6 +150,7 @@ export default function JourneyWorld(props: Props) {
       if (cached) return cached;
       const chapter = JOURNEY_ROOMS[index], group = new Group(), items = new Map<string, ItemView>(), pickables: Object3D[] = [];
       const isParty = index === CSA_ROOM_INDEX;
+      const dormLighting = index === WESTERN_INDEX ? makeDormLighting(modelGeometry) : undefined;
       const wall = (): WallView => ({ group: new Group(), material: baseMaterial.clone() });
       const walls = { left: wall(), right: wall(), front: wall(), back: wall() };
       const shell = buildCutawayShell(index), bounds = interior(chapter);
@@ -183,6 +186,7 @@ export default function JourneyWorld(props: Props) {
         if (glass) (holder.children[1] as Mesh).material = glass;
         const bounds = new Box3().setFromObject(holder);
         if (!bounds.isEmpty()) bounds.expandByScalar(1);
+        dormLighting?.add(p.model, holder);
         const wall = wallFor(p);
         const prop = { holder, bounds, material, glass, wall, visibility: 1 };
         props.push(prop);
@@ -255,7 +259,7 @@ export default function JourneyWorld(props: Props) {
         walls.front.group.add(party.stageWall);
         pickables.push(...party.djPickables);
       }
-      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party };
+      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party, dormLighting };
       rooms.set(index, view);
       return view;
     }
@@ -559,8 +563,17 @@ export default function JourneyWorld(props: Props) {
 
     function interact() {
       if (transition || intro || live.current.blocked) return;
-      if (nearby) live.current.onOpen(nearby);
+      if (nearby) activateItem(nearby);
       else if (room(chapter).party?.nearDj(player)) openCsaDj();
+    }
+
+    function toggleDormLamps() {
+      if (chapter === WESTERN_INDEX && !transition && !intro) room(chapter).dormLighting?.toggle();
+    }
+
+    function activateItem(id: string) {
+      if (id === WESTERN_LIGHT_SWITCH_ID) toggleDormLamps();
+      else live.current.onOpen(id);
     }
 
     function openCsaDj() { window.open(CSA_DJ_LINK.href, "_blank", "noopener,noreferrer"); }
@@ -575,6 +588,7 @@ export default function JourneyWorld(props: Props) {
     const control: JourneyControls = {
       setStick: (x, y) => { stick.x = x; stick.y = y; },
       interact,
+      toggleDormLamps,
       jump,
       volley: playVolley,
       goTo: index => { if (index < CHAPTERS.length && (index !== chapter || intro)) startTransition(index, "jump"); },
@@ -671,7 +685,7 @@ export default function JourneyWorld(props: Props) {
         setPointer(event);
         const hit = pick();
         if (hit?.userData.csaDj) openCsaDj();
-        else if (hit?.userData.itemId) live.current.onOpen(hit.userData.itemId);
+        else if (hit?.userData.itemId) activateItem(hit.userData.itemId);
       }
     }
     function onPointerLeave() { pointerInside = false; hovered = null; tooltip.hidden = true; region.style.cursor = ""; }
@@ -890,8 +904,9 @@ export default function JourneyWorld(props: Props) {
         item.marker.scale.setScalar(0.65);
       }
       const csaDjNearby = activeRoom.party?.nearDj(player);
-      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}|${csaDjNearby ?? ""}`;
-      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action, csaDjNearby }); }
+      const dormLampsOn = activeRoom.dormLighting?.enabled;
+      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}|${csaDjNearby ?? ""}|${dormLampsOn ?? ""}`;
+      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action, csaDjNearby, dormLampsOn }); }
 
       renderer.render(scene, camera);
       // Show the avatar through foreground props without drawing it solidly in front of them.
@@ -925,6 +940,7 @@ export default function JourneyWorld(props: Props) {
         r.items.forEach(i => i.markerMaterial.dispose());
         Object.values(r.walls).forEach(wall => wall.material.dispose());
         r.party?.dispose();
+        r.dormLighting?.dispose();
       });
       shadow.material.dispose();
       grass.material.dispose();

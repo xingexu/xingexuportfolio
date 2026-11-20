@@ -20,13 +20,14 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(req, result, result.exports);
   return result.exports;
 }
-const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
+const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID } = load('src/lib/journey/data.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
+const { makeDormLighting } = load('src/lib/journey/dormLighting.ts');
 const { CSA_GUESTS, buildCsaDiscoBall, buildCsaGuest, csaActivityLabel, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { BOULDER_CYCLE, BOULDER_LANES, BOULDER_TOP_TIME, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, buildBoulderingWall, sampleBouldering } = load('src/lib/journey/csaClimb.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
@@ -816,15 +817,74 @@ test('each desk is by its own bed, with the fridge and closet next to the player
   for (const gap of [fridge.minX - mine.maxX, mine.minX - closet.maxX]) assert.ok(gap >= 7 && gap <= 15);
 });
 
-test('the tall Western closet has hanging clothes and four stocked pantry tiers', () => {
+test('the Western wardrobes have closed wooden doors over drawers', () => {
   const closet = buildModel('closet'), size = modelFootprint('closet');
   assert.ok(size.maxX - size.minX >= 44 && size.height >= 30);
-  for (const y of [2, 10, 17, 25]) {
-    let stocked = 0;
-    for (let x = 5; x < 22; x++) for (let z = 1; z <= 5; z++) if (closet.has(x, y, z)) stocked++;
-    assert.ok(stocked >= 12, `snack tier at ${y}`);
+  for (const x of [-23, 1]) {
+    for (const door of [x + 1, x + 11]) {
+      for (let col = door; col < door + 9; col++) assert.ok(closet.has(col, 20, 7), 'door face is closed');
+      assert.ok(closet.has(door + (door === x + 1 ? 7 : 1), 19, 8), 'door has a pull');
+    }
+    for (const y of [2, 6]) assert.ok(closet.has(x + 10, y, 8), 'drawer has a pull');
   }
-  assert.ok(closet.has(-20, 20, 2) && !closet.has(-20, 20, 6), 'the hanging bay is open');
+});
+
+test('Western has light walls, warm carpet, curtained windows, and a clear entry switch', () => {
+  const room = CHAPTERS[WESTERN_INDEX], bounds = W.interior(room);
+  const { fixed, walls } = W.buildCutawayShell(WESTERN_INDEX);
+  const rgb = c => [c >> 16, (c >> 8) & 255, c & 255];
+  assert.equal(room.floor, 'carpet');
+  assert.ok(rgb(walls.left.get(bounds.minX - 1, 23, 0)).every(channel => channel > 215));
+  const [r, g, b] = rgb(fixed.get(0, -1, 0));
+  assert.ok(r > g && g > b && b >= 108 && r < 165, 'warm gray floor');
+  for (const z of [-46, 25]) {
+    const [red, green, blue] = rgb(walls.right.get(bounds.maxX - 3, 22, z));
+    assert.ok(red > green && green > blue && blue > 130, 'beige curtain stays with the cutaway wall');
+  }
+  assert.equal(room.decor.filter(prop => prop.model === 'dorm-chair').length, 2);
+  const bed = W.placementBox(room.items.find(item => item.id === 'richards-bed'));
+  assert.ok(room.roommate.x >= bed.minX && room.roommate.x <= bed.maxX &&
+    room.roommate.z >= bed.minZ && room.roommate.z <= bed.maxZ, 'Richard starts on his own bed');
+  const sw = room.items.find(item => item.id === WESTERN_LIGHT_SWITCH_ID);
+  assert.equal(sw.solid, false);
+  assert.ok(reachable(WESTERN_INDEX, W.spawn(WESTERN_INDEX, 'forward')).some(point =>
+    Math.hypot(point.x, point.z - bounds.maxZ + 7) < 12 && W.nearestItem(WESTERN_INDEX, point)?.id === sw.id
+  ), 'the switch is the primary interaction beside the entry');
+});
+
+test('the dorm switch only changes the two desk lamps, light pools, and its own rocker', () => {
+  const geometries = new Map();
+  const geometry = model => {
+    if (!geometries.has(model)) geometries.set(model, gridGeometry(buildModel(model)));
+    return geometries.get(model);
+  };
+  const lighting = makeDormLighting(geometry);
+  const room = CHAPTERS[WESTERN_INDEX], models = [...room.items, ...room.decor].map(p => p.model);
+  const fixtures = ['dorm-light-switch', 'desk-lamp'];
+  const entries = [...fixtures.flatMap(model => models.filter(m => m === model)), 'standing-desk', 'monitor'].map(model => {
+    const holder = new Group(), mesh = new Mesh(geometry(model));
+    holder.add(mesh);
+    lighting.add(model, holder);
+    return { model, mesh, pool: holder.children[1] };
+  });
+  const check = enabled => {
+    assert.equal(lighting.enabled, enabled);
+    for (const { model, mesh, pool } of entries) {
+      assert.equal(mesh.geometry, geometry(model === 'desk-lamp' && !enabled ? 'desk-lamp-off' :
+        model === 'dorm-light-switch' && enabled ? 'dorm-light-switch-on' : model), model);
+      assert.equal(mesh.visible, true, 'fixture itself remains visible');
+      if (model === 'desk-lamp') assert.equal(pool.visible, enabled);
+      else assert.equal(pool, undefined);
+    }
+  };
+  assert.equal(entries.filter(({ pool }) => pool).length, 2);
+  check(false);
+  lighting.toggle();
+  check(true);
+  lighting.toggle();
+  check(false);
+  lighting.dispose();
+  for (const g of geometries.values()) g.dispose();
 });
 
 test('the story runs from age 7 to 18 with the requested outfits', () => {

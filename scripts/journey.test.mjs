@@ -20,7 +20,7 @@ function load(file) {
   new Function('require', 'module', 'exports', js)(req, result, result.exports);
   return result.exports;
 }
-const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, WESTERN_INDEX } = load('src/lib/journey/data.ts');
+const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, CSA_STAGE_Z, JOURNEY_ROOMS, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID } = load('src/lib/journey/data.ts');
 const { roomFromUrl, roomPath } = load('src/lib/journey/navigation.ts');
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
@@ -28,10 +28,12 @@ const W = load('src/lib/journey/world.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
-const { CSA_GUESTS, buildCsaGuest, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
+const { makeDormLighting } = load('src/lib/journey/dormLighting.ts');
+const { CSA_GUESTS, buildCsaDiscoBall, buildCsaGuest, csaActivityLabel, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
+const { BOULDER_CYCLE, BOULDER_LANES, BOULDER_TOP_TIME, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, buildBoulderingWall, sampleBouldering } = load('src/lib/journey/csaClimb.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
-const { Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
+const { Box3, Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
 
 test('each journey room can be restored at its normal entrance from the About URL', () => {
   const about = 'https://xinge.ca/about';
@@ -837,15 +839,74 @@ test('each desk is by its own bed, with the fridge and closet next to the player
   for (const gap of [fridge.minX - mine.maxX, mine.minX - closet.maxX]) assert.ok(gap >= 7 && gap <= 15);
 });
 
-test('the tall Western closet has hanging clothes and four stocked pantry tiers', () => {
+test('the Western wardrobes have closed wooden doors over drawers', () => {
   const closet = buildModel('closet'), size = modelFootprint('closet');
   assert.ok(size.maxX - size.minX >= 44 && size.height >= 30);
-  for (const y of [2, 10, 17, 25]) {
-    let stocked = 0;
-    for (let x = 5; x < 22; x++) for (let z = 1; z <= 5; z++) if (closet.has(x, y, z)) stocked++;
-    assert.ok(stocked >= 12, `snack tier at ${y}`);
+  for (const x of [-23, 1]) {
+    for (const door of [x + 1, x + 11]) {
+      for (let col = door; col < door + 9; col++) assert.ok(closet.has(col, 20, 7), 'door face is closed');
+      assert.ok(closet.has(door + (door === x + 1 ? 7 : 1), 19, 8), 'door has a pull');
+    }
+    for (const y of [2, 6]) assert.ok(closet.has(x + 10, y, 8), 'drawer has a pull');
   }
-  assert.ok(closet.has(-20, 20, 2) && !closet.has(-20, 20, 6), 'the hanging bay is open');
+});
+
+test('Western has light walls, warm carpet, curtained windows, and a clear entry switch', () => {
+  const room = CHAPTERS[WESTERN_INDEX], bounds = W.interior(room);
+  const { fixed, walls } = W.buildCutawayShell(WESTERN_INDEX);
+  const rgb = c => [c >> 16, (c >> 8) & 255, c & 255];
+  assert.equal(room.floor, 'carpet');
+  assert.ok(rgb(walls.left.get(bounds.minX - 1, 23, 0)).every(channel => channel > 215));
+  const [r, g, b] = rgb(fixed.get(0, -1, 0));
+  assert.ok(r > g && g > b && b >= 108 && r < 165, 'warm gray floor');
+  for (const z of [-46, 25]) {
+    const [red, green, blue] = rgb(walls.right.get(bounds.maxX - 3, 22, z));
+    assert.ok(red > green && green > blue && blue > 130, 'beige curtain stays with the cutaway wall');
+  }
+  assert.equal(room.decor.filter(prop => prop.model === 'dorm-chair').length, 2);
+  const bed = W.placementBox(room.items.find(item => item.id === 'richards-bed'));
+  assert.ok(room.roommate.x >= bed.minX && room.roommate.x <= bed.maxX &&
+    room.roommate.z >= bed.minZ && room.roommate.z <= bed.maxZ, 'Richard starts on his own bed');
+  const sw = room.items.find(item => item.id === WESTERN_LIGHT_SWITCH_ID);
+  assert.equal(sw.solid, false);
+  assert.ok(reachable(WESTERN_INDEX, W.spawn(WESTERN_INDEX, 'forward')).some(point =>
+    Math.hypot(point.x, point.z - bounds.maxZ + 7) < 12 && W.nearestItem(WESTERN_INDEX, point)?.id === sw.id
+  ), 'the switch is the primary interaction beside the entry');
+});
+
+test('the dorm switch only changes the two desk lamps, light pools, and its own rocker', () => {
+  const geometries = new Map();
+  const geometry = model => {
+    if (!geometries.has(model)) geometries.set(model, gridGeometry(buildModel(model)));
+    return geometries.get(model);
+  };
+  const lighting = makeDormLighting(geometry);
+  const room = CHAPTERS[WESTERN_INDEX], models = [...room.items, ...room.decor].map(p => p.model);
+  const fixtures = ['dorm-light-switch', 'desk-lamp'];
+  const entries = [...fixtures.flatMap(model => models.filter(m => m === model)), 'standing-desk', 'monitor'].map(model => {
+    const holder = new Group(), mesh = new Mesh(geometry(model));
+    holder.add(mesh);
+    lighting.add(model, holder);
+    return { model, mesh, pool: holder.children[1] };
+  });
+  const check = enabled => {
+    assert.equal(lighting.enabled, enabled);
+    for (const { model, mesh, pool } of entries) {
+      assert.equal(mesh.geometry, geometry(model === 'desk-lamp' && !enabled ? 'desk-lamp-off' :
+        model === 'dorm-light-switch' && enabled ? 'dorm-light-switch-on' : model), model);
+      assert.equal(mesh.visible, true, 'fixture itself remains visible');
+      if (model === 'desk-lamp') assert.equal(pool.visible, enabled);
+      else assert.equal(pool, undefined);
+    }
+  };
+  assert.equal(entries.filter(({ pool }) => pool).length, 2);
+  check(false);
+  lighting.toggle();
+  check(true);
+  lighting.toggle();
+  check(false);
+  lighting.dispose();
+  for (const g of geometries.values()) g.dispose();
 });
 
 test('the story runs from age 7 to 18 with the requested outfits', () => {
@@ -977,6 +1038,8 @@ test('the auditorium has three rows, a clear center aisle, barber furniture, and
   assert.equal(buildModel(logo.model).size, buildModel('poster-csa').size);
   const rows = hall.decor.filter(prop => prop.model === 'csa-seat-row');
   assert.deepEqual([...new Set(rows.map(({ z }) => z))], [40, 55, 70]);
+  assert.equal(buildModel('csa-seat-row').get(0, 6, 0), 0xf5f0ec, 'white cushions');
+  assert.equal(buildModel('csa-seat-row').get(0, 13, -3), 0xfffcf5, 'white seat backs');
   for (const row of rows) {
     assert.equal(row.rot, 2, 'seats face the stage');
     assert.ok(W.blocked(CSA_ROOM_INDEX, row.x, row.z, radius));
@@ -994,26 +1057,42 @@ test('the auditorium has three rows, a clear center aisle, barber furniture, and
   }
 });
 
-test('the five walkers face their movement and clear seats, stage, and one another', () => {
+test('the original guests and all listed execs have activities and clear one another', () => {
   assert.deepEqual(CSA_GUESTS.map(guest => guest.name), [
     'Jason Zhuang', 'Rain Li', 'Amelie Hu', 'Lydia Zheng', 'Daniel Su', 'Lucas Xue', 'Jeffrey Ban', 'William Wang',
+    'Kevin Li', 'Selina Lim', 'Gloria Huang', 'Cassidy Lee', 'Jessica Zhang', 'Callista Chan', 'Michael Tan',
+    'Harry Yang', 'Sarah Gao', 'Melissa Zhang', 'Tanya Mai', 'Ava Cheh', 'Aleena Liu', 'Kate Chen', 'Ray Shen', 'Nuo Zhang',
   ]);
-  assert.deepEqual(CSA_GUESTS.filter(guest => guest.scale < 1).map(guest => guest.name), ['Amelie Hu', 'Lydia Zheng']);
+  assert.ok(CSA_GUESTS.find(guest => guest.name === 'Amelie Hu').scale < 0.85);
+  assert.ok(CSA_GUESTS.find(guest => guest.name === 'Lydia Zheng').scale < 0.82);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.dj).map(guest => guest.name), ['Rain Li']);
   const walkers = CSA_GUESTS.map((guest, i) => ({ guest, i })).filter(({ guest }) => guest.walk);
-  assert.equal(walkers.length, 5);
+  assert.equal(walkers.length, 19);
+  assert.deepEqual(CSA_GUESTS.filter(guest => csaActivityLabel(guest) === 'Boulders').map(guest => guest.name).sort(), [...CLIMBER_NAMES].sort());
+  assert.equal(new Set(walkers.map(({ guest }) => csaActivityLabel(guest))).size, 9);
+  assert.equal(CSA_GUESTS.find(guest => guest.name === 'Kevin Li').activity, 'tablet');
   for (const [i, guest] of CSA_GUESTS.entries()) {
     assert.deepEqual(sampleCsaGuest(guest, i, 0, true), sampleCsaGuest(guest, i, 3, true));
   }
-  for (let time = 0; time < 44; time += 0.22) {
-    const positions = walkers.map(({ guest, i }) => {
+  walkers.forEach(({ guest }, index) => {
+    for (const { guest: other } of walkers.slice(index + 1)) {
+      const x = Math.max(0, Math.abs(guest.x - other.x) - guest.walk[0] - other.walk[0]);
+      const z = Math.max(0, Math.abs(guest.z - other.z) - guest.walk[1] - other.walk[1]);
+      assert.ok(Math.hypot(x, z) > 5, guest.name + ' and ' + other.name + ' have separate routes even if one yields');
+    }
+  });
+  for (const { guest, i } of walkers) {
+    let works = false, walks = false;
+    for (let time = 0; time < 30; time += 0.11) {
       const at = sampleCsaGuest(guest, i, time, false), next = sampleCsaGuest(guest, i, time + 0.01, false);
       assert.ok(!W.blocked(CSA_ROOM_INDEX, at.x, at.z, 2.5), guest.name);
-      assert.ok((next.x - at.x) * Math.sin(at.yaw) + (next.z - at.z) * Math.cos(at.yaw) > 0, guest.name + ' faces their stride');
-      return at;
-    });
-    positions.forEach((at, i) => positions.slice(i + 1).forEach(next =>
-      assert.ok(Math.hypot(at.x - next.x, at.z - next.z) > 5, 'walkers keep space')));
+      const dx = next.x - at.x, dz = next.z - at.z;
+      if (Math.hypot(dx, dz) > 0.004) {
+        walks = true;
+        assert.ok(dx * Math.sin(at.yaw) + dz * Math.cos(at.yaw) > 0, guest.name + ' faces their stride');
+      } else if (at.step === 0 && at.right < -0.45) works = true;
+    }
+    assert.ok(walks && works, guest.name + ' stops to perform a gesture');
   }
 });
 
@@ -1045,8 +1124,38 @@ test('reference-based hairstyles have distinct silhouettes', () => {
   assert.notEqual(jason.head.get(-8, 5, -4), jason.head.get(-8, 9, -4), 'the fade starts low near the ear');
   assert.ok(guest('Lydia Zheng').head.bounds().minY < guest('Amelie Hu').head.bounds().minY, 'Lydia has longer straight hair');
   assert.equal(william.torso.get(2, 21, 3), 0xe1ded7, 'the silver chain is on the chest');
+  const lydia = guest('Lydia Zheng').head.get(0, -14, -8);
+  assert.ok((lydia >> 16) > (lydia >> 8 & 255) * 1.5, 'Lydia has copper-orange hair');
   const { head } = guest('Rain Li');
-  assert.ok(head.has(-10, 8, 0) && head.has(9, 8, 0) && head.has(0, 15, 0));
+  assert.ok(head.has(0, 22, 5), 'fluffy fringe rises above the old crown');
+  assert.ok(head.has(-12, 8, 0) && head.has(11, 8, 0) && head.has(0, 27, 0), 'padded ear cups and arched band');
+});
+
+test('the DJ console holds a mixing-screen laptop and is flanked by white twin-ring towers', () => {
+  const stage = JOURNEY_ROOMS[CSA_ROOM_INDEX].decor;
+  const laptop = stage.find(prop => prop.model === 'csa-dj-macbook');
+  const table = W.placementBox(stage.find(prop => prop.model === 'csa-dj-booth'));
+  const laptopBox = W.placementBox(laptop);
+  assert.equal(laptop.rot, 2, 'DJ sees the laptop display');
+  assert.equal(laptop.y, 13);
+  assert.ok(laptopBox.minX > table.minX && laptopBox.maxX < table.maxX);
+  assert.ok(laptopBox.minZ > table.minZ && laptopBox.maxZ < table.maxZ);
+  assert.equal(buildModel(laptop.model).get(-16, 21, -11), 0x79e3dc, 'waveform overlay');
+  assert.equal(stage.filter(prop => prop.model === 'csa-speaker').length, 4);
+  const speaker = buildModel('csa-speaker');
+  assert.equal(speaker.get(-10, 22, 2), 0xece9e7, 'white shell');
+  assert.equal(speaker.get(0, 22, 8), 0x88e7e5, 'lower light ring');
+  assert.equal(speaker.get(0, 44, 8), 0xaeb9fc, 'upper light ring');
+});
+
+test('neither laptop has MacBook lettering on its chassis or object label', () => {
+  const school = ALL_ITEMS.find(item => item.id === 'laptop');
+  const dj = JOURNEY_ROOMS[CSA_ROOM_INDEX].decor.find(prop => prop.model === 'csa-dj-macbook');
+  assert.doesNotMatch(school.label, /macbook/i);
+  for (const { model } of [school, dj]) {
+    const laptop = buildModel(model);
+    laptop.forEach((_x, _y, z) => assert.ok(z < 12, 'no lettering protrudes from the front lip'));
+  }
 });
 
 test('Lucas wears black athletic shorts and Daniel has a swept side part, both with the CSA tee', () => {
@@ -1079,12 +1188,35 @@ test('the DJ meshes can be picked and the same URL is available by the booth', t
   assert.equal(CSA_DJ_LINK.href, 'https://wewantdrought.me');
 });
 
-test('Rain cues his headphones and Lucas keeps the moving clippers near Jason’s low fade', t => {
+test('Rain cues his headphones and works the mixer', () => {
   assert.deepEqual(sampleCsaDj(0, true), sampleCsaDj(6, true));
-  assert.deepEqual(sampleCsaCut(0, true), sampleCsaCut(6, true));
   assert.ok(sampleCsaDj(2.8, false).right.y > 21, 'Rain reaches for his headphones');
   assert.ok(sampleCsaDj(0.3, false).right.y < 17, 'Rain works the mixer');
   assert.notEqual(sampleCsaDj(0.3, false).vinyl, sampleCsaDj(0, false).vinyl);
+});
+
+test('Kevin carries a tablet and the disco lighting stays still in reduced motion', t => {
+  const oldDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });
+  const material = new MeshBasicMaterial({ vertexColors: true }), party = makeCsaParty(material, material);
+  t.after(() => { party.dispose(); material.dispose(); });
+  const kevin = party.group.getObjectByName('Kevin Li'), tablet = kevin.getObjectByName('Checks production cues');
+  assert.ok(tablet.isMesh && tablet.parent.isMesh, 'Kevin carries his tablet in his hand');
+  const disco = party.group.getObjectByName('Disco ball'), reflection = party.group.getObjectByName('Disco reflection');
+  assert.equal(buildCsaDiscoBall().bounds().maxY, 11);
+  assert.ok(disco.position.y > 32 && disco.position.z > CSA_STAGE_Z);
+  party.update(0, true, { x: 0, z: 80 });
+  const still = reflection.position.clone();
+  party.update(1, true, { x: 0, z: 80 });
+  assert.equal(disco.rotation.y, 0);
+  assert.ok(reflection.position.equals(still));
+  party.update(1, false, { x: 0, z: 80 });
+  assert.ok(disco.rotation.y > 0 && !reflection.position.equals(still));
+});
+
+test('Lucas keeps the moving clippers near Jason’s low fade', t => {
+  assert.deepEqual(sampleCsaCut(0, true), sampleCsaCut(6, true));
   const oldDocument = globalThis.document;
   globalThis.document = { createElement: () => ({ getContext: () => null }) };
   t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });
@@ -1103,6 +1235,80 @@ test('Rain cues his headphones and Lucas keeps the moving clippers near Jason’
     assert.ok(tip.distanceTo(head.getWorldPosition(new Vector3())) < 6.1);
     assert.ok(Math.abs(tip.x - CSA_BARBER_CHAIR.x) < 2);
   }
+});
+
+test('the vertical wall has four single-color routes above a shared crash mat', () => {
+  const { grid, holds, mat } = buildBoulderingWall();
+  const wallX = grid.bounds().minX;
+  assert.equal(wallX, grid.bounds().maxX, 'wall has no overhang');
+  assert.equal(new Set(BOULDER_LANES.flatMap(lane => lane.courses.map(course => course.color))).size, 4);
+  for (const lane of BOULDER_LANES) for (const course of lane.courses) {
+    const start = sampleBouldering(lane, course, 0, false), top = sampleBouldering(lane, course, BOULDER_TOP_TIME, false);
+    assert.ok(top.hips.y > start.hips.y + 18);
+    assert.equal(top.hips.z, start.hips.z, 'climbs in its own lane');
+    assert.deepEqual(sampleBouldering(lane, course, BOULDER_CYCLE, false), start, 'descends to the mat before another route');
+    assert.deepEqual(sampleBouldering(lane, course, 0, true), sampleBouldering(lane, course, 60, true));
+    for (const { x, y, z } of [start.grip[1], start.grip[3]]) {
+      assert.equal(y, (mat.bounds().maxY + 1) * MAT_VOXEL_HEIGHT);
+      assert.ok(mat.has(Math.floor(x), 2, Math.floor(z)));
+    }
+    const rocks = course.holds.flat();
+    for (const { x, y, z } of rocks) {
+      assert.equal(holds.get(Math.floor(x * 2), Math.floor(y * 2), Math.floor(z * 2)), course.color);
+    }
+    for (let time = 0; time <= BOULDER_TOP_TIME; time += 0.041) {
+      const { grip } = sampleBouldering(lane, course, time, false);
+      const moving = grip.filter(point => !rocks.some(({ x, y, z }) =>
+        Math.hypot(x - point.x, y - point.y, z - point.z) < 1e-6));
+      if (time > 3) assert.ok(moving.length <= 1, 'at least three limbs stay on their selected color');
+      assert.ok(grip.every(point => point.x < wallX));
+    }
+  }
+});
+
+test('both climbers reach their randomly selected holds without intersecting each other', t => {
+  const oldDocument = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (oldDocument) globalThis.document = oldDocument; else delete globalThis.document; });
+  let draws = 0;
+  const material = new MeshBasicMaterial({ vertexColors: true });
+  const party = makeCsaParty(material, material, () => draws++ < 2 ? 0 : 0.99);
+  t.after(() => { party.dispose(); material.dispose(); });
+  const viewer = { x: 77, z: 0 };
+  const climbers = CLIMBER_NAMES.map(name => {
+    const avatar = party.group.getObjectByName(name);
+    const limbs = ['Left forearm', 'Left climbing shoe', 'Right forearm', 'Right climbing shoe'].map(name => avatar.getObjectByName(name));
+    limbs.forEach(limb => limb.geometry.computeBoundingBox());
+    return { avatar, limbs };
+  });
+  const bounds = [new Box3(), new Box3()];
+  const wallX = buildBoulderingWall().grid.bounds().minX;
+  const dt = BOULDER_CYCLE / 250;
+  for (let frame = 0; frame < 500; frame++) {
+    const time = frame * dt;
+    party.update(frame ? dt : 0, false, viewer);
+    climbers.forEach(({ avatar, limbs }, index) => {
+      const lane = BOULDER_LANES[index], elapsed = Math.max(0, time - lane.delay);
+      const course = lane.courses[Number(elapsed >= BOULDER_CYCLE)];
+      const pose = sampleBouldering(lane, course, elapsed % BOULDER_CYCLE, false);
+      assert.ok(Math.abs(avatar.position.y - pose.hips.y) < 1e-6 && avatar.children[0].rotation.x === 0);
+      limbs.forEach((limb, slot) => {
+        const { x, y, z } = pose.grip[slot];
+        const box = limb.geometry.boundingBox;
+        const tip = limb.localToWorld(slot % 2
+          ? new Vector3(0, box.min.y, box.max.z - AVATAR_VOXEL_SIZE / 2)
+          : new Vector3(0, box.min.y + AVATAR_VOXEL_SIZE, 0));
+        const distance = tip.distanceTo(new Vector3(x, y, z));
+        assert.ok(distance < 0.8, `${avatar.name} ${limb.name} misses its grip by ${distance.toFixed(2)} at ${time.toFixed(2)} s`);
+      });
+      bounds[index].setFromObject(avatar, true);
+      assert.ok(bounds[index].max.x <= wallX, `${avatar.name} clips the wall at ${time.toFixed(2)} s (x=${bounds[index].max.x.toFixed(2)})`);
+    });
+    assert.ok(!bounds[0].intersectsBox(bounds[1]), 'all rendered limbs stay in their own lane');
+  }
+  assert.equal(draws, 4, 'each climber reselects once while on the mat');
+  assert.equal(party.group.getObjectByName('Bouldering crash mat').scale.y, MAT_VOXEL_HEIGHT);
+  assert.ok(!W.blocked(CSA_ROOM_INDEX, viewer.x, viewer.z, 2));
 });
 
 test('the floating arrows mark the walkable aisle from every spawn to its exit', () => {

@@ -16,6 +16,7 @@ export type JourneyItem = Placement & {
 export type Outfit = "kid" | "starwars" | "stussy" | "western" | "csa";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "auditorium";
 export type Roommate = { id: string; x: number; z: number; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
+export const WESTERN_LIGHT_SWITCH_ID = "dorm-light-switch";
 type Vec2 = { x: number; z: number };
 export type Chapter = {
   id: string;
@@ -151,7 +152,7 @@ const ROOMS: Chapter[] = [
       { id: "volleyball", model: "volleyball", x: -17, z: 17, ball: "mikasa", label: "Mikasa volleyball", title: "Mikasa volleyball",
         description: "I started playing in high school. Press R or tap Spike near the ball.",
         links: [{ href: LINKS.volleyball, label: "Follow @ziggyvb" }] },
-      { id: "laptop", model: "macbook", x: 25, z: 6, y: 12, rot: 3, solid: false, label: "MacBook · competitive programming", title: "Competitive programming",
+      { id: "laptop", model: "macbook", x: 25, z: 6, y: 12, rot: 3, solid: false, label: "Laptop · competitive programming", title: "Competitive programming",
         description: "I practiced for the Canadian Computing Competition and solved LeetCode problems.",
         links: [gh("leetcode", "My LeetCode solutions"), gh("CCC", "My CCC practice")] },
       { id: "aime", model: "plaque-aime", x: 35, z: -28, y: 13, rot: 3, solid: false, label: "AIME qualifier · 2024 & 2025", title: "American Invitational Mathematics Examination",
@@ -198,8 +199,10 @@ const ROOMS: Chapter[] = [
     id: "western", stop: "University", number: "06", place: "Ontario Hall", location: "Western University · London, Ontario", heading: "Where I am now.",
     intro: "My first-year double room at Western.",
     ageFrom: 18, ageTo: 18, outfit: "western", outfitLabel: "Regular-fit black hoodie & sweatpants · black UGGs",
-    width: 132, depth: 128, floor: "laminate", wall: 0x3f3c4e, trim: 0x554463, background: 0x25334c, doorLabel: "NEXT",
+    width: 132, depth: 128, floor: "carpet", wall: 0xefeee8, trim: 0xb8b1a3, background: 0x575653, doorLabel: "NEXT",
     items: [
+      { id: WESTERN_LIGHT_SWITCH_ID, model: "dorm-light-switch", x: 12, z: 61, y: 11, rot: 2, solid: false,
+        label: "Lamp switch", title: "Dorm lamp switch", description: "Switches both desk lamps without changing the room lighting." },
       { id: "degree", model: "cs-ivey", x: 47, z: 61, y: 18, rot: 2, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey",
         description: "I study Computer Science at Western and have Ivey AEO status.",
         links: [{ href: "https://www.csd.uwo.ca", label: "Western Computer Science" }, { href: "https://www.ivey.uwo.ca/hba/", label: "Ivey HBA" }] },
@@ -238,17 +241,19 @@ const ROOMS: Chapter[] = [
       { id: "fragrances", model: "fragrances", x: 53, z: 34, y: 13, rot: 3, solid: false, label: "Fragrances", title: "Fragrances",
         description: "I keep these on the mini fridge." },
       { id: "fan", model: "fan", x: 23, z: 51, y: 9, rot: 2, solid: false, label: "Table fan", title: "Table fan" },
-      { id: "closet", model: "closet", x: -14, z: 37, rot: 1, label: "Closet and snacks", title: "Closet and snacks",
-        description: "Hoodies and sweatpants on one side, snacks on the other." },
-      { id: "pink-shoes", model: "pink-court-shoes", x: -12, z: 10, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
-      { id: "molten", model: "molten-volleyball", x: -8, z: 5, ball: "molten", label: "Molten volleyball", title: "Molten volleyball",
+      { id: "closet", model: "closet", x: -14, z: 37, rot: 1, label: "Wardrobes", title: "Wooden wardrobes",
+        description: "Hoodies, sweatpants, and snacks are put away inside." },
+      { id: "pink-shoes", model: "pink-court-shoes", x: -30, z: 49, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
+      { id: "molten", model: "molten-volleyball", x: -26, z: 28, ball: "molten", label: "Molten volleyball", title: "Molten volleyball",
         description: "Press R or tap Set near the ball." },
       { id: "laundry", model: "laundry-basket", x: -28, z: 43, rot: 1, label: "Laundry basket", title: "Laundry basket" },
     ],
     decor: [
       { model: "desk-divider", x: 24, z: 0 },
       { model: "monitor", x: 24, z: -9, y: 17, rot: 2, solid: false },
-      { model: "rug-western", x: 24, z: 22, solid: false }, { model: "nightstand", x: 23, z: 51, rot: 2 },
+      { model: "desk-lamp", x: 12, z: -7, y: 18, rot: 2, solid: false },
+      { model: "dorm-chair", x: 33, z: 16 }, { model: "dorm-chair", x: 33, z: -16, rot: 2 },
+      { model: "nightstand", x: 23, z: 51, rot: 2 },
     ],
     roommate: { id: "richard", x: 32, z: -41, fridge: "mini-fridge", pad: "hockey-pad",
       via: [{ x: 47, z: -41 }, { x: 47, z: 22 }, { x: 47, z: -22 }, { x: 5, z: -22 }] },
@@ -271,10 +276,11 @@ export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
   doorLabel: "DORM", items: [],
   decor: [
     { model: "csa-dj-booth", x: 0, z: CSA_STAGE_Z },
-    { model: "csa-speaker", x: -38, z: CSA_STAGE_Z - 3 },
-    { model: "csa-speaker", x: -27, z: CSA_STAGE_Z - 3 },
-    { model: "csa-speaker", x: 27, z: CSA_STAGE_Z - 3 },
-    { model: "csa-speaker", x: 38, z: CSA_STAGE_Z - 3 },
+    { model: "csa-dj-macbook", x: 12, z: CSA_STAGE_Z - 0.75, y: 13, rot: 2, solid: false },
+    { model: "csa-speaker", x: -41, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: -28, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: 28, z: CSA_STAGE_Z - 3 },
+    { model: "csa-speaker", x: 41, z: CSA_STAGE_Z - 3 },
     { model: "csa-stage-logo", x: 0, z: CSA_STAGE_Z - 16, y: 20, solid: false },
     ...[40, 55, 70].flatMap(z => [-32, 32].map(x => ({ model: "csa-seat-row", x, z, rot: 2 as const }))),
     { model: "csa-barber-chair", ...CSA_BARBER_CHAIR, rot: 1 },
@@ -287,7 +293,7 @@ export const JOURNEY_ROOMS: readonly Chapter[] = [...CHAPTERS, {
     { model: "csa-water-bottle", x: 28, z: 61, solid: false },
     { model: "csa-boba-cup", x: 66, z: -22, rot: 2, solid: false },
     { model: "csa-soda-cup", x: -72, z: -21, solid: false },
-    { model: "csa-boba-cup", x: -9, z: CSA_STAGE_Z - 1, y: 13, solid: false },
+    { model: "csa-boba-cup", x: -13, z: CSA_STAGE_Z + 2, y: 13, solid: false },
   ],
 }];
 const CHAPTER_ACCENTS = [0x89cced, 0xffcf79, 0x80ddc5, 0xfaac96, 0x91b8f3, 0xc4a2ff];

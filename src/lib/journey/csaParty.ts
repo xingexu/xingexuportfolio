@@ -2,25 +2,61 @@ import { CanvasTexture, Group, Mesh, NearestFilter, Sprite, SpriteMaterial, Vect
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar } from "./avatar";
 import { CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_STAGE_Z } from "./data";
 import { gridGeometry } from "./mesh";
+import { BOULDER_CYCLE, BOULDER_LANES, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, boulderStart, buildBoulderingWall, sampleBouldering } from "./csaClimb";
 import { Grid, hash3, shade, type Color } from "./voxel";
 import { AVATAR_SCALE, type Vec } from "./world";
 
-type Hairstyle = "taper-fade" | "tousled" | "straight" | "waves" | "side-part" | "cropped-fringe";
+type Hairstyle = "taper-fade" | "tousled" | "fluffy" | "straight" | "waves" | "side-part" | "cropped-fringe";
+const ACTIVITY_LABELS = {
+  greet: "Welcomes guests", direct: "Directs the floor", photo: "Takes photos", notes: "Checks a clipboard",
+  drink: "Sips a drink", talk: "Chats", radio: "Checks in by radio", phone: "Posts updates", tablet: "Checks production cues",
+};
+type Activity = keyof typeof ACTIVITY_LABELS;
 type Guest = Vec & {
   name: string; yaw: number; scale: number; dj?: boolean; hair?: Hairstyle; hairColor?: Color;
-  skin?: Color; chain?: boolean; shorts?: boolean; cut?: "client" | "barber"; walk?: readonly [number, number];
+  skin?: Color; chain?: boolean; shorts?: boolean; cut?: "client" | "barber"; walk?: readonly [number, number]; activity?: Activity;
+  climb?: 0 | 1;
 };
+type Climber = Guest & { climb: NonNullable<Guest["climb"]> };
 
+const floorGuest = (name: string, x: number, z: number, activity: Activity, hair: Hairstyle, scale = 1,
+  walk: NonNullable<Guest["walk"]> = [3.2, 3.8], hairColor?: Color): Guest =>
+  ({ name, x, z, yaw: 0, activity, hair, scale, walk, hairColor });
+
+// The Western CSA team list supplies the exec roster; the original After Hours guests remain.
 export const CSA_GUESTS: readonly Guest[] = [
   { name: "Jason Zhuang", ...CSA_BARBER_CHAIR, yaw: Math.PI / 2, scale: 1, hair: "taper-fade", hairColor: 0x302722, cut: "client" },
-  { name: "Rain Li", x: 0, z: CSA_STAGE_Z - 8, yaw: 0, scale: 1, dj: true },
-  { name: "Amelie Hu", x: -41, z: 14, yaw: 0, scale: 0.91, hair: "waves", hairColor: 0x382821, walk: [9, 11] },
-  { name: "Lydia Zheng", x: 42, z: 13, yaw: 0, scale: 0.93, hair: "straight", hairColor: 0x453128, walk: [10, 11] },
-  { name: "Daniel Su", x: 44, z: -25, yaw: 0, scale: 1, hair: "side-part", hairColor: 0x2b2420, skin: 0xefd2ba, walk: [11, 9] },
+  { name: "Rain Li", x: 0, z: CSA_STAGE_Z - 8, yaw: 0, scale: 1, dj: true, hair: "fluffy", hairColor: 0x2d252c },
+  floorGuest("Amelie Hu", -36, 16, "phone", "waves", 0.82, [5, 5], 0x382821),
+  floorGuest("Lydia Zheng", 35, 12, "photo", "straight", 0.79, [5, 5], 0xb4643b),
+  { ...floorGuest("Daniel Su", 31, -23, "direct", "side-part", 1, [5, 5], 0x2b2420), skin: 0xefd2ba },
   { name: "Lucas Xue", x: CSA_BARBER_CHAIR.x + 3, z: CSA_BARBER_CHAIR.z + 9.5, yaw: -2.85, scale: 1.06, hair: "cropped-fringe", hairColor: 0x201e1e, skin: 0xe6c7ab, shorts: true, cut: "barber" },
-  { name: "Jeffrey Ban", x: -16, z: 14, yaw: 0, scale: 1, walk: [8, 13] },
-  { name: "William Wang", x: 13, z: -21, yaw: 0, scale: 1, hair: "tousled", hairColor: 0x252020, chain: true, walk: [10, 13] },
+  floorGuest("Jeffrey Ban", -15, 11, "talk", "cropped-fringe", 1, [4, 5]),
+  { name: CLIMBER_NAMES[1], ...boulderStart(BOULDER_LANES[1]),
+    yaw: Math.PI / 2, scale: 1, hair: "tousled", hairColor: 0x252020, chain: true, climb: 1 },
+  floorGuest("Kevin Li", 14, -43, "tablet", "side-part", 1, [4, 4], 0x32272a),
+  floorGuest("Selina Lim", -19, 28, "greet", "straight", 0.94),
+  floorGuest("Gloria Huang", 19, 25, "greet", "waves", 0.96, undefined, 0x493128),
+  floorGuest("Cassidy Lee", 53, -21, "notes", "waves", 0.93),
+  floorGuest("Jessica Zhang", 70, 10, "drink", "straight", 0.96),
+  floorGuest("Callista Chan", -34, -22, "tablet", "straight", 0.94),
+  floorGuest("Michael Tan", -15, -26, "notes", "tousled"),
+  floorGuest("Harry Yang", 72, -25, "notes", "tousled", 1.02),
+  floorGuest("Sarah Gao", 54, 24, "photo", "straight", 0.94),
+  floorGuest("Melissa Zhang", 74, 39, "notes", "waves", 0.97),
+  floorGuest("Tanya Mai", -77, 24, "phone", "straight", 0.94),
+  floorGuest("Ava Cheh", -62, 34, "photo", "waves", 0.95),
+  floorGuest("Aleena Liu", 76, 58, "greet", "straight", 0.95),
+  floorGuest("Kate Chen", -70, 57, "drink", "waves", 0.92),
+  floorGuest("Ray Shen", -34, -42, "radio", "cropped-fringe"),
+  { name: CLIMBER_NAMES[0], ...boulderStart(BOULDER_LANES[0]),
+    yaw: Math.PI / 2, scale: 0.94, hair: "cropped-fringe", hairColor: 0x352933, climb: 0 },
 ];
+
+export function csaActivityLabel(guest: Guest) {
+  return guest.dj ? "DJ" : guest.cut === "barber" ? "Cuts Jason’s hair" : guest.cut === "client" ? "Gets a haircut" :
+    guest.climb !== undefined ? "Boulders" : guest.activity ? ACTIVITY_LABELS[guest.activity] : "";
+}
 
 export function buildCsaGuest(guest: Guest) {
   const base = guest.hairColor ?? 0x242022;
@@ -31,17 +67,19 @@ export function buildCsaGuest(guest: Guest) {
   const hair = guest.hair;
   if (hair) {
     const long = hair === "straight" || hair === "waves";
-    const sidePart = hair === "side-part", cropped = hair === "cropped-fringe", fade = hair === "taper-fade";
+    const sidePart = hair === "side-part", cropped = hair === "cropped-fringe", fade = hair === "taper-fade", fluffy = hair === "fluffy";
     const fringeLengths = [0, 1, 1, 2, 4, 2, 0, 1, 0, 2, 4, 1, 0, 1, 3, 2, 1, 0];
     for (let x = -9; x < 9; x++) for (let z = -8; z <= 8; z++) {
-      const rim = (x + 0.5) ** 2 / (cropped ? 81 : 93) + (z + 0.5) ** 2 / 85;
+      const rim = (x + 0.5) ** 2 / (cropped ? 81 : fluffy ? 106 : 93) + (z + 0.5) ** 2 / (fluffy ? 98 : 85);
       if (rim > 1.13) continue;
-      const tuft = hair === "tousled" || cropped ? Math.floor(hash3(x, 17, z) * 3) : 0;
-      const part = hair !== "tousled" && !cropped && (sidePart ? x === 3 : x === -1 || x === 0) && z > -3;
-      const top = 14 + Math.round((1 - rim) * (long ? 3 : 4)) + tuft - (part ? 2 : 0);
+      const tuft = fluffy ? Math.round(1.7 + Math.sin(x * 0.88 + z * 0.44) + Math.cos(z * 0.93 - x * 0.21)) :
+        hair === "tousled" || cropped ? Math.floor(hash3(x, 17, z) * 3) : 0;
+      const part = hair !== "tousled" && !cropped && !fluffy && (sidePart ? x === 3 : x === -1 || x === 0) && z > -3;
+      const top = (fluffy ? 17 : 14) + Math.round((1 - rim) * (long ? 3 : fluffy ? 6 : 4)) + tuft - (part ? 2 : 0);
       const bang = long ? (Math.abs(x + 0.5) < 4 ? 12 : 8)
         : sidePart ? 8 + Math.max(0, 5 - Math.abs(x - 2))
         : cropped ? 9 + fringeLengths[x + 9]
+        : fluffy ? 9 + Math.round(Math.cos(x * 1.15) * 1.5)
         : hair === "tousled" ? 9 + (x * x + 1) % 4 : 8 + Math.max(0, 4 - Math.abs(x));
       const bottom = z > 5 ? bang : Math.abs(x + 0.5) > 7 && !cropped && !fade ? 8 : 12;
       if (z >= 6 && bottom > 8) for (let y = 8; y < bottom; y++) {
@@ -92,7 +130,7 @@ export function buildCsaGuest(guest: Guest) {
 }
 
 export function sampleCsaGuest(guest: Guest, index: number, time: number, reduced: boolean) {
-  const idle = { x: guest.x, z: guest.z, yaw: guest.yaw, lift: 0, step: 0, roll: 0, left: 0, right: 0, nod: 0 };
+  const idle = { x: guest.x, z: guest.z, yaw: guest.yaw, lift: 0, step: 0, roll: 0, left: 0, right: 0, nod: 0, spread: 0 };
   const clock = reduced ? 0 : time;
   const beat = clock * Math.PI * 4;
   if (guest.dj) return {
@@ -101,17 +139,42 @@ export function sampleCsaGuest(guest: Guest, index: number, time: number, reduce
   if (guest.cut === "client") return { ...idle, nod: -0.08 + Math.sin(clock * Math.PI) * 0.055 };
   if (guest.cut === "barber") return { ...idle, left: -0.2 + Math.sin(clock * Math.PI) * 0.08, roll: -0.035, nod: 0.15 };
   if (!guest.walk) return idle;
-  const [rx, rz] = guest.walk, angle = clock * (0.41 - index * 0.008) + index * 1.37;
-  const step = reduced ? 0 : Math.sin(time * 5.6 + index) * 0.43;
+  const [rx, rz] = guest.walk, ramp = 0.55;
+  const travel = Math.PI * (rx + rz) / 4.6 + ramp, task = 3.5 + index % 4 * 0.35;
+  const elapsed = reduced ? travel + task * 0.5 : (clock + index * 1.67) % (travel + task);
+  const t = Math.min(travel, elapsed);
+  const distance = t < ramp ? t * t / (2 * ramp) : t > travel - ramp ? travel - ramp - (travel - t) ** 2 / (2 * ramp) : t - ramp / 2;
+  const angle = index * 1.37 + Math.PI * 2 * distance / (travel - ramp);
+  const step = Math.sin(distance * 7.5 + index) * 0.43 * Math.min(1, t / ramp, (travel - t) / ramp);
+  const doing = pulse((elapsed - travel) / 0.52) * pulse((travel + task - elapsed) / 0.6);
+  const gesture = sampleActivity(guest.activity, reduced ? 0 : elapsed - travel);
   return {
     ...idle, x: guest.x + Math.cos(angle) * rx, z: guest.z + Math.sin(angle) * rz,
-    yaw: Math.atan2(-rx * Math.sin(angle), rz * Math.cos(angle)),
-    lift: Math.abs(step) * 0.57, step, roll: step * 0.065, left: -step * 0.82, right: step * 0.82, nod: Math.abs(step) * 0.07,
+    yaw: Math.atan2(-rx * Math.sin(angle), rz * Math.cos(angle)) + doing * gesture.turn,
+    lift: Math.abs(step) * 0.57, step, roll: step * 0.065, left: mix(-step * 0.82, gesture.left, doing),
+    right: mix(step * 0.82, gesture.right, doing), nod: mix(Math.abs(step) * 0.07, gesture.nod, doing), spread: doing * gesture.spread,
   };
 }
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const pulse = (value: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, value)))) / 2;
+
+function sampleActivity(activity: Activity | undefined, time: number) {
+  const beat = Math.sin(time * Math.PI * 2.15), sway = Math.sin(time * 3.1);
+  const at = (left: number, right: number, nod = 0, spread = 0, turn = 0) => ({ left, right, nod, spread, turn });
+  switch (activity) {
+    case "greet": return at(-0.16, -2.45 + beat * 0.22, 0.03, 0.31 + sway * 0.21, 0.43);
+    case "direct": return at(-0.26, -1.52 + beat * 0.16, 0.1, 0.93 + sway * 0.12, 0.6);
+    case "photo": return at(-1.26, -1.88 + beat * 0.07, 0.05, -0.33, -0.44 + sway * 0.11);
+    case "notes": return at(-1.28 + beat * 0.14, -1.05, 0.26 + beat * 0.05, -0.29);
+    case "drink": return at(-0.1, -1.7 - pulse((time - 0.3) * 1.8) * 0.4, -0.08, -0.44);
+    case "talk": return at(-0.7 - beat * 0.26, -0.64 + beat * 0.3, 0.07 + sway * 0.09, 0.4, 0.32);
+    case "radio": return at(-0.12, -2.04 + sway * 0.09, 0.12, -0.53);
+    case "phone": return at(-0.79 + beat * 0.12, -1.56, 0.29, -0.36);
+    case "tablet": return at(-1.17 + beat * 0.12, -1.27, 0.32, -0.35, 0.28);
+    default: return at(0, 0);
+  }
+}
 const MIXER_PADS = [{ x: -1.6, z: -2.35 }, { x: -0.45, z: -2.35 }, { x: 0.7, z: -2.35 }, { x: 1.85, z: -2.35 }];
 const DJ_PATTERN = [2, 3, 1, 3, 2, 1, 0, 3];
 
@@ -127,7 +190,7 @@ export function sampleCsaDj(time: number, reduced: boolean) {
     pad: cue > 0.12 || tap < 0.6 ? -1 : pad,
     left: { x: -5.4 + scratch * 0.55, y: 15.4, z: CSA_STAGE_Z - 1.8 - scratch * 0.55 },
     right: {
-      x: mix(mix(from.x, to.x, travel) + 0.32, 3.55, cue),
+      x: mix(mix(from.x, to.x, travel) + 0.32, 4.1, cue),
       y: mix(16.2 - tap * 0.85, 21.6, cue),
       z: mix(CSA_STAGE_Z + from.z + 0.32, CSA_STAGE_Z - 7.1, cue),
     },
@@ -145,16 +208,60 @@ export function sampleCsaCut(time: number, reduced: boolean) {
 }
 
 export function csaHeadphones(head: Grid) {
-  return head.box(-10, 5, -3, 2, 6, 6, 0x24232b).box(8, 5, -3, 2, 6, 6, 0x24232b)
-    .box(-9, 7, -2, 1, 6, 4, 0x6a597a).box(8, 7, -2, 1, 6, 4, 0x6a597a)
-    .box(-8, 13, -2, 2, 2, 4, 0x38313e).box(6, 13, -2, 2, 2, 4, 0x38313e)
-    .box(-7, 14, -2, 14, 2, 4, 0x37323f)
-    .box(-5, 15, -1, 10, 1, 2, 0x574962);
+  for (const side of [-1, 1]) {
+    const x = side < 0 ? -12 : 8, shell = side < 0 ? x : x + 3;
+    head.box(x, 5, -4, 4, 8, 8, 0x26242e).box(x + 1, 4, -3, 2, 10, 6, 0x413b4a);
+    head.box(shell, 6, -3, 1, 6, 6, 0xa5a5bd).box(shell, 7, -2, 1, 4, 4, 0x5f5671);
+    head.set(shell, 7, 3, 0x87dec9);
+    for (let y = 12; y <= 25; y++) {
+      const curve = Math.max(0, y - 20);
+      head.box(side < 0 ? -11 + curve : 9 - curve, y, -2, 2, 1, 4, y > 19 ? 0x736b83 : 0x494457);
+    }
+  }
+  return head.box(-6, 25, -2, 12, 2, 4, 0x4a4255).box(-4, 27, -1, 8, 1, 2, 0x8f809b);
 }
 
 const APRICOT = 0xff986e, LAVENDER = 0xc8a3ff, PINK = 0xff90bb;
+const DISCO_Z = CSA_STAGE_Z + 6;
 const DOWN = new Vector3(0, -1, 0), UP = new Vector3(0, 1, 0);
 type Point = Vec & { y: number };
+
+export function buildCsaDiscoBall() {
+  const g = new Grid(), tiles = [0x7f7993, 0xbdb3cb, 0xeee2e9, 0xa9d4df, 0xf5b3c9, 0xc1afd8, 0xfaf3de];
+  for (let x = -11; x <= 11; x++) for (let y = -11; y <= 11; y++) for (let z = -11; z <= 11; z++) {
+    if (x * x + y * y + z * z > 121) continue;
+    const tile = Math.floor(hash3(Math.floor(x / 2), Math.floor((y + 10) / 2), Math.floor(z / 2)) * tiles.length);
+    g.set(x, y, z, shade(tiles[tile], 0.91 + Math.max(0, y) * 0.01));
+  }
+  return g;
+}
+
+function activityGear(activity: Activity | undefined) {
+  const g = new Grid(), ink = 0x292435, shell = 0x53495f;
+  switch (activity) {
+    case "photo":
+      return g.box(-5, -1, -2, 10, 7, 5, ink).box(-3, 1, 3, 6, 5, 3, shell)
+        .box(-2, 2, 6, 4, 3, 1, 0xa69ccb).box(-3, 6, 0, 4, 2, 3, 0xeedce3);
+    case "notes":
+      g.box(-5, -2, 0, 10, 13, 2, 0x9c644d).box(-4, -1, 2, 8, 11, 1, 0xf9e8ce).box(-2, 9, 2, 4, 2, 1, 0xb8a2a3);
+      for (let y = 0; y < 8; y += 2) g.box(-3, y, 3, 5, 1, 1, 0xb59b9a);
+      return g;
+    case "drink":
+      return g.box(-2, -2, -2, 4, 7, 4, 0xc68c9e).box(-3, 5, -3, 6, 1, 6, 0xffd4c5)
+        .box(1, 6, 0, 1, 4, 1, 0xfb927d);
+    case "radio":
+      return g.box(-3, -2, -2, 6, 10, 4, ink).box(-2, 2, 2, 4, 4, 1, shell)
+        .box(-2, 8, -1, 1, 5, 1, 0x8b7a97).set(1, 6, 2, 0x8ae0bd);
+    case "phone":
+      return g.box(-3, -1, -1, 6, 10, 2, 0xf1bcae).box(-2, 0, -2, 4, 8, 1, 0x99b5dc)
+        .set(-1, 7, 1, ink).set(-2, 6, 1, ink);
+    case "tablet":
+      g.box(-7, -2, -1, 14, 10, 2, 0xd3ccd6).box(-6, -1, -2, 12, 8, 1, 0x38496e);
+      for (let x = -4; x < 5; x += 2) g.box(x, 1, -3, 1, 2 + (x + 5) % 4, 1, x < 0 ? 0x8de7cf : 0xe6a6cb);
+      return g;
+    default: return null;
+  }
+}
 
 function splitLimb(grid: Grid, hinge: number, center = 0) {
   const upper = new Grid(), lower = new Grid();
@@ -165,12 +272,12 @@ function splitLimb(grid: Grid, hinge: number, center = 0) {
   return { upper, lower };
 }
 
-function aimArm(upper: Object3D, lower: Object3D, hand: Vector3, upperLength: number, lowerLength: number, side: number) {
+function aimArm(upper: Object3D, lower: Object3D, hand: Vector3, upperLength: number, lowerLength: number, side: number, poleZ = -0.3) {
   const forward = hand.clone().sub(upper.position);
   const reach = Math.min(forward.length(), upperLength + lowerLength - 0.03);
   forward.normalize();
   const bend = (upperLength ** 2 - lowerLength ** 2 + reach ** 2) / (2 * Math.max(0.05, reach));
-  const pole = new Vector3(side, -0.8, -0.3);
+  const pole = new Vector3(side, -0.8, poleZ);
   pole.addScaledVector(forward, -pole.dot(forward)).normalize();
   lower.position.copy(upper.position).addScaledVector(forward, bend)
     .addScaledVector(pole, Math.sqrt(Math.max(0, upperLength ** 2 - bend ** 2)));
@@ -194,6 +301,9 @@ function stageScenery() {
   }
   g.box(-68, 41, wall + 4, 136, 2, 2, 0x9c6660).box(-68, 43, wall + 4, 136, 1, 2, 0xe3a26e);
   for (let x = -64; x <= 64; x += 8) g.box(x, 42, wall + 6, 2, 1, 1, APRICOT);
+  g.box(-2, 43, wall - 1, 4, 5, 5, 0x4e4159).box(-1, 46, wall + 1, 2, 2, DISCO_Z - wall, 0x4e4159);
+  for (let z = wall + 3; z < DISCO_Z; z += 3) g.box(-2, 46, z, 4, 1, 1, 0x846d8c);
+  g.box(-1, 44, DISCO_Z - 1, 2, 3, 2, 0x9e899e);
   g.text("CSA", -37, 24, wall + 1, 0xffeddb, 2);
   g.text("WESTERN", -41, 17, wall + 1, 0xfda3ad);
   g.text("AFTER", 20, 24, wall + 1, 0xffeddb);
@@ -213,7 +323,7 @@ function stageScenery() {
   return { backdrop: g, floor };
 }
 
-function makeNameTag(guest: Guest) {
+function makeNameTag(guest: Pick<Guest, "name" | "dj">) {
   const canvas = document.createElement("canvas");
   const text = guest.dj ? `${guest.name} · DJ` : guest.name;
   canvas.width = 180; canvas.height = 38;
@@ -234,7 +344,76 @@ function makeNameTag(guest: Guest) {
   return { sprite, dispose: () => { material.dispose(); texture.dispose(); } };
 }
 
-export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial) {
+function makeClimber(guest: Climber, mesh: (grid: Grid, size?: number) => Mesh, random: () => number) {
+  const lane = BOULDER_LANES[guest.climb];
+  const pickCourse = () => lane.courses[Math.floor(random() * lane.courses.length)];
+  let course = pickCourse(), circuit = 0;
+  const group = new Group(), body = new Group();
+  group.name = guest.name;
+  group.add(body);
+  body.scale.setScalar(AVATAR_SCALE * guest.scale);
+  body.rotation.y = guest.yaw;
+  const parts = buildCsaGuest(guest);
+  if (guest.climb === 0) parts.head.box(-2, 11, -12, 4, 3, 5, 0x352933).box(-2, 10, -12, 4, 4, 1, 0x987ba7).box(-3, 8, -15, 5, 6, 3, 0x3c303c)
+    .box(-4, 4, -16, 5, 6, 3, 0x352932).box(-5, 2, -15, 4, 3, 3, 0x2a222c);
+  const torso = mesh(parts.torso, AVATAR_VOXEL_SIZE), head = mesh(parts.head, AVATAR_VOXEL_SIZE);
+  if (parts.shirtPrint) torso.add(mesh(parts.shirtPrint, SHIRT_PRINT_VOXEL_SIZE));
+  torso.add(mesh(new Grid().box(-3, 1, -8, 6, 5, 4, guest.climb === 0 ? 0x997189 : 0x597982)
+    .box(-3, 5, -8, 6, 1, 4, 0x434057).box(-2, 6, -7, 4, 1, 2, 0xcab8c9), AVATAR_VOXEL_SIZE));
+  head.name = "Head";
+  head.position.y = parts.shoulder + 2 - parts.hip;
+  body.add(torso, head);
+
+  const limb = (grid: Grid, side: -1 | 1, foot: boolean) => {
+    const { minX, maxX, minY } = grid.bounds(), hinge = Math.round(minY * 0.5), center = (minX + maxX + 1) / 2;
+    const sideName = side < 0 ? "Left" : "Right";
+    const shoe = foot ? mesh(new Grid().box(-3, -1, -2, 6, 1, 6, 0x45364d)
+      .box(-3, 0, -2, 6, 2, 5, guest.climb === 0 ? 0x8bcec1 : 0xd1b075)
+      .box(-2, 0, 3, 4, 1, 1, guest.climb === 0 ? 0x498679 : 0x8d7047), AVATAR_VOXEL_SIZE) : null;
+    const toe = new Vector3(0, -0.5, 1.75);
+    if (shoe) {
+      grid.box(minX, minY, -5, maxX - minX + 1, 3, 12, -1);
+      shoe.name = `${sideName} climbing shoe`;
+      body.add(shoe);
+    }
+    const { upper, lower } = splitLimb(grid, hinge, center);
+    const joint = mesh(upper, AVATAR_VOXEL_SIZE), end = mesh(lower, AVATAR_VOXEL_SIZE);
+    joint.position.set(side * (foot ? 1.5 : parts.shoulderX + 1), foot ? 0 : parts.shoulder + 1 - parts.hip, 0);
+    end.name = `${sideName} ${foot ? "shin" : "forearm"}`;
+    body.add(joint, end);
+    return (goal: Point) => {
+      const target = body.worldToLocal(new Vector3(goal.x, goal.y, goal.z));
+      if (shoe) target.sub(toe);
+      aimArm(joint, end, target, -hinge * AVATAR_VOXEL_SIZE, (hinge - minY - (shoe ? 3 : 1)) * AVATAR_VOXEL_SIZE, side, foot ? -0.7 : -0.3);
+      if (shoe) shoe.position.copy(target);
+    };
+  };
+  const reach = [limb(parts.armL, -1, false), limb(parts.legL, -1, true), limb(parts.armR, 1, false), limb(parts.legR, 1, true)];
+  const tag = makeNameTag(guest);
+  if (tag) group.add(tag.sprite);
+  return {
+    group,
+    update(time: number, reduced: boolean, player: Vec) {
+      const elapsed = Math.max(0, time - lane.delay);
+      const next = Math.floor(elapsed / BOULDER_CYCLE);
+      if (!reduced && next !== circuit) {
+        circuit = next;
+        course = pickCourse();
+      }
+      const pose = sampleBouldering(lane, course, elapsed % BOULDER_CYCLE, reduced);
+      group.position.set(pose.hips.x, pose.hips.y, pose.hips.z);
+      head.rotation.x = -0.15;
+      reach.forEach((set, index) => set(pose.grip[index]));
+      if (tag) {
+        tag.sprite.position.set(-2, 12, 0);
+        tag.sprite.visible = Math.hypot(group.position.x - player.x, group.position.z - player.z) < 64;
+      }
+    },
+    dispose: () => tag?.dispose(),
+  };
+}
+
+export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial, random = Math.random) {
   const group = new Group(), stageWall = new Group(), geometries: BufferGeometry[] = [];
   const mesh = (grid: Grid, size = 1, paint = material) => {
     const geometry = gridGeometry(grid, [0, 0, 0], 0.02, size);
@@ -244,15 +423,43 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
   const { backdrop, floor } = stageScenery();
   group.add(mesh(floor));
   stageWall.add(mesh(backdrop, 1, wallMaterial));
+  const climbingWall = buildBoulderingWall(), boulder = mesh(climbingWall.grid), mat = mesh(climbingWall.mat);
+  boulder.name = "Vertical bouldering wall";
+  mat.name = "Bouldering crash mat";
+  mat.scale.y = MAT_VOXEL_HEIGHT;
+  group.add(boulder, mesh(climbingWall.holds, 0.5), mat);
+  const climbers = CSA_GUESTS.filter((guest): guest is Climber => guest.climb !== undefined).map(guest => {
+    const climber = makeClimber(guest, mesh, random);
+    group.add(climber.group);
+    climber.update(0, false, { x: 0, z: 0 });
+    return climber;
+  });
+  const disco = new Group(), sphere = mesh(buildCsaDiscoBall(), 0.46);
+  disco.name = "Disco ball";
+  sphere.position.setScalar(-0.23);
+  disco.position.set(0, 39, DISCO_Z);
+  disco.add(sphere);
+  group.add(disco);
+  const reflectionShapes = [0xfbc29c, 0xc9b5fa, 0xa4e7de, 0xf2afcd].map(color =>
+    mesh(new Grid().set(0, 0, 0, color).set(1, 0, 0, shade(color, 0.67)), 0.55).geometry);
+  const reflections = Array.from({ length: 18 }, (_, index) => {
+    const spot = new Mesh(reflectionShapes[index % reflectionShapes.length], material);
+    spot.name = "Disco reflection";
+    spot.scale.set(1, 0.06, 1);
+    group.add(spot);
+    return spot;
+  });
   const djPickables: Object3D[] = [];
-  const guests = CSA_GUESTS.map((guest, index) => {
+  const guests = CSA_GUESTS.flatMap((guest, index) => {
+    if (guest.climb !== undefined) return [];
     const parts = buildCsaGuest(guest);
     const holder = new Group(), body = new Group();
     holder.name = guest.name;
     holder.add(body);
     body.scale.setScalar(AVATAR_SCALE * guest.scale);
-    const start = sampleCsaGuest(guest, index, 0, true);
+    const start = sampleCsaGuest(guest, index, 0, false);
     holder.position.set(start.x, 0, start.z);
+    holder.rotation.y = start.yaw;
     group.add(holder);
     const part = (grid: Grid, x: number, y: number) => {
       const object = mesh(grid, AVATAR_VOXEL_SIZE);
@@ -277,6 +484,14 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
       return { upper: shoulder, aim };
     };
     const left = arm(parts.armL, -1, !!guest.dj), right = arm(parts.armR, 1, !!guest.dj || guest.cut === "barber");
+    const gearGrid = activityGear(guest.activity);
+    const gear = gearGrid && mesh(gearGrid, 0.25);
+    if (gear) {
+      const hand = parts.armR.bounds();
+      gear.name = csaActivityLabel(guest);
+      gear.position.set((hand.minX + hand.maxX + 1) * AVATAR_VOXEL_SIZE / 2, (hand.minY + 2) * AVATAR_VOXEL_SIZE, 0.8);
+      right.upper.add(gear);
+    }
     const leg = (grid: Grid) => {
       if (guest.cut !== "client") return part(grid, 0, parts.hip);
       const hinge = Math.round(grid.bounds().minY * 0.54), { upper, lower } = splitLimb(grid, hinge);
@@ -291,7 +506,8 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
     const seatOffset = guest.cut === "client" ? CSA_BARBER_SEAT - parts.hip * body.scale.y + 0.04 : 0;
     const tag = makeNameTag(guest);
     if (tag) {
-      tag.sprite.position.y = parts.height * body.scale.y + seatOffset + 2.2;
+      const silhouette = parts.shoulder + 2 + (parts.head.bounds().maxY + 1) * AVATAR_VOXEL_SIZE;
+      tag.sprite.position.y = Math.max(parts.height, silhouette) * body.scale.y + seatOffset + 2.2;
       holder.add(tag.sprite);
     }
     if (guest.dj) holder.traverse(object => {
@@ -300,7 +516,7 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
         djPickables.push(object);
       }
     });
-    return { guest, holder, body, head, left, right, legL, legR, tag, seatOffset, clock: 0 };
+    return [{ guest, index, holder, body, head, left, right, legL, legR, tag, gear, seatOffset, clock: 0 }];
   });
   const clipper = mesh(new Grid().box(-2, 0, -1, 4, 5, 3, 0x292831)
     .box(-1, 1, 2, 2, 3, 1, 0x685870).set(0, 2, 3, 0x9fefd1)
@@ -340,16 +556,26 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
       return Math.hypot(player.x, player.z - (CSA_STAGE_Z - 8)) <= 23;
     },
     blocks(from: Vec, to: Vec, radius: number) {
-      return guests.some(({ holder }) => {
-        const { x, z } = holder.position, next = Math.hypot(to.x - x, to.z - z);
+      const approaches = ({ x, z }: Vec) => {
+        const next = Math.hypot(to.x - x, to.z - z);
         return next < radius + 2.5 && next < Math.hypot(from.x - x, from.z - z);
-      });
+      };
+      return guests.some(({ holder }) => approaches(holder.position)) ||
+        climbers.some(({ group }) => group.position.y < 14 && approaches(group.position));
     },
     update(dt: number, reduced: boolean, player: Vec) {
       if (!reduced) time += dt;
+      climbers.forEach(climber => climber.update(time, reduced, player));
       const dj = sampleCsaDj(time, reduced), cut = sampleCsaCut(time, reduced);
-      for (const [index, view] of guests.entries()) {
-        const { guest, holder, body, head, left, right, legL, legR, tag, seatOffset } = view;
+      const spin = reduced ? 0 : time * 0.32;
+      disco.rotation.y = spin;
+      reflections.forEach((spot, index) => {
+        const angle = index * 2.4 + spin * (index % 2 ? 1 : -0.8), ring = 12 + index % 5 * 8.2;
+        spot.position.set(Math.cos(angle) * ring, 0.047, DISCO_Z + Math.sin(angle) * ring * 0.56);
+        spot.rotation.y = -angle;
+      });
+      for (const view of guests) {
+        const { guest, index, holder, body, head, left, right, legL, legR, tag, gear, seatOffset } = view;
         const pose = sampleCsaGuest(guest, index, guest.walk ? view.clock + dt : time, reduced);
         const gap = Math.hypot(player.x - holder.position.x, player.z - holder.position.z);
         const nextGap = Math.hypot(player.x - pose.x, player.z - pose.z);
@@ -376,9 +602,12 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
               const { x, y, z } = cut.blade;
               clipper.quaternion.setFromUnitVectors(UP, new Vector3(x, y, z).sub(hand).normalize());
             }
-          } else right.upper.rotation.set(waiting ? 0 : pose.right, 0, 0.12);
+          } else {
+            right.upper.rotation.set(waiting ? 0 : pose.right, 0, waiting ? 0.12 : 0.12 + pose.spread);
+            if (gear) gear.rotation.x = -right.upper.rotation.x - 0.18;
+          }
         }
-        if (tag) tag.sprite.visible = gap < (guest.dj ? 65 : 26);
+        if (tag) tag.sprite.visible = gap < (guest.dj ? 65 : 21);
       }
       records.forEach((vinyl, i) => { vinyl.rotation.y = dj.vinyl * (i ? 1 : -0.67); });
       pads.forEach((pad, i) => { pad.visible = i === dj.pad; });
@@ -387,6 +616,7 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
     dispose() {
       geometries.forEach(geometry => geometry.dispose());
       guests.forEach(guest => guest.tag?.dispose());
+      climbers.forEach(climber => climber.dispose());
     },
   };
 }

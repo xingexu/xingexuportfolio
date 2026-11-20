@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { CHAPTERS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
-import { CSA_GUESTS } from "@/lib/journey/csaParty";
+import { CHAPTERS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
+import { CSA_GUESTS, csaActivityLabel } from "@/lib/journey/csaParty";
 import { LINKS } from "@/app/data";
 import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus, type TransitionInfo } from "./JourneyWorld";
 import ObjectPreview from "./ObjectPreview";
@@ -110,6 +110,7 @@ export default function About() {
   const [camera, setCamera] = useState<CameraMode>({ front: false, tilt: false });
   const near = status.nearby.map(id => itemById(id)).find(Boolean) ?? null;
   const item = opened?.kind === "item" ? itemById(opened.id) : null;
+  const lampAction = status.dormLampsOn ? "Turn desk lamps off" : "Turn desk lamps on";
 
   const openItem = useCallback((id: string) => {
     setOpened({ kind: "item", id });
@@ -157,7 +158,7 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={JOURNEY_ROOMS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows to the far door."} Use Rooms to teleport. Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows to the far door."} Use Rooms to teleport. Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. {status.chapter === WESTERN_INDEX && "Press E near the lamp switch beside the entry to toggle both desk lamps. "}Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={onStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
@@ -192,8 +193,11 @@ export default function About() {
           {status.csaDjNearby && <a className="journey-prompt journey-csa-action" href={CSA_DJ_LINK.href} target="_blank" rel="noopener noreferrer" aria-keyshortcuts="E">
             <kbd aria-hidden="true">E</kbd><span>{CSA_DJ_LINK.label} ↗</span><span className="sr-only"> (opens in a new tab)</span>
           </a>}
-          {near && <button type="button" className="journey-prompt" onClick={() => openItem(near.id)} aria-keyshortcuts="E">
-            <kbd aria-hidden="true">E</kbd><span>{near.label}</span>
+          {near && <button type="button" className="journey-prompt" onClick={() => {
+            if (near.id === WESTERN_LIGHT_SWITCH_ID) controls.current?.toggleDormLamps();
+            else openItem(near.id);
+          }} aria-keyshortcuts="E">
+            <kbd aria-hidden="true">E</kbd><span>{near.id === WESTERN_LIGHT_SWITCH_ID ? lampAction : near.label}</span>
           </button>}
           {status.volley && <button type="button" className="journey-prompt journey-volley" onClick={() => controls.current?.volley()} aria-keyshortcuts="R">
             <kbd aria-hidden="true">R</kbd><span>{status.volley}</span>
@@ -259,10 +263,11 @@ export default function About() {
             {item.video ? <video key={item.video.src} className="journey-video" src={item.video.src} poster={item.video.poster} controls playsInline preload="metadata" aria-label={item.video.label}>
               {item.video.captions && <track kind="captions" src={item.video.captions} srcLang="en" label="English" />}
               <a href={item.video.src}>Watch {item.video.label}</a>
-            </video> : <ObjectPreview model={item.model} label={item.label} />}
+            </video> : <ObjectPreview model={item.id === WESTERN_LIGHT_SWITCH_ID && status.dormLampsOn ? "dorm-light-switch-on" : item.model} label={item.label} />}
             {item.description && <p className="journey-copy">{item.description}</p>}
             {item.links && <div className="journey-links">{item.links.map(link => <StoryLink key={link.href} link={link} />)}</div>}
             {item.id === CSA_POSTER_ID && <button type="button" className="journey-continue journey-csa-action" onClick={() => { controls.current?.visitCsa(); close(); }}>Step through the poster <span aria-hidden="true">↗</span></button>}
+            {item.id === WESTERN_LIGHT_SWITCH_ID && item.chapter === status.chapter && <button type="button" className="journey-continue" onClick={() => controls.current?.toggleDormLamps()}>{lampAction}</button>}
             {chapterItems.length > 1 && <nav className="journey-item-nav" aria-label={`More from ${home.place}`}>
               <button type="button" onClick={() => openItem(chapterItems[(itemIndex + chapterItems.length - 1) % chapterItems.length].id)} aria-label="Previous object">←</button>
               <button type="button" onClick={() => browse(item.chapter)}>All objects <span>· {itemIndex + 1} / {chapterItems.length}</span></button>
@@ -273,8 +278,9 @@ export default function About() {
         {opened?.kind === "party" && <>
           <p className="journey-eyebrow">Western University · Secret room</p>
           <h2 id="journey-dialog-title">CSA After Hours</h2>
-          <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}{guest.dj && <span>DJ</span>}</li>)}</ul>
+          <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}<span>{csaActivityLabel(guest)}</span></li>)}</ul>
           <div className="journey-links"><StoryLink link={CSA_DJ_LINK} /></div>
+          <p className="journey-copy">Nuo Zhang and William Wang boulder on the right wall, following one color at a time.</p>
         </>}
         {opened?.kind === "finale" && <>
           <p className="journey-eyebrow">Age 18 · today</p>

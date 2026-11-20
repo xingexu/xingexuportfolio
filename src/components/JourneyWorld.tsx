@@ -13,6 +13,7 @@ import { makeRoommateView } from "@/lib/journey/roommateView";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildDormEntryDoor, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
+import { makeWuzuFanView } from "@/lib/journey/wuzuFanView";
 
 export type JourneyControls = {
   setStick: (x: number, y: number) => void;
@@ -106,14 +107,6 @@ export default function JourneyWorld(props: Props) {
       }
       return geometry;
     }
-    function place(p: Placement, material: MeshBasicMaterial) {
-      const holder = new Group();
-      holder.add(new Mesh(modelGeometry(p.model), material));
-      if (modelHasGlass(p.model)) holder.add(new Mesh(modelGeometry(p.model, true), glassMaterial));
-      holder.position.set(p.x, p.y ?? 0, p.z);
-      holder.rotation.y = (p.rot ?? 0) * Math.PI / 2;
-      return holder;
-    }
     const markerGrid = new Grid();
     for (let x = -4; x <= 4; x++) for (let y = -4; y <= 4; y++) for (let z = -4; z <= 4; z++) {
       if (Math.abs(x) + Math.abs(y) + Math.abs(z) <= 4) markerGrid.set(x, y, z, y >= 2 ? 0xffef9e : y < -1 ? 0xe5ac41 : 0xffd84a);
@@ -131,7 +124,7 @@ export default function JourneyWorld(props: Props) {
     type DoorView = { x: number; z: number; side: "front" | "back"; leaves: [Mesh, Mesh?]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
     type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty>; dormLighting?: ReturnType<typeof makeDormLighting> };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty>; dormLighting?: ReturnType<typeof makeDormLighting>; fans: ReturnType<typeof makeWuzuFanView>[] };
     const rooms = new Map<number, RoomView>();
     function setOpacity(material: MeshBasicMaterial, opacity: number) {
       material.opacity = opacity;
@@ -188,10 +181,15 @@ export default function JourneyWorld(props: Props) {
       const wallFor = (p: Placement) =>
         !p.ball && !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) ?? undefined : undefined;
       const props: PropView[] = [], reactive: ReactiveView[] = [], balls: BallView[] = [], itemPositions = new Map<string, Ball | Vector3>();
+      const fans: RoomView["fans"] = [];
       const addProp = (p: Placement) => {
-        const material = baseMaterial.clone(), holder = place(p, material);
+        const material = baseMaterial.clone(), holder = new Group();
+        holder.position.set(p.x, p.y ?? 0, p.z);
+        holder.rotation.y = (p.rot ?? 0) * Math.PI / 2;
+        if (p.model === "fan") fans.push(makeWuzuFanView(holder, material));
+        else holder.add(new Mesh(modelGeometry(p.model), material));
         const glass = modelHasGlass(p.model) ? glassMaterial.clone() : undefined;
-        if (glass) (holder.children[1] as Mesh).material = glass;
+        if (glass) holder.add(new Mesh(modelGeometry(p.model, true), glass));
         const bounds = new Box3().setFromObject(holder);
         if (!bounds.isEmpty()) bounds.expandByScalar(1);
         dormLighting?.add(p.model, holder);
@@ -269,7 +267,7 @@ export default function JourneyWorld(props: Props) {
         walls.front.group.add(party.stageWall);
         pickables.push(...party.djPickables);
       }
-      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party, dormLighting };
+      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party, dormLighting, fans };
       rooms.set(index, view);
       return view;
     }
@@ -789,6 +787,7 @@ export default function JourneyWorld(props: Props) {
 
       const activeRoom = room(chapter);
       activeRoom.party?.update(!blockedNow && !transition ? dt : 0, motion.matches, player);
+      for (const fan of activeRoom.fans) fan.update(time, motion.matches);
       if (!transition && !blockedNow) {
         kickPose = Math.max(0, kickPose - dt);
         const npc = activeRoom.roommate;
@@ -921,6 +920,7 @@ export default function JourneyWorld(props: Props) {
         Object.values(r.walls).forEach(wall => wall.material.dispose());
         r.party?.dispose();
         r.dormLighting?.dispose();
+        r.fans.forEach(fan => fan.dispose());
       });
       shadow.material.dispose();
       grass.material.dispose();

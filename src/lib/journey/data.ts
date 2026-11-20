@@ -15,9 +15,11 @@ export type JourneyItem = Placement & {
 };
 export type Outfit = "kid" | "starwars" | "stussy" | "western" | "csa";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "auditorium";
-export type Roommate = { id: string; x: number; z: number; seatSide: -1 | 1; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
+export type Roommate = { id: string; x: number; z: number; seatFacing: Rot; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
 export const WESTERN_LIGHT_SWITCH_ID = "dorm-light-switch";
 const WESTERN_ENTRY_X = 36;
+const RICHARD_SEAT = { x: 7, z: 46 };
+const WESTERN_FRIDGE = { x: 41, z: -57, rot: 0 } as const;
 type Vec2 = { x: number; z: number };
 export type Chapter = {
   id: string;
@@ -205,7 +207,7 @@ const ROOMS: Chapter[] = [
     items: [
       { id: WESTERN_LIGHT_SWITCH_ID, model: "dorm-light-switch", x: WESTERN_ENTRY_X - 9, z: 61, y: 14, rot: 2, solid: false,
         label: "Lamp switch", title: "Dorm lamp switch", description: "Switches both desk lamps without changing the room lighting." },
-      { id: "degree", model: "cs-ivey", x: 0, z: 61, y: 20, rot: 2, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey",
+      { id: "degree", model: "cs-ivey", x: -10, z: 61, y: 20, rot: 2, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey",
         description: "I study Computer Science at Western and have Ivey AEO status.",
         links: [{ href: "https://www.csd.uwo.ca", label: "Western Computer Science" }, { href: "https://www.ivey.uwo.ca/hba/", label: "Ivey HBA" }] },
       { id: "mustangs", model: "go-mustangs", x: -20, z: 61, y: 14, rot: 2, solid: false, label: "Go Mustangs poster", title: "Go Mustangs",
@@ -221,8 +223,8 @@ const ROOMS: Chapter[] = [
         description: "I’m a director on the Projects team.",
         links: [{ href: "https://linktr.ee/westernfoundersnetwork", label: "Western Founders Network" }, { href: "https://www.instagram.com/westernfoundersnetwork/", label: "@westernfoundersnetwork" }] },
       { id: "ohall-bed", model: "bed-western", x: 24, z: -27, label: "Blue and beige bed", title: "My bed in Ontario Hall" },
-      { id: "richards-bed", model: "bed-roommate", x: WESTERN_ENTRY_X - 18, z: 47, label: "Richard’s bed", title: "Richard’s bed" },
-      { id: "richard", model: "roommate-portrait", x: WESTERN_ENTRY_X - 25, z: 44, solid: false, label: "Richard Su", title: "Richard Su",
+      { id: "richards-bed", model: "bed-roommate", x: WESTERN_ENTRY_X - 23, z: 53, rot: 1, label: "Richard’s bed", title: "Richard’s bed" },
+      { id: "richard", model: "roommate-portrait", ...RICHARD_SEAT, solid: false, label: "Richard Su", title: "Richard Su",
         description: "My roommate in Ontario Hall.",
         video: { src: "/videos/journey/richard.mp4", label: "Richard’s dorm routine: walking, getting milk, and practicing hockey (silent)", poster: "/videos/journey/richard.webp" },
         links: [{ href: "https://www.linkedin.com/in/richard-su-7377542b9/", label: "Richard’s LinkedIn" }] },
@@ -241,16 +243,17 @@ const ROOMS: Chapter[] = [
       { id: "smiskis", model: "smiskis", x: 52, z: -23, y: 18, rot: 3, solid: false, label: "My Smiskis", title: "My Smiskis" },
       { id: "buldak", model: "buldak-bowl", x: 52, z: 1, y: 18, rot: 3, solid: false, label: "Buldak noodles", title: "Buldak at 5 a.m.",
         video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m. (silent)", poster: "/videos/journey/buldak.webp" } },
-      { id: "mini-fridge", model: "mini-fridge", x: -54, z: 45, rot: 1, label: "Mini fridge", title: "Mini fridge",
+      { id: "mini-fridge", model: "mini-fridge", ...WESTERN_FRIDGE, label: "Mini fridge", title: "Mini fridge",
         description: "Snacks and drinks." },
-      { id: "fragrances", model: "fragrances", x: -54, z: 45, y: 13, rot: 1, solid: false, label: "Fragrances", title: "Fragrances",
+      { id: "fragrances", model: "fragrances", ...WESTERN_FRIDGE, y: 13, solid: false, label: "Fragrances", title: "Fragrances",
         description: "I keep these on the mini fridge." },
-      { id: "fan", model: "fan", x: 55, z: 10.5, y: 12, rot: 3, solid: false, label: "Table fan", title: "Table fan" },
+      { id: "fan", model: "fan", x: 55, z: 10.5, y: 12, rot: 3, solid: false, label: "Wuzu fan", title: "Wuzu fan",
+        description: "An oscillating fan that blows a breeze across the dorm." },
       { id: "dorm-snacks", model: "dorm-snacks", x: 50, z: 8, y: 12, rot: 3, solid: false, label: "Dorm snacks", title: "Dorm snacks",
         description: "Chips, cookies, Pocky, and a cup of instant noodles." },
       { id: "closet", model: "closet", x: 55, z: 38, rot: 3, label: "Double closet", title: "Wooden double closet",
         description: "Hoodies, sweatpants, and snacks are put away inside." },
-      { id: "pink-shoes", model: "pink-court-shoes", x: 42, z: 19, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
+      { id: "pink-shoes", model: "pink-court-shoes", x: 26, z: 37, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
       { id: "molten", model: "molten-volleyball", x: -24, z: 14, ball: "molten", label: "Molten volleyball", title: "Molten volleyball",
         description: "Press R or tap Set near the ball." },
       { id: "laundry", model: "laundry-basket", x: -56, z: 17, rot: 1, label: "Laundry basket", title: "Laundry basket" },
@@ -264,8 +267,8 @@ const ROOMS: Chapter[] = [
       { model: "dorm-snacks", x: 59, z: -21, y: 32, rot: 3, solid: false },
       { model: "dorm-snacks", x: -38, z: -13, y: 10, rot: 1, solid: false },
     ],
-    roommate: { id: "richard", x: WESTERN_ENTRY_X - 25, z: 44, seatSide: -1, fridge: "mini-fridge", pad: "hockey-pad",
-      via: [{ x: 3, z: 44 }, { x: 3, z: 33 }, { x: -22, z: 21 }, { x: -43, z: 19 }] },
+    roommate: { id: "richard", ...RICHARD_SEAT, seatFacing: 2, fridge: "mini-fridge", pad: "hockey-pad",
+      via: [{ x: 7, z: 38 }, { x: 7, z: 29 }, { x: -22, z: 21 }, { x: -43, z: 19 }] },
   },
 ];
 

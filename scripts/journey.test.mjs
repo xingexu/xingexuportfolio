@@ -28,6 +28,7 @@ const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
 const { makeDormLighting } = load('src/lib/journey/dormLighting.ts');
+const { makeWuzuFanView } = load('src/lib/journey/wuzuFanView.ts');
 const { CSA_GUESTS, buildCsaDiscoBall, buildCsaGuest, csaActivityLabel, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { BOULDER_CYCLE, BOULDER_LANES, BOULDER_TOP_TIME, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, buildBoulderingWall, sampleBouldering } = load('src/lib/journey/csaClimb.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
@@ -707,10 +708,11 @@ function roommateScene() {
 
 test('Richard’s seated collider covers his knees on the open side of his bed', () => {
   const { view } = roommateScene(), pose = view.pose, radius = 2.38;
-  const start = { x: pose.x - 8, z: pose.z }, end = { x: pose.x - 6.5, z: pose.z };
+  const facing = { ...pose, rot: dorm.roommate.seatFacing };
+  const start = R.placementPoint(facing, 0, 8), end = R.placementPoint(facing, 0, 6.5);
   assert.ok(!W.blocked(WESTERN_INDEX, end.x, end.z, radius), 'the bed itself does not block the visitor');
-  const movement = W.step(WESTERN_INDEX, start, end.x - start.x, 0, radius, (from, to, r) => view.blocks(from, to, r, pose));
-  assert.ok(movement.x < end.x, 'the visitor cannot walk through the seated avatar');
+  const movement = W.step(WESTERN_INDEX, start, end.x - start.x, end.z - start.z, radius, (from, to, r) => view.blocks(from, to, r, pose));
+  assert.ok(Math.hypot(movement.x - end.x, movement.z - end.z) > 0.01, 'the visitor cannot walk through the seated avatar');
   assert.ok(!view.blocks(end, start, radius, pose), 'the visitor can back away');
 });
 
@@ -719,18 +721,18 @@ test('the volleyball bounces off Richard in both his seated and moving poses', (
   const field = W.buildBallField(CHAPTERS.length - 1);
   field.blocks.push(view.ballBlock);
   const checkBounce = () => {
-    const { minX, minZ, maxZ } = view.ballBlock, z = (minZ + maxZ) / 2;
-    const ball = V.makeBall(minX - 2.4, 0, z, 1.3);
-    V.launchBall(ball, { x: 19, y: 0, z: 0 });
+    const { minX, maxX, minZ } = view.ballBlock, x = (minX + maxX) / 2;
+    const ball = V.makeBall(x, 0, minZ - 2.4, 1.3);
+    V.launchBall(ball, { x: 0, y: 0, z: 19 });
     V.stepBall(ball, field, 0.14);
-    assert.ok(ball.vx < 0 && ball.x < minX - ball.radius, 'the ball bounces before entering his model');
+    assert.ok(ball.vz < 0 && ball.z < minZ - ball.radius, 'the ball bounces before entering his model');
   };
-  const seatedMinX = view.ballBlock.minX;
+  const seatedMinZ = view.ballBlock.minZ;
   checkBounce();
   const aisle = routine.beats.find(b => b.action === 'walk' && b.from.x > 0 && b.to.x < 0);
   const walking = R.sampleRoommate(routine, (aisle.start + aisle.end) / 2);
   view.apply(walking, walking.yaw);
-  assert.ok(view.ballBlock.maxX < seatedMinX, 'the collider leaves the bed with Richard');
+  assert.ok(view.ballBlock.maxZ < seatedMinZ, 'the collider leaves the bed with Richard');
   checkBounce();
 });
 
@@ -795,17 +797,71 @@ test('the Western dorm keeps small props and signs proportional to the furniture
   for (const id of ['csa', 'wds', 'wfn', 'mustangs']) assert.ok(footprint(id).height < W.AVATAR_SCALE * avatarHeight(18));
 });
 
-test('Richard’s bed touches the entry wall with its foot immediately left of the door', () => {
+test('Richard’s bed runs along the entry wall with the head away from the door', () => {
   const bed = dorm.items.find(item => item.id === 'richards-bed');
   const box = W.placementBox(bed), entrance = W.spawn(WESTERN_INDEX, 'start');
   const bounds = W.interior(dorm), doorLeft = entrance.x - W.DOOR_HALF;
   const head = R.placementPoint(bed, 0, -15), foot = R.placementPoint(bed, 0, 15);
   assert.ok(doorLeft - box.maxX >= 0 && doorLeft - box.maxX <= 3);
   assert.equal(box.maxZ, bounds.maxZ);
-  assert.equal(foot.z, bounds.maxZ);
-  assert.ok(head.z < foot.z - 25);
+  assert.equal(head.z, foot.z, 'the length of the bed runs parallel with the door frame');
+  assert.ok(head.x < foot.x - 25);
+  const model = buildModel(bed.model), wallSide = model.bounds().minX;
+  assert.ok(model.has(wallSide, 13, -14), 'the headboard extends to the wall-side edge');
+  const headAtWall = R.placementPoint(bed, wallSide, -14);
+  assert.equal(headAtWall.z, bounds.maxZ, 'the headboard meets the wall');
   const cells = reachable(WESTERN_INDEX, entrance);
-  assert.ok(cells.some(p => p.x < box.minX && W.boxDistance(box, p) <= 6), 'Richard can get out of bed on the open side');
+  assert.ok(cells.some(p => p.z < box.minZ && W.boxDistance(box, p) <= 6), 'Richard can get out of bed on the open side');
+});
+
+test('the mini fridge sits in the window corner between my bed and standing desk', () => {
+  const item = id => dorm.items.find(p => p.id === id);
+  const fridge = item('mini-fridge'), box = W.placementBox(fridge);
+  const bed = W.placementBox(item('ohall-bed')), desk = W.placementBox(item('standing-desk'));
+  const { minZ } = W.interior(dorm);
+  assert.ok(bed.maxX < box.minX && box.maxX < desk.minX, 'the fridge fits between the bed and desk');
+  assert.ok(box.minZ >= minZ && box.minZ <= minZ + 2 && box.maxZ < bed.minZ);
+  assert.ok(R.placementPoint(fridge, 0, 8).z > box.maxZ, 'the fridge opens into the aisle');
+  assert.equal(item('fragrances').x, fridge.x);
+  assert.equal(item('fragrances').z, fridge.z);
+});
+
+test('the Wuzu fan spins and sends airflow out its moving grille without capturing clicks', () => {
+  const prop = dorm.items.find(p => p.id === 'fan');
+  const cabinet = dorm.decor.find(p => p.model === 'dorm-cabinet');
+  const holder = new Group(), material = new MeshBasicMaterial();
+  holder.position.set(prop.x, prop.y, prop.z);
+  holder.rotation.y = prop.rot * Math.PI / 2;
+  const fan = makeWuzuFanView(holder, material);
+  try {
+    assert.equal(prop.label, 'Wuzu fan');
+    assert.equal(prop.title, prop.label);
+    const placed = W.placementBox(prop), surface = W.placementBox(cabinet);
+    assert.ok(placed.minX >= surface.minX && placed.maxX <= surface.maxX && placed.minZ >= surface.minZ && placed.maxZ <= surface.maxZ);
+    const parked = new Box3().setFromObject(holder);
+    assert.equal(parked.min.y, prop.y);
+    assert.equal(parked.max.y, prop.y + modelFootprint(prop.model).height);
+
+    fan.update(0.1, false);
+    const firstZ = fan.air.children[0].position.z, firstYaw = fan.head.rotation.y, firstSpin = fan.blades.rotation.z;
+    fan.update(0.45, false);
+    assert.ok(fan.air.visible && fan.air.children[0].position.z > firstZ);
+    assert.notEqual(fan.head.rotation.y, firstYaw);
+    assert.notEqual(fan.blades.rotation.z, firstSpin);
+    const origin = fan.head.getWorldPosition(new Vector3());
+    const streak = fan.air.children[0].getWorldPosition(new Vector3());
+    assert.ok(streak.x < origin.x - 2, 'the breeze moves away from the cabinet and into the room');
+    const ray = new Raycaster(origin, streak.clone().sub(origin).normalize());
+    assert.equal(ray.intersectObjects(fan.air.children).length, 0);
+
+    fan.update(1, true);
+    assert.equal(fan.head.rotation.y, 0);
+    assert.equal(fan.blades.rotation.z, 0);
+    assert.equal(fan.air.visible, false);
+  } finally {
+    fan.dispose();
+    material.dispose();
+  }
 });
 
 test('the offset entry, door animation, and threshold use the same opening', () => {

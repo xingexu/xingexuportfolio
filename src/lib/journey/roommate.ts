@@ -128,7 +128,7 @@ export function buildHockeyStick() {
 type Activity = "seat" | "rise" | "walk" | "open" | "take" | "close" | "sip" | "reopen" | "replace" | "shut" | "grab" | "practice" | "rack" | "sit";
 type Beat = { action: Activity; start: number; end: number; from: Vec; to: Vec; yaw: number };
 
-export function placementPoint(p: Placement, x: number, z: number): Vec {
+export function placementPoint(p: Vec & Pick<Placement, "rot">, x: number, z: number): Vec {
   const rot = p.rot ?? 0;
   return { x: p.x + [x, z, -x, -z][rot], z: p.z + [z, -x, -z, x][rot] };
 }
@@ -143,7 +143,7 @@ export function fridgeDoorDistance(fridge: Placement, open: number, p: Vec) {
 }
 
 export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Placement) {
-  const out = { x: spec.x + spec.seatSide * 5, z: spec.z }, seatYaw = spec.seatSide * Math.PI / 2;
+  const out = placementPoint({ ...spec, rot: spec.seatFacing }, 0, 5), seatYaw = spec.seatFacing * Math.PI / 2;
   const fridgeSpot = placementPoint(fridge, -2, 8.1), fridgeYaw = ((fridge.rot ?? 0) + 2) * Math.PI / 2;
   const padSpot = placementPoint(pad, 0, -4), padYaw = (pad.rot ?? 0) * Math.PI / 2;
   const [bedside, aisle, padAisle, padEntry] = spec.via;

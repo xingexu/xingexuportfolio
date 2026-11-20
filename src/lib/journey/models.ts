@@ -1,6 +1,7 @@
 import { Grid, hash3, shade, textWidth, type Color } from "./voxel";
 import { LOGOS, type PixelLogo } from "./logos";
 import { buildFridgeCabinet, buildFridgeDoor, buildRoommatePreview, FRIDGE_HINGE, FRIDGE_VOXEL_SIZE } from "./roommate";
+import { buildWuzuFan, FAN_VOXEL_SIZE } from "./wuzuFan";
 
 /* Every prop is authored facing +z with y = 0 on the floor. */
 type Painter = (i: number, j: number) => Color | null;
@@ -120,7 +121,9 @@ function bed(g: Grid, quilt: Color, accent: Color, frameColor: Color, pillow: Co
     for (const x of [-8, 6]) for (const z of [-13, 12]) g.box(x, 0, z, 2, 3, 2, frameColor);
   } else g.box(-8, 0, -14, w, 4, len, frameColor);
   g.box(-8, 4, -14, w, 2, len, 0xf4f1ea);
-  g.box(-8, 0, -15, w, 13, 2, frameColor).box(-8, 13, -15, w, 1, 2, shade(frameColor, 1.15));
+  const headboard = openFrame ? w + 2 : w;
+  g.box(-headboard / 2, 0, -15, headboard, 13, 2, frameColor)
+    .box(-headboard / 2, 13, -15, headboard, 1, 2, shade(frameColor, 1.15));
   for (const x of [-7, 1]) g.box(x, 6, -12, 6, 2, 5, shade(pillow, 0.85)).box(x + 1, 8, -11, 4, 1, 3, pillow);
   g.box(-8, 6, -6, w, 1, 20, (x, _y, z) => pattern(x, z) ? accent : shade(quilt, (x + 8) % 4 === 0 || (z + 6) % 4 === 0 ? 0.9 : 1.04));
   g.box(-8, 7, -7, w, 1, 2, shade(accent, 0.9));
@@ -347,8 +350,14 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 
 const GLASS = 0x9dd8e4;
 const DETAIL_VOXELS = new Set(["macbook", "csa-dj-macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn", "dorm-headphones", "dorm-snacks", "smiskis"]);
-const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo", "csa-boba-cup", "csa-soda-cup", "csa-water-bottle", "csa-speaker", "dorm-light-switch", "dorm-light-switch-on"]);
-export const modelVoxelSize = (id: string) => id === "chess-table" ? 0.125 : id === "mini-fridge" ? FRIDGE_VOXEL_SIZE : DETAIL_VOXELS.has(id) || id.startsWith("plaque-") ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") || id === "hockey-pad" || id === "roommate-portrait" ? 0.5 : 1;
+const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo", "csa-boba-cup", "csa-soda-cup", "csa-water-bottle", "csa-speaker", "dorm-light-switch", "dorm-light-switch-on"]);
+export function modelVoxelSize(id: string) {
+  if (id === "chess-table") return 0.125;
+  if (id === "mini-fridge") return FRIDGE_VOXEL_SIZE;
+  if (id === "fan") return FAN_VOXEL_SIZE;
+  if (DETAIL_VOXELS.has(id) || id.startsWith("plaque-")) return 0.25;
+  return HALF_VOXELS.has(id) || id.startsWith("poster-") || id === "hockey-pad" || id === "roommate-portrait" ? 0.5 : 1;
+}
 
 type ChessMan = "pawn" | "rook" | "knight" | "bishop" | "queen" | "king";
 
@@ -938,18 +947,7 @@ const MODELS: Record<string, (g: Grid) => void> = {
     const bottles: [number, number, Color, Color][] = [[-4, 5, 0xe6a64c, GOLD], [-1, 6, 0xdbe7ee, 0x1a1a1a], [2, 4, 0x1e1e22, 0xb5b5b5], [4, 5, 0x6b3f8f, GOLD]];
     for (const [x, h, c, cap] of bottles) g.box(x, 0, -1, 2, h, 2, c).box(x, h, -1, 2, 1, 2, cap);
   },
-  fan: g => {
-    disc(g, 0, 0, 0, 4, () => 0x595f70); g.box(-1, 1, -1, 2, 5, 2, 0x727987);
-    for (let x = -6; x <= 6; x++) for (let y = -6; y <= 6; y++) {
-      const d = Math.hypot(x, y);
-      if (d <= 6.4) {
-        if (d > 5.3) g.box(x, 9 + y, -1, 1, 1, 3, 0xb8bfcc);
-        else if ((Math.atan2(y, x) + d * 0.21 + 8) % 2.1 < 0.85) g.set(x, 9 + y, 0, 0x657790);
-        if (Math.abs(x) === Math.abs(y) || x === 0 || y === 0) g.set(x, 9 + y, 2, 0xa2adbd);
-      }
-    }
-    g.box(-1, 8, 2, 3, 3, 1, 0x565d68);
-  },
+  fan: buildWuzuFan,
   closet: dormCloset,
   "dorm-cabinet": g => {
     const wood = 0xb7885b;

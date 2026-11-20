@@ -147,7 +147,6 @@ export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Pla
   const fridgeSpot = placementPoint(fridge, -2, 8.1), fridgeYaw = ((fridge.rot ?? 0) + 2) * Math.PI / 2;
   const padSpot = placementPoint(pad, 0, -4), padYaw = (pad.rot ?? 0) * Math.PI / 2;
   const [bedside, aisle, padAisle, padEntry] = spec.via;
-  const approach = { x: fridgeSpot.x, z: aisle.z };
   const beats: Beat[] = [];
   let from: Vec = spec, yaw = seatYaw, total = 0;
   const add = (action: Activity, duration: number, to = from, angle = yaw) => {
@@ -162,7 +161,7 @@ export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Pla
   };
   add("seat", 3.2);
   add("rise", 0.65, out);
-  walk(bedside, aisle, approach, fridgeSpot);
+  walk(bedside, aisle, ...spec.fridgeVia, fridgeSpot);
   add("open", 1.15, from, fridgeYaw);
   add("take", 0.85);
   add("close", 0.95);
@@ -170,11 +169,11 @@ export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Pla
   add("reopen", 0.85);
   add("replace", 0.85);
   add("shut", 0.95);
-  walk(approach, aisle, padAisle, padEntry, padSpot);
+  walk(...[...spec.fridgeVia].reverse(), aisle, padAisle, padEntry, padSpot);
   add("grab", 0.85, from, padYaw);
   add("practice", 5.4);
   add("rack", 0.8);
-  walk(padEntry, padAisle, bedside, out);
+  walk(padEntry, padAisle, aisle, bedside, out);
   add("sit", 0.65, spec, seatYaw);
   return { beats, total, fridge };
 }

@@ -2,7 +2,7 @@ import { CanvasTexture, Group, Mesh, NearestFilter, Sprite, SpriteMaterial, Vect
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar } from "./avatar";
 import { CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_STAGE_Z } from "./data";
 import { gridGeometry } from "./mesh";
-import { buildNuoWall, NUO_NAME, sampleNuoClimb } from "./csaClimb";
+import { BOULDER_CYCLE, BOULDER_LANES, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, boulderStart, buildBoulderingWall, sampleBouldering } from "./csaClimb";
 import { Grid, hash3, shade, type Color } from "./voxel";
 import { AVATAR_SCALE, type Vec } from "./world";
 
@@ -15,7 +15,9 @@ type Activity = keyof typeof ACTIVITY_LABELS;
 type Guest = Vec & {
   name: string; yaw: number; scale: number; dj?: boolean; hair?: Hairstyle; hairColor?: Color;
   skin?: Color; chain?: boolean; shorts?: boolean; cut?: "client" | "barber"; walk?: readonly [number, number]; activity?: Activity;
+  climb?: 0 | 1;
 };
+type Climber = Guest & { climb: NonNullable<Guest["climb"]> };
 
 const floorGuest = (name: string, x: number, z: number, activity: Activity, hair: Hairstyle, scale = 1,
   walk: NonNullable<Guest["walk"]> = [3.2, 3.8], hairColor?: Color): Guest =>
@@ -30,7 +32,8 @@ export const CSA_GUESTS: readonly Guest[] = [
   { ...floorGuest("Daniel Su", 31, -23, "direct", "side-part", 1, [5, 5], 0x2b2420), skin: 0xefd2ba },
   { name: "Lucas Xue", x: CSA_BARBER_CHAIR.x + 3, z: CSA_BARBER_CHAIR.z + 9.5, yaw: -2.85, scale: 1.06, hair: "cropped-fringe", hairColor: 0x201e1e, skin: 0xe6c7ab, shorts: true, cut: "barber" },
   floorGuest("Jeffrey Ban", -15, 11, "talk", "cropped-fringe", 1, [4, 5]),
-  { ...floorGuest("William Wang", 13, -21, "radio", "tousled", 1, [5, 4], 0x252020), chain: true },
+  { name: CLIMBER_NAMES[1], ...boulderStart(BOULDER_LANES[1]),
+    yaw: Math.PI / 2, scale: 1, hair: "tousled", hairColor: 0x252020, chain: true, climb: 1 },
   floorGuest("Kevin Li", 14, -43, "tablet", "side-part", 1, [4, 4], 0x32272a),
   floorGuest("Selina Lim", -19, 28, "greet", "straight", 0.94),
   floorGuest("Gloria Huang", 19, 25, "greet", "waves", 0.96, undefined, 0x493128),
@@ -46,11 +49,13 @@ export const CSA_GUESTS: readonly Guest[] = [
   floorGuest("Aleena Liu", 76, 58, "greet", "straight", 0.95),
   floorGuest("Kate Chen", -70, 57, "drink", "waves", 0.92),
   floorGuest("Ray Shen", -34, -42, "radio", "cropped-fringe"),
+  { name: CLIMBER_NAMES[0], ...boulderStart(BOULDER_LANES[0]),
+    yaw: Math.PI / 2, scale: 0.94, hair: "cropped-fringe", hairColor: 0x352933, climb: 0 },
 ];
 
 export function csaActivityLabel(guest: Guest) {
   return guest.dj ? "DJ" : guest.cut === "barber" ? "Cuts Jason’s hair" : guest.cut === "client" ? "Gets a haircut" :
-    guest.activity ? ACTIVITY_LABELS[guest.activity] : "";
+    guest.climb !== undefined ? "Boulders" : guest.activity ? ACTIVITY_LABELS[guest.activity] : "";
 }
 
 export function buildCsaGuest(guest: Guest) {
@@ -339,51 +344,68 @@ function makeNameTag(guest: Pick<Guest, "name" | "dj">) {
   return { sprite, dispose: () => { material.dispose(); texture.dispose(); } };
 }
 
-function makeNuo(mesh: (grid: Grid, size?: number) => Mesh) {
+function makeClimber(guest: Climber, mesh: (grid: Grid, size?: number) => Mesh, random: () => number) {
+  const lane = BOULDER_LANES[guest.climb];
+  const pickCourse = () => lane.courses[Math.floor(random() * lane.courses.length)];
+  let course = pickCourse(), circuit = 0;
   const group = new Group(), body = new Group();
-  group.name = NUO_NAME;
+  group.name = guest.name;
   group.add(body);
-  const scale = AVATAR_SCALE * 0.94;
-  body.scale.setScalar(scale);
-  body.rotation.order = "YXZ";
-  body.rotation.y = Math.PI / 2;
-  const parts = buildCsaGuest({ name: NUO_NAME, x: 0, z: 0, yaw: 0, scale: 0.94, hair: "cropped-fringe", hairColor: 0x352933 });
-  parts.head.box(-2, 11, -12, 4, 3, 5, 0x352933).box(-2, 10, -12, 4, 4, 1, 0x987ba7).box(-3, 8, -15, 5, 6, 3, 0x3c303c)
+  body.scale.setScalar(AVATAR_SCALE * guest.scale);
+  body.rotation.y = guest.yaw;
+  const parts = buildCsaGuest(guest);
+  if (guest.climb === 0) parts.head.box(-2, 11, -12, 4, 3, 5, 0x352933).box(-2, 10, -12, 4, 4, 1, 0x987ba7).box(-3, 8, -15, 5, 6, 3, 0x3c303c)
     .box(-4, 4, -16, 5, 6, 3, 0x352932).box(-5, 2, -15, 4, 3, 3, 0x2a222c);
   const torso = mesh(parts.torso, AVATAR_VOXEL_SIZE), head = mesh(parts.head, AVATAR_VOXEL_SIZE);
   if (parts.shirtPrint) torso.add(mesh(parts.shirtPrint, SHIRT_PRINT_VOXEL_SIZE));
-  torso.add(mesh(new Grid().box(-3, 1, -8, 6, 5, 4, 0x997189)
-    .box(-3, 5, -8, 6, 1, 4, 0x6f4f73).box(-2, 6, -7, 4, 1, 2, 0xcab8c9), AVATAR_VOXEL_SIZE));
+  torso.add(mesh(new Grid().box(-3, 1, -8, 6, 5, 4, guest.climb === 0 ? 0x997189 : 0x597982)
+    .box(-3, 5, -8, 6, 1, 4, 0x434057).box(-2, 6, -7, 4, 1, 2, 0xcab8c9), AVATAR_VOXEL_SIZE));
   head.name = "Head";
   head.position.y = parts.shoulder + 2 - parts.hip;
   body.add(torso, head);
 
   const limb = (grid: Grid, side: -1 | 1, foot: boolean) => {
     const { minX, maxX, minY } = grid.bounds(), hinge = Math.round(minY * 0.5), center = (minX + maxX + 1) / 2;
-    if (foot) grid.box(minX, minY, 2, maxX - minX + 1, 3, 3, 0x8bcec1).box(minX, minY, 4, maxX - minX + 1, 1, 2, 0x45364d);
+    const sideName = side < 0 ? "Left" : "Right";
+    const shoe = foot ? mesh(new Grid().box(-3, -1, -2, 6, 1, 6, 0x45364d)
+      .box(-3, 0, -2, 6, 2, 5, guest.climb === 0 ? 0x8bcec1 : 0xd1b075)
+      .box(-2, 0, 3, 4, 1, 1, guest.climb === 0 ? 0x498679 : 0x8d7047), AVATAR_VOXEL_SIZE) : null;
+    const toe = new Vector3(0, -0.5, 1.75);
+    if (shoe) {
+      grid.box(minX, minY, -5, maxX - minX + 1, 3, 12, -1);
+      shoe.name = `${sideName} climbing shoe`;
+      body.add(shoe);
+    }
     const { upper, lower } = splitLimb(grid, hinge, center);
     const joint = mesh(upper, AVATAR_VOXEL_SIZE), end = mesh(lower, AVATAR_VOXEL_SIZE);
     joint.position.set(side * (foot ? 1.5 : parts.shoulderX + 1), foot ? 0 : parts.shoulder + 1 - parts.hip, 0);
-    end.name = `${side < 0 ? "Left" : "Right"} ${foot ? "shin" : "forearm"}`;
+    end.name = `${sideName} ${foot ? "shin" : "forearm"}`;
     body.add(joint, end);
     return (goal: Point) => {
       const target = body.worldToLocal(new Vector3(goal.x, goal.y, goal.z));
-      aimArm(joint, end, target, -hinge * AVATAR_VOXEL_SIZE, (hinge - minY - 1) * AVATAR_VOXEL_SIZE, side, foot ? 0.9 : -0.3);
+      if (shoe) target.sub(toe);
+      aimArm(joint, end, target, -hinge * AVATAR_VOXEL_SIZE, (hinge - minY - (shoe ? 3 : 1)) * AVATAR_VOXEL_SIZE, side, foot ? -0.7 : -0.3);
+      if (shoe) shoe.position.copy(target);
     };
   };
   const reach = [limb(parts.armL, -1, false), limb(parts.legL, -1, true), limb(parts.armR, 1, false), limb(parts.legR, 1, true)];
-  const tag = makeNameTag({ name: NUO_NAME });
+  const tag = makeNameTag(guest);
   if (tag) group.add(tag.sprite);
   return {
     group,
     update(time: number, reduced: boolean, player: Vec) {
-      const pose = sampleNuoClimb(time, reduced);
+      const elapsed = Math.max(0, time - lane.delay);
+      const next = Math.floor(elapsed / BOULDER_CYCLE);
+      if (!reduced && next !== circuit) {
+        circuit = next;
+        course = pickCourse();
+      }
+      const pose = sampleBouldering(lane, course, elapsed % BOULDER_CYCLE, reduced);
       group.position.set(pose.hips.x, pose.hips.y, pose.hips.z);
-      body.rotation.x = -pose.tilt;
       head.rotation.x = -0.15;
       reach.forEach((set, index) => set(pose.grip[index]));
       if (tag) {
-        tag.sprite.position.set(-1.4, 11 * Math.cos(pose.tilt) - 3 * Math.sin(pose.tilt), 0);
+        tag.sprite.position.set(-2, 12, 0);
         tag.sprite.visible = Math.hypot(group.position.x - player.x, group.position.z - player.z) < 64;
       }
     },
@@ -391,7 +413,7 @@ function makeNuo(mesh: (grid: Grid, size?: number) => Mesh) {
   };
 }
 
-export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial) {
+export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial, random = Math.random) {
   const group = new Group(), stageWall = new Group(), geometries: BufferGeometry[] = [];
   const mesh = (grid: Grid, size = 1, paint = material) => {
     const geometry = gridGeometry(grid, [0, 0, 0], 0.02, size);
@@ -401,12 +423,17 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
   const { backdrop, floor } = stageScenery();
   group.add(mesh(floor));
   stageWall.add(mesh(backdrop, 1, wallMaterial));
-  const climbingWall = buildNuoWall(), boulder = mesh(climbingWall.grid), mat = mesh(climbingWall.mat);
-  boulder.name = "Bouldering wall and roof";
-  mat.scale.y = 0.16;
-  const nuo = makeNuo(mesh);
-  group.add(boulder, mesh(climbingWall.holds, 0.5), mat, nuo.group);
-  nuo.update(0, false, { x: 0, z: 0 });
+  const climbingWall = buildBoulderingWall(), boulder = mesh(climbingWall.grid), mat = mesh(climbingWall.mat);
+  boulder.name = "Vertical bouldering wall";
+  mat.name = "Bouldering crash mat";
+  mat.scale.y = MAT_VOXEL_HEIGHT;
+  group.add(boulder, mesh(climbingWall.holds, 0.5), mat);
+  const climbers = CSA_GUESTS.filter((guest): guest is Climber => guest.climb !== undefined).map(guest => {
+    const climber = makeClimber(guest, mesh, random);
+    group.add(climber.group);
+    climber.update(0, false, { x: 0, z: 0 });
+    return climber;
+  });
   const disco = new Group(), sphere = mesh(buildCsaDiscoBall(), 0.46);
   disco.name = "Disco ball";
   sphere.position.setScalar(-0.23);
@@ -423,7 +450,8 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
     return spot;
   });
   const djPickables: Object3D[] = [];
-  const guests = CSA_GUESTS.map((guest, index) => {
+  const guests = CSA_GUESTS.flatMap((guest, index) => {
+    if (guest.climb !== undefined) return [];
     const parts = buildCsaGuest(guest);
     const holder = new Group(), body = new Group();
     holder.name = guest.name;
@@ -488,7 +516,7 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
         djPickables.push(object);
       }
     });
-    return { guest, holder, body, head, left, right, legL, legR, tag, gear, seatOffset, clock: 0 };
+    return [{ guest, index, holder, body, head, left, right, legL, legR, tag, gear, seatOffset, clock: 0 }];
   });
   const clipper = mesh(new Grid().box(-2, 0, -1, 4, 5, 3, 0x292831)
     .box(-1, 1, 2, 2, 3, 1, 0x685870).set(0, 2, 3, 0x9fefd1)
@@ -528,14 +556,16 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
       return Math.hypot(player.x, player.z - (CSA_STAGE_Z - 8)) <= 23;
     },
     blocks(from: Vec, to: Vec, radius: number) {
-      return guests.some(({ holder }) => {
-        const { x, z } = holder.position, next = Math.hypot(to.x - x, to.z - z);
+      const approaches = ({ x, z }: Vec) => {
+        const next = Math.hypot(to.x - x, to.z - z);
         return next < radius + 2.5 && next < Math.hypot(from.x - x, from.z - z);
-      });
+      };
+      return guests.some(({ holder }) => approaches(holder.position)) ||
+        climbers.some(({ group }) => group.position.y < 14 && approaches(group.position));
     },
     update(dt: number, reduced: boolean, player: Vec) {
       if (!reduced) time += dt;
-      nuo.update(time, reduced, player);
+      climbers.forEach(climber => climber.update(time, reduced, player));
       const dj = sampleCsaDj(time, reduced), cut = sampleCsaCut(time, reduced);
       const spin = reduced ? 0 : time * 0.32;
       disco.rotation.y = spin;
@@ -544,8 +574,8 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
         spot.position.set(Math.cos(angle) * ring, 0.047, DISCO_Z + Math.sin(angle) * ring * 0.56);
         spot.rotation.y = -angle;
       });
-      for (const [index, view] of guests.entries()) {
-        const { guest, holder, body, head, left, right, legL, legR, tag, gear, seatOffset } = view;
+      for (const view of guests) {
+        const { guest, index, holder, body, head, left, right, legL, legR, tag, gear, seatOffset } = view;
         const pose = sampleCsaGuest(guest, index, guest.walk ? view.clock + dt : time, reduced);
         const gap = Math.hypot(player.x - holder.position.x, player.z - holder.position.z);
         const nextGap = Math.hypot(player.x - pose.x, player.z - pose.z);
@@ -586,7 +616,7 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
     dispose() {
       geometries.forEach(geometry => geometry.dispose());
       guests.forEach(guest => guest.tag?.dispose());
-      nuo.dispose();
+      climbers.forEach(climber => climber.dispose());
     },
   };
 }

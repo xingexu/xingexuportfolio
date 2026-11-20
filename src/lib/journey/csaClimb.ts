@@ -1,71 +1,105 @@
 import { Grid, hash3, shade } from "./voxel";
 
-export const NUO_NAME = "Nuo";
-const WALL_X = 93, SLOPE_Y = 27, ROOF_Y = 36;
-const SLOPE_END = SLOPE_Y + (ROOF_Y - SLOPE_Y) * Math.SQRT2;
-const STEP = 4.5, ROUNDS = 10, BEAT = 0.62;
-const START = [13, 2, 11, 4] as const;
-// Left hand, left foot, right hand, right foot; set the feet before the second hand reaches.
-const ORDER = [0, 3, 1, 2];
-export const CLIMB_STEPS = ROUNDS * ORDER.length;
-export const CLIMB_TIME = BEAT * CLIMB_STEPS;
-const GRIP = [0x83e5ca, 0xeba97f, 0xc4abff, 0x94bee4];
+export const CLIMBER_NAMES = ["Nuo Zhang", "William Wang"] as const;
+const WALL_X = 92, WALL_TOP = 38, WALL_Z = -26, WIDTH = 54;
+export const MAT_VOXEL_HEIGHT = 0.24;
+const MAT_TOP = 3 * MAT_VOXEL_HEIGHT;
+const BEAT = 0.72, ROUNDS = 5;
+const MOUNT_ORDER = [0, 2, 1, 3], CLIMB_ORDER = [0, 3, 1, 2];
+const ASCENT_BEATS = ROUNDS * CLIMB_ORDER.length;
+const MOUNT_TIME = BEAT * MOUNT_ORDER.length;
+export const BOULDER_TOP_TIME = MOUNT_TIME + ASCENT_BEATS * BEAT;
+export const BOULDER_CYCLE = BOULDER_TOP_TIME * 2 + 1.5;
 const smooth = (t: number) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
 
-function surface(s: number) {
-  const slope = Math.min(ROOF_Y - SLOPE_Y, Math.max(0, (s - SLOPE_Y) * Math.SQRT1_2));
-  return { x: WALL_X - slope - Math.max(0, s - SLOPE_END), y: Math.min(s, SLOPE_Y) + slope,
-    z: -2 + Math.sin(s * 0.16) * 2.6 + s * 0.07 };
+type Point = { x: number; y: number; z: number };
+type Course = { color: number; holds: Point[][] };
+
+function makeCourse(center: number, color: number, width: number, step: number, phase: number): Course {
+  const holds = [1, -1].map(side => Array.from({ length: ROUNDS + 3 }, (_, rung) => ({
+    x: WALL_X - 1.25,
+    y: (side > 0 ? 2.1 : 3.6) + rung * step,
+    z: center + side * width + 0.55 * Math.sin(phase + rung * 1.35 + side),
+  })));
+  return { color, holds };
 }
 
-function anchor(slot: number, rung: number) {
-  const s = START[slot] + rung * STEP, p = surface(s);
-  const tilt = s < SLOPE_Y ? 0 : s < SLOPE_END ? Math.PI / 4 : Math.PI / 2;
-  return { x: p.x - 0.8 * Math.cos(tilt), y: p.y - 0.8 * Math.sin(tilt), z: p.z + (slot < 2 ? 1 : -1) * (slot % 2 ? 2.9 : 3.5) };
+export const BOULDER_LANES = [
+  { center: -12, delay: 0, courses: [makeCourse(-12, 0xff816d, 3.2, 4.2, 0), makeCourse(-12, 0x75d9ff, 6.2, 4.4, 1)] },
+  { center: 14, delay: 2.1, courses: [makeCourse(14, 0xe8b5ff, 3.2, 4.4, 2), makeCourse(14, 0xb5eb74, 6.2, 4.2, 3)] },
+];
+type Lane = typeof BOULDER_LANES[number];
+
+function anchor(course: Course, slot: number, rung: number) {
+  return course.holds[slot < 2 ? 0 : 1][rung + (slot % 2 ? 0 : 2)];
 }
 
-export function sampleNuoClimb(time: number, reduced: boolean) {
-  const clock = reduced ? 9.5 * BEAT : ((time % (2 * CLIMB_TIME) + 2 * CLIMB_TIME) % (2 * CLIMB_TIME));
-  const progress = Math.min(clock, 2 * CLIMB_TIME - clock) / BEAT;
-  const index = Math.min(CLIMB_STEPS - 1, Math.floor(progress));
-  const round = Math.floor(index / ORDER.length), beat = index % ORDER.length;
-  const reach = smooth(progress - index);
-  const rung = (slot: number) => round + Number(ORDER.indexOf(slot) < beat);
-  const hips = START.reduce((sum, s, slot) =>
-    sum + (s + (rung(slot) + (slot === ORDER[beat] ? reach : 0)) * STEP) * (slot % 2 ? 0.26 : 0.24), 0);
-  const center = surface(hips), tilt = Math.PI / 2 * smooth((hips - 24) / 17);
-  const grip = START.map((_, slot) => {
-    const from = anchor(slot, rung(slot));
-    if (slot !== ORDER[beat]) return from;
-    const to = anchor(slot, rung(slot) + 1), release = 0.95 * Math.sin(reach * Math.PI);
-    return { x: from.x + (to.x - from.x) * reach - release * Math.cos(tilt),
-      y: from.y + (to.y - from.y) * reach - release * Math.sin(tilt), z: from.z + (to.z - from.z) * reach };
+function interpolate(from: Point, to: Point, t: number): Point {
+  return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t, z: from.z + (to.z - from.z) * t };
+}
+
+function moveGrip(from: Point, to: Point, t: number) {
+  const point = interpolate(from, to, t);
+  point.x -= 1.35 * Math.sin(Math.PI * t);
+  return point;
+}
+
+export const boulderStart = (lane: Lane): Point => ({ x: WALL_X - 4.5, y: MAT_TOP + 5.9, z: lane.center });
+
+function wallPose(lane: Lane, course: Course, beats: number) {
+  const tick = Math.min(ASCENT_BEATS - 1, Math.floor(beats));
+  const round = Math.floor(tick / CLIMB_ORDER.length), step = tick % CLIMB_ORDER.length;
+  const active = CLIMB_ORDER[step], t = smooth(beats - tick);
+  const planted = CLIMB_ORDER.map((_, slot) => anchor(course, slot, round + Number(CLIMB_ORDER.indexOf(slot) < step)));
+  const next = anchor(course, active, round + 1);
+  const level = planted.map((point, slot) => slot === active ? interpolate(point, next, t) : point);
+  const y = level.reduce((sum, point, slot) => sum + point.y * (slot % 2 ? 0.26 : 0.24), 0);
+  return {
+    hips: { x: WALL_X - 3.8, y, z: lane.center },
+    grip: planted.map((point, slot) => slot === active ? moveGrip(point, next, t) : point),
+  };
+}
+
+export function sampleBouldering(lane: Lane, course: Course, clock: number, reduced: boolean) {
+  if (reduced) return wallPose(lane, course, 5);
+  const time = Math.max(0, Math.min(clock, 2 * BOULDER_TOP_TIME));
+  const ascent = Math.min(time, 2 * BOULDER_TOP_TIME - time);
+  if (ascent >= MOUNT_TIME) return wallPose(lane, course, (ascent - MOUNT_TIME) / BEAT);
+
+  const mount = ascent / BEAT, hips = boulderStart(lane);
+  const start = [1, 1, -1, -1].map((side, slot) => slot % 2
+    ? { x: hips.x + 1.15, y: MAT_TOP, z: lane.center + side * 1.45 }
+    : { x: hips.x, y: hips.y + 0.15, z: lane.center + side * 3.2 });
+  return {
+    hips: interpolate(hips, wallPose(lane, course, 0).hips, smooth((mount - 2) / 2)),
+    grip: start.map((point, slot) => {
+      const target = anchor(course, slot, 0), t = smooth(mount - MOUNT_ORDER.indexOf(slot));
+      const grip = moveGrip(point, target, t);
+      if (slot % 2) grip.y += 0.65 * Math.sin(Math.PI * t);
+      return grip;
+    }),
+  };
+}
+
+export function buildBoulderingWall() {
+  const grid = new Grid().box(WALL_X, 0, WALL_Z, 1, WALL_TOP, WIDTH, (x, y, z) => {
+    const seam = (z - WALL_Z) % 9 === 0 || y % 9 === 0;
+    return shade(seam ? 0x454052 : 0x6b6478, 0.88 + hash3(x, y, z) * 0.18);
   });
-  return { grip, tilt, hips: { x: center.x - 3.2 * Math.cos(tilt), y: center.y - 3.2 * Math.sin(tilt), z: center.z } };
-}
-
-export function buildNuoWall() {
-  const grid = new Grid(), baseZ = -14, width = 32;
-  const panel = (x: number, y: number, z: number) => shade(0x665875,
-    0.87 + hash3(x, y, z) * 0.12 + (Math.floor((z - baseZ) / 8) % 2 ? 0.1 : 0));
-  for (let y = 0; y <= ROOF_Y; y++) {
-    const face = WALL_X - Math.max(0, y - SLOPE_Y);
-    grid.box(face, y, baseZ, 2 + Number(y > SLOPE_Y), 1, width, panel);
-    for (const z of [baseZ, baseZ + width - 1]) grid.box(face, y, z, 3, 1, 1, 0x9682a6);
-  }
-  grid.box(63, ROOF_Y, baseZ, 23, 2, width, panel).box(63, ROOF_Y + 2, baseZ, 23, 1, 1, 0x9682a6)
-    .box(63, ROOF_Y + 2, baseZ + width - 1, 23, 1, 1, 0x9682a6).box(63, ROOF_Y, baseZ, 1, 2, width, 0xa491ad);
-  for (let z = baseZ + 3; z < baseZ + width; z += 7) {
-    for (let y = 3; y < ROOF_Y; y += 6) grid.set(WALL_X - Math.max(0, y - SLOPE_Y) - 1, y, z, 0x4f435e);
-  }
+  for (const z of [WALL_Z, 1, WALL_Z + WIDTH - 1]) grid.box(WALL_X, 0, z, 1, WALL_TOP, 1, 0x90869f);
   const holds = new Grid();
-  for (let slot = 0; slot < START.length; slot++) for (let rung = 0; rung <= ROUNDS; rung++) {
-    const { x, y, z } = anchor(slot, rung), [a, b, c] = [x, y, z].map(n => Math.floor(n * 2));
-    holds.box(a - 1, b - 1, c - 1, 3, 3, 3, shade(GRIP[slot], 0.72))
-      .box(a - 1, b, c - 1, 2, 2, 4, GRIP[slot]).set(a, b, c, 0x594a68);
+  for (const { courses } of BOULDER_LANES) for (const { color, holds: rows } of courses) {
+    for (const row of rows) for (const [index, point] of row.entries()) {
+      const [x, y, z] = [point.x, point.y, point.z].map(value => Math.floor(value * 2));
+      const width = index % 2 ? 3 : 4;
+      holds.box(x + 1, y - 1, z - 1, 3, 3, 3, shade(color, 0.68))
+        .box(x, y, z - 1, 2, 2, width, color)
+        .set(x, y + 1, z + 1, shade(color, 1.13));
+    }
   }
-  const mat = new Grid().box(80, 0, baseZ - 1, 13, 1, width + 2, 0x403651)
-    .box(80, 1, baseZ - 1, 13, 1, width + 2, 0x64547b);
-  for (let z = baseZ; z < baseZ + width; z += 8) mat.box(81, 1, z, 11, 1, 1, 0x8976a0);
+  const mat = new Grid().box(78, 0, WALL_Z - 1, 14, 2, WIDTH + 2, 0x373044)
+    .box(78, 2, WALL_Z - 1, 14, 1, WIDTH + 2, 0x665480)
+    .box(78, 2, WALL_Z - 1, 1, 1, WIDTH + 2, 0x967daf);
+  for (let z = WALL_Z; z < WALL_Z + WIDTH; z += 9) mat.box(79, 2, z, 13, 1, 1, 0x4c405f);
   return { grid, holds, mat };
 }

@@ -244,6 +244,7 @@ export default function About() {
           <h2 id="journey-dialog-title">CSA After Hours</h2>
           <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}<span>{csaActivityLabel(guest)}</span></li>)}</ul>
           <div className="journey-links"><StoryLink link={CSA_DJ_LINK} /></div>
+          <p className="journey-copy">Look up by the right wall to see Nuo bouldering across the ceiling.</p>
         </>}
         {opened?.kind === "finale" && <>
           <p className="journey-eyebrow">Age 18 · today</p>

@@ -24,7 +24,6 @@
 
 .journey-typed i { font-style: normal; animation: journey-caret 900ms steps(1) infinite; margin-left: 2px; }
 @keyframes journey-caret { 50% { opacity: 0; } }
-.journey-intro { position: absolute; z-index: 3; left: 50%; top: 26%; transform: translateX(-50%); pointer-events: none; text-shadow: 3px 3px 0 #000; font-family: var(--font-pixel), monospace; font-size: clamp(22px, 5vw, 40px); white-space: nowrap; }
 .journey-card { position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; padding: 20px; pointer-events: none; }
 .journey-pass {
   pointer-events: auto; cursor: pointer; position: relative; isolation: isolate;
@@ -89,7 +88,6 @@
 .journey-object-list button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; }
 .journey-object-list button span { color: #f2d24b; }
 .journey-object-list button:hover, .journey-room-picker button:hover { border-color: #f2d24b; }
-.journey-intro-copy { font-size: 12px; color: #aaa; margin-bottom: 18px; line-height: 1.7; }
 .journey-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 24px; }
 .journey-link { display: inline-flex; gap: 14px; align-items: center; border-bottom: 1px solid #777; padding-bottom: 6px; color: #eee; font-size: 12px; text-decoration: none; }
 .journey-link:hover { border-color: #f2d24b; color: #f2d24b; }

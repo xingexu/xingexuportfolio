@@ -262,6 +262,7 @@ const ROOMS: Chapter[] = [
 
 export const CHAPTERS = ROOMS.map(chapter => chapter.outdoor || chapter.id === "western" ? chapter : expandRoom(chapter));
 export const WESTERN_INDEX = CHAPTERS.findIndex(chapter => chapter.id === "western");
+export const JOURNEY_START_INDEX = WESTERN_INDEX;
 export const CSA_POSTER_ID = "csa";
 export const CSA_ROOM_INDEX = CHAPTERS.length;
 export const CSA_STAGE_Z = -62;

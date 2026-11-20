@@ -408,7 +408,6 @@ function macbook(g: Grid, display = code(9)) {
   g.box(-19, 5, -14, 38, 24, 2, silver).box(-18, 6, -12, 36, 22, 1, BLACK);
   panel(g, -16, 8, -11, 32, 18, display);
   g.box(-2, 25, -11, 4, 1, 1, BLACK);
-  centeredText(g, "MACBOOK", 1, 12, 0xedf2f6);
   const mark = [".....##.", "....##..", ".###....", "#######.", "######..", "######..", ".######.", "..####.."];
   mark.forEach((row, i) => [...row].forEach((c, x) => { if (c === "#") g.set(x - 4, 21 - i, -15, 0xe8edf4); }));
 }

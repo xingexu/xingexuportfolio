@@ -1113,7 +1113,7 @@ test('the cabinet slides folded clothes into view and stops short of an occupied
   const volleyAtCabinet = () => {
     const ball = V.makeBall(ballStart.x, 0, ballStart.z, 1.3);
     V.launchBall(ball, { x: 19, y: 0, z: 0 });
-    V.stepBall(ball, field, 0.14);
+    V.stepBall(ball, field, 0.22);
     return ball;
   };
   assert.ok(volleyAtCabinet().vx > 0, 'the ball rolls through the clear aisle when closed');
@@ -1122,9 +1122,13 @@ test('the cabinet slides folded clothes into view and stops short of an occupied
   assert.equal(view.update(0.016, false, clear, 2.38), true);
   const bottom = viewHolder.children[1], top = viewHolder.children[2];
   assert.ok(bottom.position.z > 0 && bottom.position.z < 1, 'normal motion slides incrementally');
-  assert.ok(view.update(0.016, true, clear, 2.38));
+  const nextToHandle = R.placementPoint(prop, 3.5, 13);
+  const clearBall = V.makeBall(nextToHandle.x, 2, nextToHandle.z, 1.3);
+  assert.ok(view.update(0.016, true, clear, 2.38, undefined, 0, [clearBall]), 'a ball beside the handle does not block the drawer');
   assert.ok(bottom.position.z > top.position.z && top.position.z + 5 > 7, 'both folded stacks are carried out of the cabinet');
-  assert.ok(volleyAtCabinet().vx < 0, 'the ball bounces on the extended bottom drawer');
+  const rebound = volleyAtCabinet(), drawerFront = stand(7 + bottom.position.z);
+  assert.ok(rebound.vx < 0 && rebound.x + rebound.radius <= drawerFront.x &&
+    rebound.x + rebound.radius > drawerFront.x - 0.5, 'the ball bounces on the wood, not the invisible space beside the handle');
   assert.ok(view.blocksMove(clear, stand(13), 2.38));
   assert.ok(!view.blocksMove(stand(13), clear, 2.38));
   for (const beat of routine.beats.filter(b => b.action === 'walk')) {

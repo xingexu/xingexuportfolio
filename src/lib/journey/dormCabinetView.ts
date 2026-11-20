@@ -14,16 +14,24 @@ export function makeDormCabinetView(placement: Placement, holder: Group, meshFor
   holder.add(meshFor(shell), ...slides);
   let open = false, amount = 0;
 
-  function drawerBox(extension: number) {
-    const a = placementPoint(placement, -4, 8), b = placementPoint(placement, 4, 8 + extension);
+  function footprint(halfWidth: number, back: number, front: number) {
+    const a = placementPoint(placement, -halfWidth, back), b = placementPoint(placement, halfWidth, front);
     return { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minZ: Math.min(a.z, b.z), maxZ: Math.max(a.z, b.z) };
   }
   const reach = (i: number, at: number) => at * (EXTENSION - 0.75 * i);
-  const ballBlocks: BallBlock[] = slides.map((_, i) => {
+  const ballShapes = slides.flatMap((_, i) => {
     const bottom = (placement.y ?? 0) + 1 + i * 5;
-    return { ...drawerBox(0), bottom, top: bottom + 4 };
+    return [
+      { i, halfWidth: 4, back: -5, front: 7, bottom, top: bottom + 4 },
+      { i, halfWidth: 2, back: 7, front: 8, bottom: bottom + 2, top: bottom + 3 },
+    ];
   });
-  const drawerDistance = (point: Vec, at: number) => boxDistance(drawerBox(EXTENSION * at), point);
+  const ballFootprints = (at: number): BallBlock[] => ballShapes.map(({ i, halfWidth, back, front, bottom, top }) => {
+    const offset = reach(i, at);
+    return { ...footprint(halfWidth, back + offset, front + offset), bottom, top };
+  });
+  const ballBlocks = ballFootprints(0);
+  const drawerDistance = (point: Vec, at: number) => boxDistance(footprint(4, 8, 8 + EXTENSION * at), point);
 
   return {
     ballBlocks,
@@ -44,15 +52,15 @@ export function makeDormCabinetView(placement: Placement, holder: Group, meshFor
     update(dt: number, reduced: boolean, player: Vec, radius: number, roommate?: Vec, roommateRadius = 0, balls: readonly Ball[] = []) {
       const step = reduced ? 1 : dt / 0.32;
       const next = open ? Math.min(1, amount + step) : Math.max(0, amount - step);
-      if (next === amount || (next > amount && (drawerDistance(player, next) < radius ||
+      if (next === amount) return false;
+      const footprints = ballFootprints(next);
+      if (next > amount && (drawerDistance(player, next) < radius ||
         (roommate && drawerDistance(roommate, next) < roommateRadius) ||
-        ballBlocks.some(({ bottom, top }, i) => balls.some(ball => ball.y + ball.radius > bottom &&
-          ball.y - ball.radius < top && boxDistance(drawerBox(reach(i, next)), ball) < ball.radius))))) return false;
+        footprints.some(block => balls.some(ball => ball.y + ball.radius > block.bottom &&
+          ball.y - ball.radius < block.top && boxDistance(block, ball) < ball.radius)))) return false;
       amount = next;
-      slides.forEach((drawer, i) => {
-        drawer.position.z = reach(i, amount);
-        Object.assign(ballBlocks[i], drawerBox(drawer.position.z));
-      });
+      slides.forEach((drawer, i) => { drawer.position.z = reach(i, amount); });
+      ballBlocks.forEach((block, i) => Object.assign(block, footprints[i]));
       return true;
     },
   };

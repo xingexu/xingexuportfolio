@@ -421,6 +421,19 @@ test('near-wall framing stops looking through the wall and cutaways fade on both
   }
 });
 
+test('foreground props stay visible during sustained occlusion and stay solid during sleep', () => {
+  let opacity = 1;
+  for (let frame = 0; frame < 120; frame++) {
+    opacity = W.foregroundPropOpacity(opacity, true, 0.25, false);
+    assert.ok(opacity >= 0.7, 'a blocked sightline never makes a prop vanish');
+  }
+  assert.ok(opacity < 1, 'foreground furniture can still help reveal the avatar');
+  assert.equal(W.foregroundPropOpacity(1, true, 1, false), opacity, 'reduced motion uses the same visibility floor');
+  assert.equal(W.foregroundPropOpacity(opacity, true, 0.25, true), 1, 'the sleeping view keeps the bed solid immediately');
+  for (let frame = 0; frame < 120; frame++) opacity = W.foregroundPropOpacity(opacity, false, 0.25, false);
+  assert.equal(opacity, 1, 'furniture returns to full opacity when the view clears');
+});
+
 test('door leaves fit the opening and open before you reach either threshold', () => {
   for (const chapter of CHAPTERS) {
     const bounds = W.interior(chapter), leaf = W.buildDoorLeaf(chapter).bounds();
@@ -962,16 +975,31 @@ test('Richard can pass the bedside while the player sleeps, and blocks getting u
   assert.fail('Richard walks past the bedside');
 });
 
-test('navy sheets and a thick navy pillow stay exposed above the small Capco throw', () => {
+test('the textured beige blanket sits over navy sheets, leaving the thick pillow and small Capco throw visible', () => {
   const bed = dorm.items.find(item => item.id === 'ohall-bed');
   const blanket = dorm.decor.find(p => p.model === 'capco-throw'), stitch = dorm.decor.find(p => p.model === 'capco-stitch');
   const bedBox = W.placementBox(bed), blanketBox = W.placementBox(blanket), logoBox = W.placementBox(stitch);
   assert.ok(blanketBox.minZ > bed.z + 7 && blanketBox.maxZ > bedBox.maxZ - 1, 'the throw covers only the foot');
   assert.ok(blanketBox.maxZ - blanketBox.minZ < (bedBox.maxZ - bedBox.minZ) / 3);
   const navy = color => (color & 255) > ((color >> 8) & 255) * 1.5 && (color & 255) < 100;
+  const beige = color => {
+    const red = color >> 16, green = (color >> 8) & 255, blue = color & 255;
+    return red > green && green > blue && blue >= 120;
+  };
   const bedGrid = buildModel(bed.model);
   assert.ok(navy(bedGrid.get(0, 6, 0)) && navy(bedGrid.get(0, 5, 14)), 'the sheet is navy on top and at the foot');
   for (const x of [-4, 0, 4]) assert.ok(navy(bedGrid.get(x, 11, -8)), 'the wide pillow is five voxels thick and navy');
+  const quiltSwatches = new Set();
+  for (let x = -8; x < 8; x++) for (let z = -3; z < 7; z++) {
+    const color = bedGrid.get(x, bedGrid.has(x, 8, z) ? 8 : 7, z);
+    assert.ok(beige(color), 'the visible main cover is beige');
+    quiltSwatches.add(color);
+  }
+  assert.ok(quiltSwatches.size > 15, 'the main cover has textured seams and fabric');
+  assert.ok(beige(bedGrid.get(-9, 5, 0)) && beige(bedGrid.get(8, 5, 0)), 'the cover drapes down both sides');
+  for (let x = -8; x < 8; x++) for (let z = 8; z <= 14; z++) {
+    assert.ok(beige(bedGrid.get(x, 7, z)) && !bedGrid.has(x, 8, z), 'the Capco throw sits above the main blanket at the foot');
+  }
   const grid = buildModel(blanket.model), swatches = new Set();
   for (let x = -14; x < 14; x++) swatches.add(grid.get(x, 7, 0));
   assert.ok(swatches.size > 5, 'the weave is not a flat color');

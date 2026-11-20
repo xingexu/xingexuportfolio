@@ -263,6 +263,7 @@ export default function JourneyWorld(props: Props) {
       }
       const field = balls.length ? buildBallField(index) : undefined;
       if (roommate) field?.blocks.push(roommate.ballBlock);
+      if (cabinet) field?.blocks.push(...cabinet.ballBlocks);
       const route = journeyArrows(index).map(({ x, z }, i, points) => {
         const arrow = new Mesh(arrowGeometry, arrowMaterial);
         arrow.position.set(x, 3.4, z);
@@ -870,7 +871,7 @@ export default function JourneyWorld(props: Props) {
       if (!transition && !blockedNow) {
         const { roommate: npc, cabinet } = activeRoom;
         const npcCenter = cabinet && npc ? roommateCenter(npc.pose, npc.yaw) : undefined;
-        if (cabinet?.update(dt, motion.matches, player, 3.5 * AVATAR_SCALE, npcCenter, ROOMMATE_RADIUS)) {
+        if (cabinet?.update(dt, motion.matches, player, 3.5 * AVATAR_SCALE, npcCenter, ROOMMATE_RADIUS, activeRoom.balls.map(({ state }) => state))) {
           cabinet.prop.bounds.setFromObject(cabinet.prop.holder).expandByScalar(1);
         }
         kickPose = Math.max(0, kickPose - dt);

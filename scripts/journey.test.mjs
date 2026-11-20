@@ -1108,11 +1108,23 @@ test('the cabinet slides folded clothes into view and stops short of an occupied
   view.toggle();
   assert.equal(view.open, true);
   assert.equal(view.update(0.016, true, near, 2.38), false, 'reduced motion must not snap a drawer through the player');
+  const field = W.buildBallField(WESTERN_INDEX), ballStart = stand(15.5);
+  field.blocks.push(...view.ballBlocks);
+  const volleyAtCabinet = () => {
+    const ball = V.makeBall(ballStart.x, 0, ballStart.z, 1.3);
+    V.launchBall(ball, { x: 19, y: 0, z: 0 });
+    V.stepBall(ball, field, 0.14);
+    return ball;
+  };
+  assert.ok(volleyAtCabinet().vx > 0, 'the ball rolls through the clear aisle when closed');
+  const inDrawerPath = V.makeBall(stand(11).x, 0, stand(11).z, 1.3);
+  assert.equal(view.update(0.016, true, clear, 2.38, undefined, 0, [inDrawerPath]), false, 'the drawer does not snap through a loose ball');
   assert.equal(view.update(0.016, false, clear, 2.38), true);
   const bottom = viewHolder.children[1], top = viewHolder.children[2];
   assert.ok(bottom.position.z > 0 && bottom.position.z < 1, 'normal motion slides incrementally');
   assert.ok(view.update(0.016, true, clear, 2.38));
   assert.ok(bottom.position.z > top.position.z && top.position.z + 5 > 7, 'both folded stacks are carried out of the cabinet');
+  assert.ok(volleyAtCabinet().vx < 0, 'the ball bounces on the extended bottom drawer');
   assert.ok(view.blocksMove(clear, stand(13), 2.38));
   assert.ok(!view.blocksMove(stand(13), clear, 2.38));
   for (const beat of routine.beats.filter(b => b.action === 'walk')) {
@@ -1123,6 +1135,7 @@ test('the cabinet slides folded clothes into view and stops short of an occupied
   view.toggle();
   assert.ok(view.update(0.016, true, clear, 2.38));
   assert.equal(top.position.z, 0);
+  assert.ok(volleyAtCabinet().vx > 0, 'the collider retracts with the drawers');
   viewHolder.children.forEach(mesh => mesh.geometry.dispose());
 });
 

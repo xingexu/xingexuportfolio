@@ -145,13 +145,60 @@ function standingDesk(g: Grid, wood: Color, frame: Color) {
     g.box(x - 1, 0, -5, 4, 1, 11, frame);
   }
   g.box(-14, 13, -3, 28, 2, 2, frame).box(11, 15, 6, 4, 1, 1, frame);
-  g.set(14, 15, 6, 0x83b9bd);
-  g.box(-6, 18, 1, 11, 1, 4, 0x2b2d33).box(6, 18, 1, 5, 1, 5, 0x49434e);
+  g.set(11, 15, 6, 0x656970).set(12, 15, 6, 0x656970).set(14, 15, 6, 0x83b9bd);
+  g.box(-7, 18, 0, 16, 1, 6, 0x49434e).box(-6, 18, 1, 11, 1, 4, 0x2b2d33);
   for (const z of [2, 3]) for (let x = -5; x < 4; x += 2) g.set(x, 18, z, 0x60606a);
-  g.box(8, 19, 2, 2, 1, 2, 0xd8d8d8);
+  g.box(6, 19, 2, 2, 1, 2, 0xd8d8d8);
   for (const x of [-17, 16]) g.box(x, 18, -7, 1, 14, 5, wood);
   g.box(-16, 30, -7, 32, 2, 5, wood).box(-16, 25, -7, 32, 5, 1, shade(wood, 0.86));
   g.box(-16, 24, -7, 7, 1, 5, wood).box(-10, 18, -7, 1, 6, 5, wood);
+}
+
+function dormHeadphones(g: Grid) {
+  const shell = 0x383940, cushion = 0x202125, hinge = 0x747783;
+  for (let x = -10; x <= 10; x++) for (let z = 0; z <= 11; z++) {
+    const r = Math.hypot(x, z * 0.9);
+    if (r >= 8 && r <= 10.4) g.box(x, 1, z - 3, 1, 2, 1, r < 9 ? cushion : shell);
+  }
+  for (const side of [-1, 1]) {
+    const x = side * 8;
+    g.box(x - 1, 1, -6, 3, 2, 5, hinge);
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -4; dz <= 4; dz++) {
+      if (Math.hypot(dx, dz * 0.78) <= 3.5) {
+        g.box(x + dx, 0, dz - 6, 1, 3, 1, cushion);
+        if (Math.abs(dx) < 3 && Math.abs(dz) < 4) g.set(x + dx, 3, dz - 6, shell);
+      }
+    }
+  }
+}
+
+function dormSnacks(g: Grid) {
+  const chipBag = 0xe6a342, cookieBag = 0x6474b4, pocky = 0xb63850;
+  for (const [x, z, width, height, color, label] of [
+    [-14, -3, 8, 12, chipBag, 0xd66646],
+    [-5, -5, 7, 8, cookieBag, 0xe2b477],
+  ]) {
+    g.box(x, 0, z, width, height, 3, (i, y) => shade(color, 0.94 + 0.14 * hash3(i, y, z)));
+    for (const y of [0, height - 1]) g.box(x + 1, y, z - 1, width - 2, 1, 5, shade(color, 0.77));
+    g.box(x + 1, 3, z + 3, width - 2, 3, 1, label).box(x + 2, 6, z + 3, width - 4, 1, 1, 0xf2e5cf);
+  }
+  g.box(3, 0, -5, 6, 11, 3, pocky).box(4, 7, -2, 4, 2, 1, 0xffefe0);
+  for (const x of [4, 6]) g.box(x, 2, -2, 1, 4, 1, 0xc99260).box(x, 4, -2, 1, 2, 1, 0x6f3741);
+  for (let y = 0; y < 7; y++) disc(g, 10, y, 4, y >= 5 ? 4 : 2.6 + y * 0.25, (_x, z) =>
+    y === 6 ? 0xf4dfac : z > 1 && y > 1 && y < 5 ? 0xb0473c : 0xe8d2a5);
+  g.box(-10, 0, 5, 12, 2, 4, 0x5c8570).box(-7, 2, 6, 6, 1, 2, 0xb5c78d);
+}
+
+function smiskis(g: Grid) {
+  const green = 0xc8db9f, shadow = 0xa9c685, eyes = 0x54654b;
+  g.box(-9, 0, 0, 2, 4, 2, shadow).box(-6, 0, 0, 2, 4, 2, shadow).box(-9, 4, -1, 5, 4, 3, green);
+  g.box(-10, 4, 0, 1, 3, 1, shadow).box(-4, 6, 0, 1, 4, 1, green);
+  sphere(g, -7, 10, 0, 2.65, () => green);
+  g.set(-8, 10, 2, eyes).set(-6, 10, 2, eyes);
+  g.box(4, 0, -1, 5, 4, 3, green).box(3, 0, 2, 2, 2, 3, shadow).box(8, 0, 2, 2, 2, 3, shadow);
+  g.box(4, 2, 2, 1, 1, 2, green).box(8, 2, 2, 1, 1, 2, green);
+  sphere(g, 6, 6, 0, 2.55, () => green);
+  g.set(5, 6, 2, eyes).set(7, 6, 2, eyes);
 }
 
 function dormCloset(g: Grid) {
@@ -299,7 +346,7 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 }
 
 const GLASS = 0x9dd8e4;
-const DETAIL_VOXELS = new Set(["macbook", "csa-dj-macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn"]);
+const DETAIL_VOXELS = new Set(["macbook", "csa-dj-macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn", "dorm-headphones", "dorm-snacks", "smiskis"]);
 const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fan", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo", "csa-boba-cup", "csa-soda-cup", "csa-water-bottle", "csa-speaker", "dorm-light-switch", "dorm-light-switch-on"]);
 export const modelVoxelSize = (id: string) => id === "chess-table" ? 0.125 : id === "mini-fridge" ? FRIDGE_VOXEL_SIZE : DETAIL_VOXELS.has(id) || id.startsWith("plaque-") ? 0.25 : HALF_VOXELS.has(id) || id.startsWith("poster-") || id === "hockey-pad" || id === "roommate-portrait" ? 0.5 : 1;
 
@@ -844,6 +891,16 @@ const MODELS: Record<string, (g: Grid) => void> = {
   }),
   "standing-desk": g => standingDesk(g, 0xbc8d60, 0x39393d),
   "standing-desk-roommate": g => standingDesk(g, 0xb88b61, 0x39393d),
+  "dorm-headphones": dormHeadphones,
+  "dorm-snacks": dormSnacks,
+  smiskis,
+  "dorm-nightstand": g => {
+    const wood = 0xb7885b;
+    shelfUnit(g, 9, 9, 8, [4], wood);
+    g.box(-5, 9, -4, 10, 1, 9, shade(wood, 1.12));
+    g.box(-3, 5, 3, 7, 3, 1, shade(wood, 0.89)).box(-1, 6, 4, 3, 1, 1, METAL_DARK);
+    g.box(-2, 1, 0, 5, 2, 3, 0x6a7979).box(-1, 2, 3, 3, 1, 1, 0xcbd8cf);
+  },
   "desk-divider": g => {
     g.box(-18, 0, -1, 36, 2, 2, 0xb8b1a3).box(-18, 2, -1, 36, 17, 2, 0xe9e7df);
     g.box(-19, 19, -2, 38, 1, 4, 0xf5f1e7);

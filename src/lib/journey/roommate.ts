@@ -143,13 +143,13 @@ export function fridgeDoorDistance(fridge: Placement, open: number, p: Vec) {
 }
 
 export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Placement) {
-  const out = { x: spec.x + 5, z: spec.z };
+  const out = { x: spec.x + spec.seatSide * 5, z: spec.z }, seatYaw = spec.seatSide * Math.PI / 2;
   const fridgeSpot = placementPoint(fridge, -2, 8.1), fridgeYaw = ((fridge.rot ?? 0) + 2) * Math.PI / 2;
   const padSpot = placementPoint(pad, 0, -4), padYaw = (pad.rot ?? 0) * Math.PI / 2;
   const [bedside, aisle, padAisle, padEntry] = spec.via;
   const approach = { x: fridgeSpot.x, z: aisle.z };
   const beats: Beat[] = [];
-  let from: Vec = spec, yaw = Math.PI / 2, total = 0;
+  let from: Vec = spec, yaw = seatYaw, total = 0;
   const add = (action: Activity, duration: number, to = from, angle = yaw) => {
     beats.push({ action, start: total, end: total + duration, from, to, yaw: angle });
     total += duration; from = to; yaw = angle;
@@ -175,7 +175,7 @@ export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Pla
   add("practice", 5.4);
   add("rack", 0.8);
   walk(padEntry, padAisle, bedside, out);
-  add("sit", 0.65, spec, Math.PI / 2);
+  add("sit", 0.65, spec, seatYaw);
   return { beats, total, fridge };
 }
 

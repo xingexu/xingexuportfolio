@@ -378,7 +378,7 @@ const WINDOWS: Record<string, { side: "front" | "left" | "right"; center: number
   school: [{ side: "left", center: 0, width: 28, y: 18, height: 15, sky: 0xb5d7ea, ground: 0x718c63 }],
   elm: [{ side: "front", center: 20, width: 16, y: 19, height: 16, sky: 0xffd7ac, ground: 0x715e79 }],
   bayview: [-22, 22].map(center => ({ side: "front", center, width: 17, y: 25, height: 10, sky: 0xc4dfed, ground: 0x7c9ab3 })),
-  western: [-21, 28].map(center => ({ side: "front", center, width: 22, y: 15, height: 14, sky: 0x39445d, ground: 0x252a38 })),
+  western: [-21, 46].map(center => ({ side: "front", center, width: 22, y: 15, height: 14, sky: 0x39445d, ground: 0x252a38 })),
 };
 
 function addWindow(grid: Grid, bounds: Box, chapter: Chapter, spec: (typeof WINDOWS)[string][number]) {
@@ -404,7 +404,7 @@ function addWindow(grid: Grid, bounds: Box, chapter: Chapter, spec: (typeof WIND
   }
   if (chapter.id === "western") {
     for (let x = -2; x <= width + 1; x++) paint(x, height + 2, 2, 0x9d9486);
-    const panelWidth = center > 0 ? 12 : 7;
+    const panelWidth = 6;
     for (let x = -1; x <= width; x++) {
       if (x >= panelWidth && x < width - panelWidth) continue;
       const fold = ((x + 4) % 3) === 0;

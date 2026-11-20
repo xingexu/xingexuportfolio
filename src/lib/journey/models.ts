@@ -349,7 +349,7 @@ function tee(g: Grid, x: number, color: Color, year: string) {
 }
 
 const GLASS = 0x9dd8e4;
-const DETAIL_VOXELS = new Set(["macbook", "csa-dj-macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn", "dorm-headphones", "dorm-snacks", "smiskis"]);
+const DETAIL_VOXELS = new Set(["macbook", "csa-dj-macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn", "dorm-headphones", "dorm-snacks", "smiskis", "dorm-shoe-rack", "dorm-charging-ports"]);
 const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo", "csa-boba-cup", "csa-soda-cup", "csa-water-bottle", "csa-speaker", "dorm-light-switch", "dorm-light-switch-on"]);
 export function modelVoxelSize(id: string) {
   if (id === "chess-table") return 0.125;
@@ -909,6 +909,33 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.box(-5, 9, -4, 10, 1, 9, shade(wood, 1.12));
     g.box(-3, 5, 3, 7, 3, 1, shade(wood, 0.89)).box(-1, 6, 4, 3, 1, 1, METAL_DARK);
     g.box(-2, 1, 0, 5, 2, 3, 0x6a7979).box(-1, 2, 3, 3, 1, 1, 0xcbd8cf);
+  },
+  "dorm-shoe-rack": g => {
+    const wood = 0xc19369, metal = 0x414348;
+    for (const x of [-24, 22]) for (const z of [-14, 12]) g.box(x, 0, z, 2, 32, 2, metal);
+    for (const y of [3, 15, 30]) {
+      g.box(-24, y, -16, 48, 1, 32, shade(wood, 0.83));
+      g.box(-24, y + 1, -16, 48, 1, 32, (x, _y, z) => shade(wood, z % 6 === 0 ? 0.86 : 0.97 + hash3(x >> 2, y, z) * 0.09));
+    }
+    for (const [y, x, z, upper, sole] of [
+      [5, -15, -8, 0xdfdbd3, 0xa7a6a0], [5, 5, -8, 0x3b4148, 0xc7c6bf], [17, -5, -9, 0x535e69, 0xc0bcad],
+    ] as const) {
+      for (const offset of [0, 8]) {
+        const at = x + offset;
+        g.box(at + 1, y, z, 5, 1, 15, sole).box(at, y, z + 1, 7, 1, 13, sole);
+        g.box(at, y + 1, z + 1, 7, 3, 13, upper).box(at, y + 4, z + 1, 7, 4, 6, shade(upper, 0.88));
+        g.box(at + 1, y + 4, z + 7, 5, 1, 2, sole).box(at + 1, y + 5, z + 2, 5, 3, 3, 0x303138);
+      }
+    }
+  },
+  "dorm-charging-ports": g => {
+    g.box(-8, 0, -2, 16, 12, 3, 0xe0dbce).box(-7, 1, 1, 14, 10, 1, 0xf5f0e6);
+    for (const x of [-4, 3]) {
+      g.box(x - 2, 5, 2, 5, 4, 1, 0xe0dacd);
+      g.box(x - 1, 7, 3, 1, 2, 1, 0x535258).box(x + 1, 7, 3, 1, 2, 1, 0x535258).set(x, 5, 3, 0x535258);
+    }
+    g.box(-6, 2, 2, 5, 2, 1, 0x414b56).box(-5, 2, 3, 3, 1, 1, 0x7094a9);
+    g.box(2, 2, 2, 4, 1, 1, 0x414b56).set(6, 3, 2, 0x72aa99);
   },
   "desk-divider": g => {
     g.box(-18, 0, -1, 36, 2, 2, 0xb8b1a3).box(-18, 2, -1, 36, 17, 2, 0xe9e7df);

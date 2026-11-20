@@ -638,7 +638,7 @@ test('Richard walks a furniture-free route, yields to the player and returns to 
   const { view } = roommateScene();
   const pose = beatAt('take', 0.5);
   view.apply(pose, pose.yaw);
-  const start = R.placementPoint(npcFridge, 9, 8.1), beyond = R.placementPoint(npcFridge, -4, 8.1);
+  const start = R.placementPoint(npcFridge, -13, 8.1), beyond = R.placementPoint(npcFridge, 2, 8.1);
   const dx = beyond.x - start.x, dz = beyond.z - start.z;
   assert.ok(W.boxDistance(W.placementBox(npcFridge), start) > 2.38);
   const unobstructed = W.step(index, start, dx, dz, 2.38);
@@ -648,7 +648,7 @@ test('Richard walks a furniture-free route, yields to the player and returns to 
 });
 
 test('the fridge door pauses before it swings into a stationary visitor', () => {
-  const player = R.placementPoint(npcFridge, 4.1, 8.2), radius = 2.38;
+  const player = R.placementPoint(npcFridge, 3.1, 8.2), radius = 2.38;
   assert.ok(!W.blocked(CHAPTERS.length - 1, player.x, player.z, radius), 'the visitor can stand in the aisle');
   for (const action of ['open', 'shut']) {
     const { start, end } = routine.beats.find(b => b.action === action);
@@ -797,12 +797,19 @@ test('the Western dorm keeps small props and signs proportional to the furniture
   for (const id of ['csa', 'wds', 'wfn', 'mustangs']) assert.ok(footprint(id).height < W.AVATAR_SCALE * avatarHeight(18));
 });
 
-test('Richard’s bed runs along the entry wall with the head away from the door', () => {
+test('Richard’s bed leaves room for the shoe rack along the entry wall', () => {
   const bed = dorm.items.find(item => item.id === 'richards-bed');
+  const rack = dorm.items.find(item => item.id === 'shoe-rack'), shoes = dorm.items.find(item => item.id === 'pink-shoes');
+  const rackBox = W.placementBox(rack), shoesBox = W.placementBox(shoes);
   const box = W.placementBox(bed), entrance = W.spawn(WESTERN_INDEX, 'start');
   const bounds = W.interior(dorm), doorLeft = entrance.x - W.DOOR_HALF;
   const head = R.placementPoint(bed, 0, -15), foot = R.placementPoint(bed, 0, 15);
-  assert.ok(doorLeft - box.maxX >= 0 && doorLeft - box.maxX <= 3);
+  assert.ok(box.maxX < rackBox.minX && rackBox.maxX < doorLeft, 'the rack is between the bed and the left jamb');
+  assert.equal(rackBox.maxZ, bounds.maxZ);
+  assert.ok(rackBox.minX < doorLeft - 4 && rackBox.maxX >= doorLeft - 3, 'the rack takes the old spot of the foot');
+  assert.equal(rack.rot, 2, 'the shoes face into the room');
+  assert.equal(shoes.y, modelFootprint(rack.model).height);
+  assert.ok(shoesBox.minX >= rackBox.minX && shoesBox.maxX <= rackBox.maxX && shoesBox.minZ >= rackBox.minZ && shoesBox.maxZ <= rackBox.maxZ);
   assert.equal(box.maxZ, bounds.maxZ);
   assert.equal(head.z, foot.z, 'the length of the bed runs parallel with the door frame');
   assert.ok(head.x < foot.x - 25);
@@ -814,16 +821,54 @@ test('Richard’s bed runs along the entry wall with the head away from the door
   assert.ok(cells.some(p => p.z < box.minZ && W.boxDistance(box, p) <= 6), 'Richard can get out of bed on the open side');
 });
 
-test('the mini fridge sits in the window corner between my bed and standing desk', () => {
+test('my bed, nightstand and mini fridge line the far wall in order', () => {
   const item = id => dorm.items.find(p => p.id === id);
-  const fridge = item('mini-fridge'), box = W.placementBox(fridge);
-  const bed = W.placementBox(item('ohall-bed')), desk = W.placementBox(item('standing-desk'));
-  const { minZ } = W.interior(dorm);
-  assert.ok(bed.maxX < box.minX && box.maxX < desk.minX, 'the fridge fits between the bed and desk');
-  assert.ok(box.minZ >= minZ && box.minZ <= minZ + 2 && box.maxZ < bed.minZ);
+  const fridge = item('mini-fridge'), box = W.placementBox(fridge), bed = item('ohall-bed'), nightstand = item('ohall-nightstand');
+  const bedBox = W.placementBox(bed), tableBox = W.placementBox(nightstand);
+  const { minZ, maxX } = W.interior(dorm);
+  assert.equal(bedBox.minZ, minZ, 'the head is against the far wall');
+  assert.equal(tableBox.minZ, minZ);
+  assert.ok(bedBox.maxX < tableBox.minX && tableBox.maxX < box.minX, 'the nightstand is between the bed and fridge');
+  assert.ok(box.minZ >= minZ && box.minZ <= minZ + 1 && box.maxX <= maxX && box.maxX >= maxX - 1, 'the fridge is tight to both corner walls');
   assert.ok(R.placementPoint(fridge, 0, 8).z > box.maxZ, 'the fridge opens into the aisle');
+  const frog = W.placementBox(item('jellycat'));
+  assert.ok(frog.minX >= bedBox.minX && frog.maxX <= bedBox.maxX && frog.minZ >= bedBox.minZ && frog.maxZ <= bedBox.maxZ);
   assert.equal(item('fragrances').x, fridge.x);
   assert.equal(item('fragrances').z, fridge.z);
+  const scene = roommateScene(), door = scene.fridge.getObjectByName('Fridge door');
+  for (let u = 0; u <= 1; u += 0.05) {
+    const pose = beatAt('open', u);
+    scene.view.apply(pose, pose.yaw);
+    const doorBox = new Box3().setFromObject(door, true);
+    assert.ok(doorBox.max.x <= maxX && doorBox.min.x > tableBox.maxX && doorBox.min.z >= minZ, 'the open door clears the walls and nightstand');
+  }
+});
+
+test('Richard’s nightstand sits on the desk side of his bed', () => {
+  const item = id => dorm.items.find(p => p.id === id);
+  const [desk, table, bed] = ['richards-desk', 'richards-nightstand', 'richards-bed'].map(id => W.placementBox(item(id)));
+  assert.ok(desk.maxZ < table.minZ && table.maxZ < bed.minZ);
+  assert.ok(table.maxX > bed.minX && bed.minZ - table.maxZ <= 4, 'the nightstand is next to the open bedside');
+});
+
+test('charging outlets are wall-mounted, face into the room and do not block movement', () => {
+  const { minZ, maxZ, maxX } = W.interior(dorm);
+  const ports = dorm.items.filter(p => p.model === 'dorm-charging-ports');
+  assert.equal(ports.length, 3);
+  for (const port of ports) {
+    assert.equal(port.solid, false);
+    const box = W.placementBox(port), face = R.placementPoint(port, 0, 1);
+    if (port.rot === 3) {
+      assert.equal(box.maxX, maxX);
+      assert.ok(face.x < port.x);
+    } else if (port.rot === 2) {
+      assert.equal(box.maxZ, maxZ);
+      assert.ok(face.z < port.z);
+    } else {
+      assert.equal(box.minZ, minZ);
+      assert.ok(face.z > port.z);
+    }
+  }
 });
 
 test('the Wuzu fan spins and sends airflow out its moving grille without capturing clicks', () => {
@@ -896,13 +941,13 @@ test('the double closet, low cabinet and standing desk line the right wall in en
   assert.ok(modelFootprint(cabinet.model).height < modelFootprint(desk.model).height / 2);
 });
 
-test('my bed is across from my desk and the divider separates it from Richard’s desk', () => {
+test('my bed is on my desk’s side of the divider with a clear aisle', () => {
   const item = id => dorm.items.find(item => item.id === id);
   const bed = W.placementBox(item('ohall-bed'));
   const desks = [item('standing-desk'), item('richards-desk')];
   const [mine, richards] = desks.map(W.placementBox);
   const divider = dorm.decor.find(p => p.model === 'desk-divider'), wall = W.placementBox(divider);
-  assert.ok(mine.minX - bed.maxX >= 8 && mine.minZ < bed.maxZ && mine.maxZ > bed.minZ, 'my bed faces my desk across a walking gap');
+  assert.ok(mine.minX - bed.maxX >= 8 && mine.minZ - bed.maxZ <= 2, 'my bed and desk leave a walking gap');
   assert.ok(richards.maxX < wall.minX && wall.maxX < bed.minX);
   assert.ok(Math.max(bed.minZ, wall.minZ, richards.minZ) < Math.min(bed.maxZ, wall.maxZ, richards.maxZ));
   assert.ok(modelFootprint(divider.model).height >= W.WALL_HEIGHT / 2);
@@ -920,7 +965,7 @@ test('my bed is across from my desk and the divider separates it from Richard’
 test('the headphones, figurines and snack collection sit on reachable furniture', () => {
   const item = id => dorm.items.find(p => p.id === id);
   const cabinet = dorm.decor.find(p => p.model === 'dorm-cabinet');
-  const desk = item('standing-desk'), richardsDesk = item('richards-desk'), nightstand = item('richards-nightstand');
+  const desk = item('standing-desk'), nightstand = item('richards-nightstand');
   for (const [prop, furniture, y] of [
     [item('dorm-headphones'), desk, 18], [item('smiskis'), desk, 18], [item('dorm-snacks'), cabinet, 12],
     ...dorm.decor.filter(p => p.model === 'dorm-snacks').map(p => [p, p.y === 32 ? desk : nightstand, p.y]),
@@ -931,9 +976,6 @@ test('the headphones, figurines and snack collection sit on reachable furniture'
     assert.equal(prop.solid, false);
     assert.ok(box.minX >= surface.minX && box.maxX <= surface.maxX && box.minZ >= surface.minZ && box.maxZ <= surface.maxZ, prop.model);
   }
-  const table = W.placementBox(nightstand), adjacent = W.placementBox(richardsDesk);
-  assert.equal(nightstand.rot, richardsDesk.rot);
-  assert.ok(table.minZ >= adjacent.maxZ && table.minZ - adjacent.maxZ <= 4);
   assert.equal(modelFootprint(nightstand.model).height, 10);
 });
 
@@ -957,10 +999,13 @@ test('Western has light walls, warm carpet, curtained windows, and a clear entry
   assert.ok(rgb(walls.left.get(bounds.minX - 1, 23, 0)).every(channel => channel > 215));
   const [r, g, b] = rgb(fixed.get(0, -1, 0));
   assert.ok(r > g && g > b && b >= 108 && r < 165, 'warm gray floor');
-  for (const x of [-31, 18]) {
+  for (const x of [-31, 35, 56]) {
     const [red, green, blue] = rgb(walls.front.get(x, 22, bounds.minZ + 2));
     assert.ok(red > green && green > blue && blue > 130, 'beige curtain stays with the cutaway wall');
   }
+  const mine = W.placementBox(room.items.find(item => item.id === 'ohall-bed'));
+  assert.ok(35 - mine.maxX > 0 && 35 - mine.maxX <= 4, 'the window and curtains start just to the right of the bed');
+  for (let x = mine.minX; x < mine.maxX; x++) assert.ok(!walls.front.has(x, 22, bounds.minZ + 2), 'no curtain sits directly over the bed');
   assert.equal(room.decor.filter(prop => prop.model === 'dorm-chair').length, 2);
   const bed = W.placementBox(room.items.find(item => item.id === 'richards-bed'));
   assert.ok(room.roommate.x >= bed.minX && room.roommate.x <= bed.maxX &&

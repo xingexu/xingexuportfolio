@@ -15,11 +15,15 @@ export type JourneyItem = Placement & {
 };
 export type Outfit = "kid" | "starwars" | "stussy" | "western" | "csa";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "auditorium";
-export type Roommate = { id: string; x: number; z: number; seatFacing: Rot; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
+export type Roommate = { id: string; x: number; z: number; seatFacing: Rot; fridge: string; fridgeVia: readonly Vec2[]; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
 export const WESTERN_LIGHT_SWITCH_ID = "dorm-light-switch";
 const WESTERN_ENTRY_X = 36;
-const RICHARD_SEAT = { x: 7, z: 46 };
-const WESTERN_FRIDGE = { x: 41, z: -57, rot: 0 } as const;
+const RICHARD_BED_X = WESTERN_ENTRY_X - 36;
+const RICHARD_SEAT = { x: RICHARD_BED_X - 6, z: 46 };
+const MY_BED = { x: 24, z: -47 };
+const WESTERN_FRIDGE = { x: 58.25, z: -57, rot: 0 } as const;
+const RICHARD_NIGHTSTAND = { x: -16, z: 37, rot: 1 } as const;
+const WESTERN_SHOE_RACK = { x: WESTERN_ENTRY_X - 14, z: 58, rot: 2 } as const;
 type Vec2 = { x: number; z: number };
 export type Chapter = {
   id: string;
@@ -222,20 +226,27 @@ const ROOMS: Chapter[] = [
       { id: "wfn", model: "poster-wfn", x: -63, z: 14, y: 14, rot: 1, solid: false, label: "Western Founders Network poster", title: "Western Founders Network",
         description: "I’m a director on the Projects team.",
         links: [{ href: "https://linktr.ee/westernfoundersnetwork", label: "Western Founders Network" }, { href: "https://www.instagram.com/westernfoundersnetwork/", label: "@westernfoundersnetwork" }] },
-      { id: "ohall-bed", model: "bed-western", x: 24, z: -27, label: "Blue and beige bed", title: "My bed in Ontario Hall" },
-      { id: "richards-bed", model: "bed-roommate", x: WESTERN_ENTRY_X - 23, z: 53, rot: 1, label: "Richard’s bed", title: "Richard’s bed" },
+      { id: "ohall-bed", model: "bed-western", ...MY_BED, label: "Blue and beige bed", title: "My bed in Ontario Hall" },
+      { id: "richards-bed", model: "bed-roommate", x: RICHARD_BED_X, z: 53, rot: 1, label: "Richard’s bed", title: "Richard’s bed" },
       { id: "richard", model: "roommate-portrait", ...RICHARD_SEAT, solid: false, label: "Richard Su", title: "Richard Su",
         description: "My roommate in Ontario Hall.",
         video: { src: "/videos/journey/richard.mp4", label: "Richard’s dorm routine: walking, getting milk, and practicing hockey (silent)", poster: "/videos/journey/richard.webp" },
         links: [{ href: "https://www.linkedin.com/in/richard-su-7377542b9/", label: "Richard’s LinkedIn" }] },
       { id: "hockey-pad", model: "hockey-pad", x: -43, z: 5, solid: false, label: "Hockey practice pad", title: "Synthetic ice pad",
         description: "Richard uses it to practice stickhandling." },
-      { id: "jellycat", model: "jellycat-frog", x: 28, z: -16, y: 7, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog",
+      { id: "jellycat", model: "jellycat-frog", x: MY_BED.x + 4, z: MY_BED.z + 11, y: 7, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog",
         description: "My Jellycat frog." },
       { id: "standing-desk", model: "standing-desk", x: 55, z: -14, rot: 3, label: "My standing desk", title: "My standing desk",
         description: "I use it for coding and club work." },
       { id: "richards-desk", model: "standing-desk-roommate", x: -38, z: -38, rot: 1, label: "Richard’s standing desk", title: "Richard’s standing desk" },
-      { id: "richards-nightstand", model: "dorm-nightstand", x: -38, z: -13, rot: 1, label: "Richard’s nightstand", title: "Richard’s nightstand" },
+      { id: "richards-nightstand", model: "dorm-nightstand", ...RICHARD_NIGHTSTAND, label: "Richard’s nightstand", title: "Richard’s nightstand" },
+      { id: "ohall-nightstand", model: "dorm-nightstand", x: 44, z: -58, label: "My nightstand", title: "My nightstand" },
+      { id: "desk-charging-ports", model: "dorm-charging-ports", x: 63.25, z: -39, y: 9, rot: 3, solid: false,
+        label: "Desk charging ports", title: "Desk charging ports", description: "A wall outlet with USB-A and USB-C ports." },
+      { id: "bedside-charging-ports", model: "dorm-charging-ports", x: 12, z: -61.25, y: 8, solid: false,
+        label: "My bedside charging ports", title: "My bedside charging ports", description: "A wall outlet with USB-A and USB-C ports." },
+      { id: "richards-charging-ports", model: "dorm-charging-ports", x: -25, z: 61.25, y: 8, rot: 2, solid: false,
+        label: "Richard’s charging ports", title: "Richard’s charging ports", description: "A wall outlet with USB-A and USB-C ports." },
       { id: "monitor", model: "monitor", x: 56, z: -14, y: 18, rot: 3, solid: false, label: "Monitor", title: "Monitor",
         links: [{ href: LINKS.github, label: "See what I’m building" }] },
       { id: "desk-lamp", model: "desk-lamp", x: 57, z: -27, y: 18, rot: 3, solid: false, label: "Desk lamp", title: "Desk lamp" },
@@ -253,7 +264,8 @@ const ROOMS: Chapter[] = [
         description: "Chips, cookies, Pocky, and a cup of instant noodles." },
       { id: "closet", model: "closet", x: 55, z: 38, rot: 3, label: "Double closet", title: "Wooden double closet",
         description: "Hoodies, sweatpants, and snacks are put away inside." },
-      { id: "pink-shoes", model: "pink-court-shoes", x: 26, z: 37, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
+      { id: "shoe-rack", model: "dorm-shoe-rack", ...WESTERN_SHOE_RACK, label: "Shoe rack", title: "Entry shoe rack" },
+      { id: "pink-shoes", model: "pink-court-shoes", ...WESTERN_SHOE_RACK, z: WESTERN_SHOE_RACK.z - 0.5, y: 8, solid: false, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
       { id: "molten", model: "molten-volleyball", x: -24, z: 14, ball: "molten", label: "Molten volleyball", title: "Molten volleyball",
         description: "Press R or tap Set near the ball." },
       { id: "laundry", model: "laundry-basket", x: -56, z: 17, rot: 1, label: "Laundry basket", title: "Laundry basket" },
@@ -265,10 +277,11 @@ const ROOMS: Chapter[] = [
       { model: "dorm-chair", x: 45, z: -26, rot: 3 }, { model: "dorm-chair", x: -27, z: -32, rot: 1 },
       { model: "dorm-cabinet", x: 55, z: 9, rot: 3 },
       { model: "dorm-snacks", x: 59, z: -21, y: 32, rot: 3, solid: false },
-      { model: "dorm-snacks", x: -38, z: -13, y: 10, rot: 1, solid: false },
+      { model: "dorm-snacks", ...RICHARD_NIGHTSTAND, y: 10, solid: false },
     ],
     roommate: { id: "richard", ...RICHARD_SEAT, seatFacing: 2, fridge: "mini-fridge", pad: "hockey-pad",
-      via: [{ x: 7, z: 38 }, { x: 7, z: 29 }, { x: -22, z: 21 }, { x: -43, z: 19 }] },
+      fridgeVia: [{ x: 38, z: 29 }, { x: 38, z: -41 }, { x: WESTERN_FRIDGE.x - 2, z: -41 }],
+      via: [{ x: RICHARD_SEAT.x, z: 38 }, { x: RICHARD_SEAT.x, z: 29 }, { x: -22, z: 21 }, { x: -43, z: 19 }] },
   },
 ];
 

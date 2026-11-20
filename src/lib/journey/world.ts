@@ -74,9 +74,9 @@ export function cameraLookAhead(room: Box, player: Vec, forward: Vec, lead: numb
     limit(player.z, forward.z, room.minZ, room.maxZ)));
 }
 
-export function doorwayOpening(z: number, player: Vec) {
+export function doorwayOpening(z: number, player: Vec, centerX = 0) {
   const clamp = (value: number) => Math.max(0, Math.min(1, value));
-  const approach = clamp((19 - Math.abs(player.z - z)) / 11) * clamp((DOOR_HALF + 7 - Math.abs(player.x)) / 7);
+  const approach = clamp((19 - Math.abs(player.z - z)) / 11) * clamp((DOOR_HALF + 7 - Math.abs(player.x - centerX)) / 7);
   return approach * approach * (3 - 2 * approach);
 }
 
@@ -180,7 +180,7 @@ export function blocked(index: number, x: number, z: number, r: number) {
   const chapter = JOURNEY_ROOMS[index], room = interior(chapter);
   const inDoor = index !== CSA_ROOM_INDEX && Math.abs(x) <= DOOR_HALF - r && z < room.minZ + r;
   if (!inDoor && (x < room.minX + r || x > room.maxX - r || z < room.minZ + r)) return true;
-  const inBackDoor = index > 0 && Math.abs(x) <= DOOR_HALF - r;
+  const inBackDoor = index > 0 && Math.abs(x - (chapter.entryX ?? 0)) <= DOOR_HALF - r;
   if (!inBackDoor && z > room.maxZ - r) return true;
   return obstacles(index).some(box => hits(box, x, z, r));
 }
@@ -274,22 +274,30 @@ export function ageAt(chapter: Chapter, z: number) {
 
 export type RoomArrival = "start" | "forward" | "back" | "portal";
 export function spawn(index: number, from: RoomArrival): Vec & { yaw: number } {
-  const room = interior(JOURNEY_ROOMS[index]);
+  const chapter = JOURNEY_ROOMS[index], room = interior(chapter);
   if (index === CSA_ROOM_INDEX) return { x: 0, z: room.maxZ - 8, yaw: Math.PI };
   if (index === WESTERN_INDEX && from === "portal" && csaPoster) {
     return { x: room.minX + 8, z: csaPoster.z, yaw: Math.PI / 2 };
   }
   if (from === "back") return { x: 0, z: room.minZ + 7, yaw: 0 };
   if (index === 0) return { x: -1, z: -12, yaw: Math.PI };
-  return { x: 0, z: room.maxZ - 7, yaw: Math.PI };
+  return { x: chapter.entryX ?? 0, z: room.maxZ - 7, yaw: Math.PI };
 }
 
 export function journeyArrows(index: number): Vec[] {
   if (index === CSA_ROOM_INDEX) return [];
   const exit = interior(JOURNEY_ROOMS[index]).minZ + 5;
-  const first = spawn(index, "forward").z - 8;
-  const intervals = Math.max(1, Math.ceil((first - exit) / 12));
-  return Array.from({ length: intervals + 1 }, (_, i) => ({ x: 0, z: first + (exit - first) * i / intervals }));
+  const { x, z } = spawn(index, "forward");
+  const first = { x, z: z - 8 }, last = { x: 0, z: exit };
+  const turns = index === WESTERN_INDEX ? [{ x, z: 24 }, { x: 0, z: 10 }] : [];
+  const points = [first, ...turns, last];
+  const arrows = [first];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 12));
+    for (let j = 1; j <= steps; j++) arrows.push({ x: a.x + (b.x - a.x) * j / steps, z: a.z + (b.z - a.z) * j / steps });
+  }
+  return arrows;
 }
 
 export function buildJourneyArrow() {
@@ -449,21 +457,22 @@ function addDoorway(g: Grid, chapter: Chapter, wallZ: number, side: "front" | "b
   const front = side === "front", sign = front ? -1 : 1;
   const outside = wallZ + (front ? -1 : WALL), inside = wallZ + (front ? WALL : -1);
   const backdrop = outside + sign * 8;
-  const left = -DOOR_HALF, width = DOOR_HALF * 2;
+  const centerX = front ? 0 : chapter.entryX ?? 0;
+  const left = centerX - DOOR_HALF, right = centerX + DOOR_HALF, width = DOOR_HALF * 2;
   const trim = chapter.trim, floor = front ? 0x89734f : 0x3b3942;
   g.box(left, 0, wallZ - 1, width, DOOR_HEIGHT, WALL + 3, -1);
   for (let i = 0; i <= 8; i++) {
     const z = outside + i * sign, arch = i % 3 === 0, rail = shade(trim, arch ? 0.94 : 0.71);
-    for (const x of [left - 1, DOOR_HALF]) g.box(x, 0, z, 1, DOOR_HEIGHT + 1, 1, rail);
+    for (const x of [left - 1, right]) g.box(x, 0, z, 1, DOOR_HEIGHT + 1, 1, rail);
     g.box(left, DOOR_HEIGHT, z, width, 1, 1, rail);
-    for (let x = left; x < DOOR_HALF; x++) g.set(x, -1, z, shade(floor, (arch ? 1.26 : 1) + hash3(x, z, 7) * 0.12));
+    for (let x = left; x < right; x++) g.set(x, -1, z, shade(floor, (arch ? 1.26 : 1) + hash3(x, z, 7) * 0.12));
     if (arch) g.box(left + 2, DOOR_HEIGHT - 1, z, width - 4, 1, 1, front ? 0xc9aa6b : 0x77708f);
   }
   g.box(left, 0, backdrop, width, DOOR_HEIGHT, 1, (_x, y, z) => {
     const color = front ? (y > DOOR_HEIGHT / 2 ? 0xedd1a0 : 0xa48e68) : (y > DOOR_HEIGHT / 2 ? 0x827e99 : 0x4c4b60);
     return shade(color, 0.95 + 0.1 * hash3(_x, y, z));
   });
-  for (const x of [left - 1, DOOR_HALF]) {
+  for (const x of [left - 1, right]) {
     g.box(x, 0, Math.min(outside, inside), 1, DOOR_HEIGHT + 1, Math.abs(outside - inside) + 1, trim);
     g.box(x, 1, inside, 1, DOOR_HEIGHT - 1, 1, shade(trim, 1.18));
   }
@@ -481,17 +490,17 @@ export function buildRoomShell(index: number): Grid {
     const inShadow = furniture.some(box => x > box.minX - 1 && x < box.maxX + 2 && z > box.minZ - 1 && z < box.maxZ + 2);
     g.set(x, -1, z, inShadow ? shade(color, chapter.outdoor ? 0.8 : 0.87) : color);
   }
-  const nearZ = D / 2 - WALL;
+  const nearZ = D / 2 - WALL, entryX = chapter.entryX ?? 0;
   if (index > 0) {
     for (let x = -8; x < 8; x++) for (let z = nearZ - 5; z < nearZ; z++) {
       const arrow = Math.abs(x + 0.5) <= (z - (nearZ - 5)) && x > -4 && x < 4;
-      g.set(x, 0, z, arrow ? 0xd8d8d8 : 0x2b2b30);
+      g.set(entryX + x, 0, z, arrow ? 0xd8d8d8 : 0x2b2b30);
     }
   }
   const wallColor = (x: number, y: number, z: number) => {
     const n = hash3(x, y, z);
     if (chapter.id === "western") {
-      const color = z >= nearZ && x < -DOOR_HALF ? 0xd8e3e0 : chapter.wall;
+      const color = z >= nearZ && x < entryX - DOOR_HALF ? 0xd8e3e0 : chapter.wall;
       return shade(color, y >= WALL_HEIGHT - 4 ? 0.93 : 0.98 + 0.035 * n);
     }
     if (y < 2) return chapter.trim;

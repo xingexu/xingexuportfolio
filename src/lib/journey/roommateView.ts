@@ -167,7 +167,8 @@ export function makeRoommateView(spec: Roommate, fridge: Placement, pad: Placeme
   }
 
   function blocks(from: Vec, to: Vec, radius: number, pose: RoommatePose) {
-    const centerX = holder.position.x + pose.sit * 2.4, centerZ = holder.position.z;
+    const yaw = holder.rotation.y, offset = pose.sit * 2.4;
+    const centerX = holder.position.x + offset * Math.sin(yaw), centerZ = holder.position.z + offset * Math.cos(yaw);
     const distance = (pos: Vec) => Math.hypot(pos.x - centerX, pos.z - centerZ);
     const nextDistance = distance(to);
     if (nextDistance < radius + ROOMMATE_RADIUS && nextDistance < distance(from)) return true;

@@ -128,7 +128,7 @@ export default function JourneyWorld(props: Props) {
     type ReactiveView = { prop: PropView; state: BumpProp; pivot: number };
     type BallView = { prop: PropView; state: Ball; kind: BallKind };
     type Volley = { ball: BallView; sequence: VolleySequence };
-    type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh?]; open: number };
+    type DoorView = { x: number; z: number; side: "front" | "back"; leaves: [Mesh, Mesh?]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
     type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView };
     type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty>; dormLighting?: ReturnType<typeof makeDormLighting> };
@@ -167,22 +167,23 @@ export default function JourneyWorld(props: Props) {
       owned.push(leafGeometry);
       const sides: DoorView["side"][] = isParty ? ["back"] : chapter.outdoor ? ["front"] : ["front", "back"];
       const doors = sides.map((side): DoorView => {
+        const x = side === "back" ? chapter.entryX ?? 0 : 0;
         const z = side === "front" ? bounds.minZ - 0.5 : bounds.maxZ + 0.5;
         if (index === WESTERN_INDEX && side === "back") {
           const geometry = gridGeometry(buildDormEntryDoor(), [0, 0, 0], 0.02, DOOR_VOXEL_SIZE);
           owned.push(geometry);
           const door = new Mesh(geometry, walls.back.material);
           door.name = "Wood dorm entry with mirror";
-          door.position.set(-DOOR_HALF, 0, z);
+          door.position.set(x - DOOR_HALF, 0, z);
           walls.back.group.add(door);
-          return { z, side, leaves: [door], open: 0 };
+          return { x, z, side, leaves: [door], open: 0 };
         }
         const left = new Mesh(leafGeometry, walls[side].material), right = new Mesh(leafGeometry, walls[side].material);
-        left.position.set(-DOOR_HALF, 0, z);
-        right.position.set(DOOR_HALF, 0, z);
+        left.position.set(x - DOOR_HALF, 0, z);
+        right.position.set(x + DOOR_HALF, 0, z);
         right.scale.x = -1;
         walls[side].group.add(left, right);
-        return { z, side, leaves: [left, right], open: 0 };
+        return { x, z, side, leaves: [left, right], open: 0 };
       });
       const wallFor = (p: Placement) =>
         !p.ball && !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) ?? undefined : undefined;
@@ -246,9 +247,11 @@ export default function JourneyWorld(props: Props) {
       }
       const field = balls.length ? buildBallField(index) : undefined;
       if (roommate) field?.blocks.push(roommate.ballBlock);
-      const route = journeyArrows(index).map(({ x, z }) => {
+      const route = journeyArrows(index).map(({ x, z }, i, points) => {
         const arrow = new Mesh(arrowGeometry, arrowMaterial);
         arrow.position.set(x, 3.4, z);
+        const next = points[i + 1];
+        if (next) arrow.rotation.y = Math.atan2(x - next.x, z - next.z);
         group.add(arrow);
         return arrow;
       });
@@ -389,7 +392,7 @@ export default function JourneyWorld(props: Props) {
 
     function updateDoors(ease: number) {
       for (const door of room(chapter).doors) {
-        const target = doorwayOpening(door.z, player);
+        const target = doorwayOpening(door.z, player, door.x);
         door.open += (target - door.open) * ease;
         if (Math.abs(target - door.open) < 0.001) door.open = target;
         const [left, right] = door.leaves;

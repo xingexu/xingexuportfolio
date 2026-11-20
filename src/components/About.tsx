@@ -242,7 +242,9 @@ export default function About() {
         {opened?.kind === "party" && <>
           <p className="journey-eyebrow">Western University · Secret room</p>
           <h2 id="journey-dialog-title">CSA After Hours</h2>
-          <ul className="journey-csa-guests">{CSA_GUESTS.map(guest => <li key={guest.name}>{guest.name}<span>{csaActivityLabel(guest)}</span></li>)}</ul>
+          <ul className="journey-csa-guests">{CSA_GUESTS.map(guest =>
+            <li key={guest.name}>{guest.name}<span>{guest.role ? `${guest.role} · ` : ""}{csaActivityLabel(guest)}</span></li>
+          )}</ul>
           <div className="journey-links"><StoryLink link={CSA_DJ_LINK} /></div>
         </>}
         {opened?.kind === "finale" && <>

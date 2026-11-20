@@ -974,26 +974,31 @@ test('the auditorium has three rows, a clear center aisle, barber furniture, and
   }
 });
 
-test('the original guests and all listed execs have activities and clear one another', () => {
+test('the original guests, execs, and pictured advisors have space for their activities', () => {
   assert.deepEqual(CSA_GUESTS.map(guest => guest.name), [
     'Jason Zhuang', 'Rain Li', 'Amelie Hu', 'Lydia Zheng', 'Daniel Su', 'Lucas Xue', 'Jeffrey Ban', 'William Wang',
     'Kevin Li', 'Selina Lim', 'Gloria Huang', 'Cassidy Lee', 'Jessica Zhang', 'Callista Chan', 'Michael Tan',
     'Harry Yang', 'Sarah Gao', 'Melissa Zhang', 'Tanya Mai', 'Ava Cheh', 'Aleena Liu', 'Kate Chen', 'Ray Shen',
+    'Luca Fukuyo', 'Vincent Zheng', 'Tony Zhang', 'Jiayi Hong', 'Austin Sun', 'Tiffany Zhao', 'Zong Xie',
+  ]);
+  assert.deepEqual(CSA_GUESTS.filter(guest => guest.role === 'President').map(guest => guest.name), ['Selina Lim', 'Gloria Huang']);
+  assert.deepEqual(CSA_GUESTS.filter(guest => guest.role === 'Senior advisor').map(guest => guest.name), [
+    'Luca Fukuyo', 'Vincent Zheng', 'Tony Zhang', 'Jiayi Hong', 'Austin Sun', 'Tiffany Zhao', 'Zong Xie',
   ]);
   assert.ok(CSA_GUESTS.find(guest => guest.name === 'Amelie Hu').scale < 0.85);
   assert.ok(CSA_GUESTS.find(guest => guest.name === 'Lydia Zheng').scale < 0.82);
   assert.deepEqual(CSA_GUESTS.filter(guest => guest.dj).map(guest => guest.name), ['Rain Li']);
   const walkers = CSA_GUESTS.map((guest, i) => ({ guest, i })).filter(({ guest }) => guest.walk);
-  assert.equal(walkers.length, 20);
+  assert.equal(walkers.length, 27);
   assert.equal(new Set(walkers.map(({ guest }) => csaActivityLabel(guest))).size, 9);
   assert.equal(CSA_GUESTS.find(guest => guest.name === 'Kevin Li').activity, 'tablet');
   for (const [i, guest] of CSA_GUESTS.entries()) {
     assert.deepEqual(sampleCsaGuest(guest, i, 0, true), sampleCsaGuest(guest, i, 3, true));
   }
-  walkers.forEach(({ guest }, index) => {
-    for (const { guest: other } of walkers.slice(index + 1)) {
-      const x = Math.max(0, Math.abs(guest.x - other.x) - guest.walk[0] - other.walk[0]);
-      const z = Math.max(0, Math.abs(guest.z - other.z) - guest.walk[1] - other.walk[1]);
+  CSA_GUESTS.forEach((guest, index) => {
+    for (const other of CSA_GUESTS.slice(index + 1)) {
+      const x = Math.max(0, Math.abs(guest.x - other.x) - (guest.walk?.[0] ?? 0) - (other.walk?.[0] ?? 0));
+      const z = Math.max(0, Math.abs(guest.z - other.z) - (guest.walk?.[1] ?? 0) - (other.walk?.[1] ?? 0));
       assert.ok(Math.hypot(x, z) > 5, guest.name + ' and ' + other.name + ' have separate routes even if one yields');
     }
   });
@@ -1040,8 +1045,17 @@ test('reference-based hairstyles have distinct silhouettes', () => {
   assert.notEqual(jason.head.get(-8, 5, -4), jason.head.get(-8, 9, -4), 'the fade starts low near the ear');
   assert.ok(guest('Lydia Zheng').head.bounds().minY < guest('Amelie Hu').head.bounds().minY, 'Lydia has longer straight hair');
   assert.equal(william.torso.get(2, 21, 3), 0xe1ded7, 'the silver chain is on the chest');
-  const lydia = guest('Lydia Zheng').head.get(0, -14, -8);
-  assert.ok((lydia >> 16) > (lydia >> 8 & 255) * 1.5, 'Lydia has copper-orange hair');
+  const isBrown = color => {
+    const red = color >> 16, green = color >> 8 & 255, blue = color & 255;
+    return red > 62 && red < 147 && red > green && red < green * 1.5 && green > blue;
+  };
+  assert.ok(isBrown(guest('Lydia Zheng').head.get(0, -14, -8)), 'Lydia has warm brown, not ginger hair');
+  assert.ok(isBrown(guest('Ray Shen').head.get(0, 15, 0)), 'Ray has brown hair');
+  const amelie = guest('Amelie Hu').head;
+  assert.ok((amelie.get(0, 16, 0) >> 16) < 49, 'Amelie has black roots');
+  assert.ok(isBrown(amelie.get(0, -13, -8)), 'Amelie has brown dyed ends');
+  assert.ok(guest('Gloria Huang').head.bounds().minY < guest('Selina Lim').head.bounds().minY, 'Gloria’s waves are longer');
+  assert.equal(guest('Selina Lim').head.get(9, 3, 5), 0xffefdc, 'Selina has hoop earrings');
   const { head } = guest('Rain Li');
   assert.ok(head.has(0, 22, 5), 'fluffy fringe rises above the old crown');
   assert.ok(head.has(-12, 8, 0) && head.has(11, 8, 0) && head.has(0, 27, 0), 'padded ear cups and arched band');
@@ -1109,6 +1123,8 @@ test('Kevin carries a tablet and the disco lighting stays still in reduced motio
   t.after(() => { party.dispose(); material.dispose(); });
   const kevin = party.group.getObjectByName('Kevin Li'), tablet = kevin.getObjectByName('Checks production cues');
   assert.ok(tablet.isMesh && tablet.parent.isMesh, 'Kevin carries his tablet in his hand');
+  const william = party.group.getObjectByName('William Wang');
+  assert.ok(kevin.getObjectByName('Head').getWorldPosition(new Vector3()).y > 1.12 * william.getObjectByName('Head').getWorldPosition(new Vector3()).y, 'Kevin stands visibly taller');
   const disco = party.group.getObjectByName('Disco ball'), reflection = party.group.getObjectByName('Disco reflection');
   assert.equal(buildCsaDiscoBall().bounds().maxY, 11);
   assert.ok(disco.position.y > 32 && disco.position.z > CSA_STAGE_Z);

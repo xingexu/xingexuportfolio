@@ -10,7 +10,7 @@ import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarPart
 import { gridGeometry } from "@/lib/journey/mesh";
 import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
-import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
+import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildDormEntryDoor, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 
@@ -128,7 +128,7 @@ export default function JourneyWorld(props: Props) {
     type ReactiveView = { prop: PropView; state: BumpProp; pivot: number };
     type BallView = { prop: PropView; state: Ball; kind: BallKind };
     type Volley = { ball: BallView; sequence: VolleySequence };
-    type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh]; open: number };
+    type DoorView = { z: number; side: "front" | "back"; leaves: [Mesh, Mesh?]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
     type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView };
     type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty>; dormLighting?: ReturnType<typeof makeDormLighting> };
@@ -168,6 +168,15 @@ export default function JourneyWorld(props: Props) {
       const sides: DoorView["side"][] = isParty ? ["back"] : chapter.outdoor ? ["front"] : ["front", "back"];
       const doors = sides.map((side): DoorView => {
         const z = side === "front" ? bounds.minZ - 0.5 : bounds.maxZ + 0.5;
+        if (index === WESTERN_INDEX && side === "back") {
+          const geometry = gridGeometry(buildDormEntryDoor(), [0, 0, 0], 0.02, DOOR_VOXEL_SIZE);
+          owned.push(geometry);
+          const door = new Mesh(geometry, walls.back.material);
+          door.name = "Wood dorm entry with mirror";
+          door.position.set(-DOOR_HALF, 0, z);
+          walls.back.group.add(door);
+          return { z, side, leaves: [door], open: 0 };
+        }
         const left = new Mesh(leafGeometry, walls[side].material), right = new Mesh(leafGeometry, walls[side].material);
         left.position.set(-DOOR_HALF, 0, z);
         right.position.set(DOOR_HALF, 0, z);
@@ -383,9 +392,10 @@ export default function JourneyWorld(props: Props) {
         const target = doorwayOpening(door.z, player);
         door.open += (target - door.open) * ease;
         if (Math.abs(target - door.open) < 0.001) door.open = target;
-        const swing = door.open * Math.PI / 2 * (door.side === "front" ? 1 : -1);
-        door.leaves[0].rotation.y = swing;
-        door.leaves[1].rotation.y = -swing;
+        const [left, right] = door.leaves;
+        const swing = door.open * Math.PI / 2 * (door.side === "front" || !right ? 1 : -1);
+        left.rotation.y = swing;
+        if (right) right.rotation.y = -swing;
       }
     }
 

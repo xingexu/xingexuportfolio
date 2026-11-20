@@ -103,6 +103,26 @@ export function buildDoorLeaf(chapter: Chapter) {
   return leaf;
 }
 
+export function buildDormEntryDoor() {
+  const width = 2 * DOOR_HALF / DOOR_VOXEL_SIZE - 1, height = DOOR_HEIGHT / DOOR_VOXEL_SIZE - 1;
+  const door = new Grid().box(0, 0, -1, width, height, 2, (x, y) => {
+    const grain = hash3(x, Math.floor(y / 14), 19);
+    return shade(0xb48556, x === 0 || x === width - 1 ? 0.83 : 0.9 + grain * 0.19);
+  });
+  door.box(6, 7, -2, 14, 41, 1, 0x575657);
+  door.box(7, 8, -2, 12, 39, 1, (x, y) => {
+    const sheen = x + Math.floor(y * 0.55);
+    return sheen >= 31 && sheen <= 34 ? 0xd4e1e1 : y > 28 ? 0xb1c1c3 : 0x97aaaf;
+  });
+  for (const side of [-1, 1]) {
+    const z = side < 0 ? -2 : 1;
+    door.box(width - 4, 22, z, 2, 5, 1, 0x7d7972);
+    door.box(width - 6, 24, z + side, 4, 1, 1, 0xd9d3c9);
+    for (const y of [7, 29, 48]) door.box(0, y, z, 1, 3, 1, 0x77726a);
+  }
+  return door;
+}
+
 export function placementBox(p: Placement): Box {
   const f = modelFootprint(p.model), rot = p.rot ?? 0;
   const [minX, maxX, minZ, maxZ] =
@@ -350,7 +370,7 @@ const WINDOWS: Record<string, { side: "front" | "left" | "right"; center: number
   school: [{ side: "left", center: 0, width: 28, y: 18, height: 15, sky: 0xb5d7ea, ground: 0x718c63 }],
   elm: [{ side: "front", center: 20, width: 16, y: 19, height: 16, sky: 0xffd7ac, ground: 0x715e79 }],
   bayview: [-22, 22].map(center => ({ side: "front", center, width: 17, y: 25, height: 10, sky: 0xc4dfed, ground: 0x7c9ab3 })),
-  western: [-36, 35].map(center => ({ side: "right", center, width: 26, y: 15, height: 14, sky: 0x39445d, ground: 0x252a38 })),
+  western: [-21, 28].map(center => ({ side: "front", center, width: 22, y: 15, height: 14, sky: 0x39445d, ground: 0x252a38 })),
 };
 
 function addWindow(grid: Grid, bounds: Box, chapter: Chapter, spec: (typeof WINDOWS)[string][number]) {

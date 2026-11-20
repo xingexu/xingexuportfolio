@@ -894,10 +894,14 @@ const MODELS: Record<string, (g: Grid) => void> = {
     g.box(-1, 8, 2, 3, 3, 1, 0x565d68);
   },
   closet: dormCloset,
-  "nightstand": g => {
-    shelfUnit(g, 9, 9, 7, [0, 8], 0xb38760);
-    g.box(-3, 4, -2, 6, 3, 6, 0xa97851).box(-1, 5, 4, 2, 1, 1, METAL);
-    g.box(-3, 1, -2, 5, 2, 4, 0x3d4c65).box(-3, 1, 2, 5, 1, 1, 0xa7a3a1);
+  "dorm-cabinet": g => {
+    const wood = 0xb7885b;
+    g.box(-5, 0, -6, 10, 11, 12, wood).box(-5, 11, -6, 10, 1, 13, shade(wood, 1.13));
+    g.box(-4, 1, 6, 8, 9, 1, shade(wood, 0.7));
+    for (const y of [1, 6]) {
+      g.box(-4, y, 7, 8, 4, 1, (x, row) => shade(wood, 0.94 + hash3(x, Math.floor(row / 3), y) * 0.12));
+      g.box(-2, y + 2, 8, 4, 1, 1, METAL_DARK);
+    }
   },
   "laundry-basket": g => { g.box(-4, 0, -3, 8, 7, 6, (x, y, z) => (x + y + z) % 2 ? 0xc9b48f : 0xb39d76).box(-3, 6, -2, 6, 2, 4, 0x1a1a1a); },
 };

@@ -349,11 +349,11 @@ test('lifting a Molten beside a tall closet does not pull it inside', () => {
   const room = CHAPTERS[index], field = W.buildBallField(index);
   const { x, z } = room.items.find(item => item.id === 'closet');
   const closet = field.blocks.find(p => p.minX < x && p.maxX > x && p.minZ < z && p.maxZ > z);
-  const ball = V.makeBall(closet.maxX + 2, 0, z, 1.875);
-  V.liftBall(ball, { x: closet.maxX - 1, y: 23, z: ball.z }, field);
+  const ball = V.makeBall(closet.minX - 2, 0, z, 1.875);
+  V.liftBall(ball, { x: closet.minX + 1, y: 23, z: ball.z }, field);
   assert.ok(Math.abs(ball.y - 23) < 1e-6);
-  assert.ok(ball.x >= closet.maxX + ball.radius);
-  V.launchBall(ball, { x: -3.5, y: 27, z: 0 });
+  assert.ok(ball.x <= closet.minX - ball.radius);
+  V.launchBall(ball, { x: 3.5, y: 27, z: 0 });
   for (let i = 0; i < 360; i++) V.stepBall(ball, field, 1 / 120);
   assert.ok(ball.grounded && (ball.y === ball.radius || ball.y >= closet.top + ball.radius));
 });
@@ -432,6 +432,17 @@ test('door leaves fit the opening and open before you reach either threshold', (
       assert.equal(W.doorwayOpening(z, { x: 20, z }), 0);
     }
   }
+});
+
+test('the Western entry is one full-width wood door with a mirror on its room-facing side', () => {
+  const entry = W.buildDormEntryDoor(), leaf = entry.bounds();
+  assert.equal((leaf.maxX + 1) * W.DOOR_VOXEL_SIZE, 2 * W.DOOR_HALF - W.DOOR_VOXEL_SIZE);
+  assert.ok((leaf.maxY + 1) * W.DOOR_VOXEL_SIZE < W.DOOR_HEIGHT);
+  const wood = entry.get(12, 35, 0), mirror = entry.get(12, 35, -2);
+  const red = c => c >> 16, blue = c => c & 255;
+  assert.ok(red(wood) > blue(wood) + 50, 'warm wood shows on the hall side');
+  assert.ok(blue(mirror) > red(mirror) && mirror !== entry.get(6, 35, -2), 'the glass is framed on the inside');
+  assert.equal(entry.get(12, 35, 1), undefined, 'there is no mirror on the hall side');
 });
 
 test('render pixels use half the old pitch at desktop and phone sizes', () => {
@@ -619,26 +630,29 @@ test('Richard walks a furniture-free route, yields to the player and returns to 
   const t = walk.start + 0.2;
   const next = R.sampleRoommate(routine, t + 0.08);
   assert.equal(R.advanceRoommate(routine, t, 0.06, next, 2.38), t, 'waits instead of walking through the player');
-  assert.equal(R.advanceRoommate(routine, t, 0.06, { x: -50, z: 40 }, 2.38), t + 0.06);
+  assert.equal(R.advanceRoommate(routine, t, 0.06, { x: 8, z: 18 }, 2.38), t + 0.06);
   const seat = R.sampleRoommate(routine, routine.total);
   assert.deepEqual(seat, R.sampleRoommate(routine, 0), 'the loop resets to its seated, stationary pose');
   assert.equal(seat.sit, 1);
   const { view } = roommateScene();
-  const inside = { x: 44.9, z: 32 };
   const pose = beatAt('take', 0.5);
   view.apply(pose, pose.yaw);
-  const fromSouth = { x: inside.x, z: inside.z + 11 };
-  const movement = W.step(index, fromSouth, 0, -13, 2.38, (from, to, r) => view.blocks(from, to, r, pose));
-  assert.ok(movement.z > inside.z + 4, 'player cannot walk through the open door and Richard');
+  const start = R.placementPoint(npcFridge, 9, 8.1), beyond = R.placementPoint(npcFridge, -4, 8.1);
+  const dx = beyond.x - start.x, dz = beyond.z - start.z;
+  assert.ok(W.boxDistance(W.placementBox(npcFridge), start) > 2.38);
+  const unobstructed = W.step(index, start, dx, dz, 2.38);
+  assert.ok(Math.hypot(unobstructed.x - beyond.x, unobstructed.z - beyond.z) < 0.01);
+  const movement = W.step(index, start, dx, dz, 2.38, (from, to, r) => view.blocks(from, to, r, pose));
+  assert.ok(Math.hypot(movement.x - start.x, movement.z - start.z) < 7, 'player cannot walk through the open door and Richard');
 });
 
 test('the fridge door pauses before it swings into a stationary visitor', () => {
-  const player = { x: 44.8, z: 38.1 }, radius = 2.38;
+  const player = R.placementPoint(npcFridge, 4.1, 8.2), radius = 2.38;
   assert.ok(!W.blocked(CHAPTERS.length - 1, player.x, player.z, radius), 'the visitor can stand in the aisle');
   for (const action of ['open', 'shut']) {
     const { start, end } = routine.beats.find(b => b.action === action);
     let time = start, hit = false;
-    const visitor = action === 'open' ? player : { x: 44.8, z: 32.1 };
+    const visitor = action === 'open' ? player : R.placementPoint(npcFridge, -1.9, 8.2);
     for (let i = 0; i < 100 && time < end; i++) {
       const next = R.advanceRoommate(routine, time, 0.016, visitor, radius);
       if (next === time) { hit = true; break; }
@@ -704,7 +718,8 @@ test('the volleyball bounces off Richard in both his seated and moving poses', (
   };
   const seatedMaxX = view.ballBlock.maxX;
   checkBounce();
-  const walking = R.sampleRoommate(routine, routine.beats.find(b => b.action === 'walk').end - 0.1);
+  const aisle = routine.beats.find(b => b.action === 'walk' && b.from.x < 0 && b.to.x > 0);
+  const walking = R.sampleRoommate(routine, (aisle.start + aisle.end) / 2);
   view.apply(walking, walking.yaw);
   assert.ok(view.ballBlock.minX > seatedMaxX, 'the collider leaves the bed with Richard');
   checkBounce();
@@ -771,60 +786,51 @@ test('the Western dorm keeps small props and signs proportional to the furniture
   for (const id of ['csa', 'wds', 'wfn', 'mustangs']) assert.ok(footprint(id).height < W.AVATAR_SCALE * avatarHeight(18));
 });
 
-test('the beds keep their T alignment but are far apart on opposite sides of the divider', () => {
-  const room = CHAPTERS.at(-1);
-  assert.ok(room.width >= 120 && room.depth >= 120);
-  const [bar, stem] = ['ohall-bed', 'richards-bed'].map(id => room.items.find(item => item.id === id));
-  assert.equal(Math.abs(bar.rot - stem.rot) % 2, 1, 'the beds are a quarter turn apart');
-  const a = W.placementBox(bar), b = W.placementBox(stem);
-  assert.equal((a.minX + a.maxX) / 2, (b.minX + b.maxX) / 2);
-  assert.ok(a.minX < b.minX && a.maxX > b.maxX, 'the crossbar extends past both sides of the stem');
-  const divider = room.decor.find(prop => prop.model === 'desk-divider');
-  assert.ok(a.minZ > divider.z && b.maxZ < divider.z);
-  assert.ok(a.minZ - b.maxZ >= 40, 'a broad gap separates the beds');
+test('Richard’s bed is left of the entry and its foot is nearest the door', () => {
+  const bed = dorm.items.find(item => item.id === 'richards-bed');
+  const box = W.placementBox(bed), entrance = W.spawn(WESTERN_INDEX, 'start');
+  const head = R.placementPoint(bed, 0, -15), foot = R.placementPoint(bed, 0, 15);
+  assert.ok(box.maxX < -W.DOOR_HALF && box.minZ > 0);
+  assert.ok(Math.abs(entrance.z - foot.z) < 5 && head.z < foot.z - 25);
+  const cells = reachable(WESTERN_INDEX, entrance);
+  assert.ok(cells.some(p => p.x > box.maxX && W.boxDistance(box, p) <= 6), 'Richard’s bed is accessible from the aisle');
 });
 
-test('the standing desks are directly opposite, with both monitors facing their beds', () => {
-  const index = CHAPTERS.length - 1, room = CHAPTERS[index];
-  const [mine, richards] = room.items.filter(item => item.model.startsWith('standing-desk'));
-  const divider = room.decor.find(prop => prop.model === 'desk-divider');
-  const wall = W.placementBox(divider), wallHeight = modelFootprint(divider.model).height;
-  assert.equal(mine.x, divider.x);
-  assert.equal(richards.x, divider.x);
-  assert.equal(mine.z - divider.z, divider.z - richards.z);
-  assert.equal(mine.rot ?? 0, 0);
-  assert.equal(richards.rot, 2);
-  const monitors = [room.items.find(item => item.id === 'monitor'), room.decor.find(prop => prop.model === 'monitor')];
-  assert.equal(monitors[0].z - divider.z, divider.z - monitors[1].z);
-  assert.ok(wallHeight >= W.WALL_HEIGHT / 2 && wallHeight <= W.WALL_HEIGHT / 2 + 1);
-  assert.ok(W.blocked(index, divider.x, divider.z, 3.5));
-  const cells = reachable(index, W.spawn(index, 'forward'));
-  for (const [i, desk] of [mine, richards].entries()) {
-    const footprint = modelFootprint(desk.model), rect = W.placementBox(desk);
-    assert.ok(footprint.maxX - footprint.minX >= 30 && footprint.maxZ - footprint.minZ >= 12);
-    assert.ok(wall.minX <= rect.minX && wall.maxX >= rect.maxX);
-    const south = desk.z > divider.z, gap = south ? rect.minZ - wall.maxZ : wall.minZ - rect.maxZ;
-    assert.ok(gap >= 0 && gap <= 2, 'the desk backs sit against the divider');
-    assert.ok(cells.some(p => p.x === desk.x && p.z === (south ? rect.maxZ + 5 : rect.minZ - 5)), 'the front of the desk is walkable');
-    const monitor = W.placementBox(monitors[i]);
-    assert.equal(monitors[i].rot ?? 0, desk.rot ?? 0);
-    assert.ok(monitor.minX >= rect.minX && monitor.maxX <= rect.maxX && monitor.minZ >= rect.minZ && monitor.maxZ <= rect.maxZ);
+test('the double closet, low cabinet and standing desk line the right wall in entry order', () => {
+  const closet = dorm.items.find(item => item.id === 'closet'), cabinet = dorm.decor.find(p => p.model === 'dorm-cabinet');
+  const desk = dorm.items.find(item => item.id === 'standing-desk');
+  const bounds = W.interior(dorm), cells = reachable(WESTERN_INDEX, W.spawn(WESTERN_INDEX, 'start'));
+  for (const prop of [closet, cabinet, desk]) {
+    const box = W.placementBox(prop);
+    assert.equal(prop.x, closet.x);
+    assert.equal(prop.rot, 3, 'the furniture faces into the room');
+    assert.ok(bounds.maxX - box.maxX <= 3, 'the back is along the wall');
+    assert.ok(cells.some(p => p.x < box.minX && p.z === prop.z && W.boxDistance(box, p) <= 5), prop.model);
   }
-  for (const x of [wall.minX - 4, wall.maxX + 4]) {
-    assert.ok(!W.blocked(index, x, divider.z, 3.5), 'the divider leaves passage at both ends');
-  }
+  const boxes = [closet, cabinet, desk].map(W.placementBox);
+  assert.ok(bounds.maxZ - boxes[0].maxZ < 12, 'the closet starts by the entrance');
+  for (let i = 1; i < boxes.length; i++) assert.ok(boxes[i - 1].minZ - boxes[i].maxZ <= 5 && boxes[i - 1].minZ >= boxes[i].maxZ);
+  assert.ok(modelFootprint(cabinet.model).height < modelFootprint(desk.model).height / 2);
 });
 
-test('each desk is by its own bed, with the fridge and closet next to the player’s bed', () => {
-  const room = CHAPTERS.at(-1);
-  const itemBox = id => W.placementBox(room.items.find(item => item.id === id));
-  const mine = itemBox('ohall-bed'), richards = itemBox('richards-bed');
-  const deskGap = mine.minZ - itemBox('standing-desk').maxZ;
-  const richardsGap = itemBox('richards-desk').minZ - richards.maxZ;
-  for (const gap of [deskGap, richardsGap]) assert.ok(gap >= 8 && gap <= 12, 'room to walk between each bed and desk');
-  const fridge = itemBox('mini-fridge'), closet = itemBox('closet');
-  for (const prop of [fridge, closet]) assert.ok(prop.minZ < mine.maxZ && prop.maxZ > mine.minZ && prop.minZ > 0);
-  for (const gap of [fridge.minX - mine.maxX, mine.minX - closet.maxX]) assert.ok(gap >= 7 && gap <= 15);
+test('my bed is across from my desk and the divider separates it from Richard’s desk', () => {
+  const item = id => dorm.items.find(item => item.id === id);
+  const bed = W.placementBox(item('ohall-bed'));
+  const desks = [item('standing-desk'), item('richards-desk')];
+  const [mine, richards] = desks.map(W.placementBox);
+  const divider = dorm.decor.find(p => p.model === 'desk-divider'), wall = W.placementBox(divider);
+  assert.ok(mine.minX - bed.maxX >= 8 && mine.minZ < bed.maxZ && mine.maxZ > bed.minZ, 'my bed faces my desk across a walking gap');
+  assert.ok(richards.maxX < wall.minX && wall.maxX < bed.minX);
+  assert.ok(Math.max(bed.minZ, wall.minZ, richards.minZ) < Math.min(bed.maxZ, wall.maxZ, richards.maxZ));
+  assert.ok(modelFootprint(divider.model).height >= W.WALL_HEIGHT / 2);
+  assert.ok(W.blocked(WESTERN_INDEX, divider.x, divider.z, 3.5));
+
+  const monitors = [item('monitor'), dorm.decor.find(prop => prop.model === 'monitor')];
+  for (const [i, monitor] of monitors.entries()) {
+    const { minX, maxX, minZ, maxZ } = W.placementBox(monitor), footprint = W.placementBox(desks[i]);
+    assert.equal(monitor.rot ?? 0, desks[i].rot ?? 0);
+    assert.ok(minX >= footprint.minX && maxX <= footprint.maxX && minZ >= footprint.minZ && maxZ <= footprint.maxZ);
+  }
 });
 
 test('the Western wardrobes have closed wooden doors over drawers', () => {
@@ -847,8 +853,8 @@ test('Western has light walls, warm carpet, curtained windows, and a clear entry
   assert.ok(rgb(walls.left.get(bounds.minX - 1, 23, 0)).every(channel => channel > 215));
   const [r, g, b] = rgb(fixed.get(0, -1, 0));
   assert.ok(r > g && g > b && b >= 108 && r < 165, 'warm gray floor');
-  for (const z of [-46, 25]) {
-    const [red, green, blue] = rgb(walls.right.get(bounds.maxX - 3, 22, z));
+  for (const x of [-31, 18]) {
+    const [red, green, blue] = rgb(walls.front.get(x, 22, bounds.minZ + 2));
     assert.ok(red > green && green > blue && blue > 130, 'beige curtain stays with the cutaway wall');
   }
   assert.equal(room.decor.filter(prop => prop.model === 'dorm-chair').length, 2);

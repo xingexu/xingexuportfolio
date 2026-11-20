@@ -705,6 +705,15 @@ function roommateScene() {
   return { view, fridge };
 }
 
+test('Richard’s seated collider covers his knees on the open side of his bed', () => {
+  const { view } = roommateScene(), pose = view.pose, radius = 2.38;
+  const start = { x: pose.x - 8, z: pose.z }, end = { x: pose.x - 6.5, z: pose.z };
+  assert.ok(!W.blocked(WESTERN_INDEX, end.x, end.z, radius), 'the bed itself does not block the visitor');
+  const movement = W.step(WESTERN_INDEX, start, end.x - start.x, 0, radius, (from, to, r) => view.blocks(from, to, r, pose));
+  assert.ok(movement.x < end.x, 'the visitor cannot walk through the seated avatar');
+  assert.ok(!view.blocks(end, start, radius, pose), 'the visitor can back away');
+});
+
 test('the volleyball bounces off Richard in both his seated and moving poses', () => {
   const { view } = roommateScene();
   const field = W.buildBallField(CHAPTERS.length - 1);

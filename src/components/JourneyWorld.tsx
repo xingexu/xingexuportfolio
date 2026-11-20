@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import { Box3, Color, DataTexture, GreaterDepth, Group, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, NearestMipmapLinearFilter, PerspectiveCamera, PlaneGeometry, Ray, Raycaster, RepeatWrapping, Scene, Vector2, Vector3, WebGLRenderer, type BufferGeometry, type Object3D } from "three";
-import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, JOURNEY_START_INDEX, WESTERN_BED_ID, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
+import { CHAPTERS, CSA_DJ_LINK, CSA_ROOM_INDEX, JOURNEY_ROOMS, JOURNEY_START_INDEX, WESTERN_BED_ID, WESTERN_CABINET_ID, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, chapterAccent, type Placement, type Outfit } from "@/lib/journey/data";
 import { BED_SLEEP_DURATION, bedsidePosition, sampleBedSleep } from "@/lib/journey/bedSleep";
 import { makeCsaParty } from "@/lib/journey/csaParty";
 import { makeDormLighting } from "@/lib/journey/dormLighting";
+import { makeDormCabinetView } from "@/lib/journey/dormCabinetView";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
@@ -21,6 +22,7 @@ export type JourneyControls = {
   interact: () => void;
   pushRoommate: () => void;
   toggleDormLamps: () => void;
+  toggleCabinet: () => void;
   jump: () => void;
   volley: () => void;
   goTo: (index: number) => void;
@@ -31,7 +33,7 @@ export type JourneyControls = {
   toggleCamera: (mode: keyof CameraMode) => void;
 };
 export type CameraMode = { front: boolean; tilt: boolean };
-export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; bedAction?: "Sleep" | "Wake up"; canPush?: boolean; csaDjNearby?: boolean; dormLampsOn?: boolean };
+export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; bedAction?: "Sleep" | "Wake up"; canPush?: boolean; csaDjNearby?: boolean; dormLampsOn?: boolean; cabinetOpen?: boolean };
 export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" | "portal" };
 type Props = {
   controls: RefObject<JourneyControls | null>;
@@ -130,7 +132,7 @@ export default function JourneyWorld(props: Props) {
     type DoorView = { x: number; z: number; side: "front" | "back"; leaves: [Mesh, Mesh?]; open: number };
     type WallView = { group: Group; material: MeshBasicMaterial };
     type RoommateView = ReturnType<typeof makeRoommateView> & { prop: PropView; fridge: PropView; push: ReturnType<typeof planRoommatePush> };
-    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty>; dormLighting?: ReturnType<typeof makeDormLighting>; fans: ReturnType<typeof makeWuzuFanView>[] };
+    type RoomView = { group: Group; items: Map<string, ItemView>; props: PropView[]; reactive: ReactiveView[]; balls: BallView[]; itemPositions: Map<string, Ball | Vector3>; field?: BallField; doors: DoorView[]; route: Mesh[]; pickables: Object3D[]; walls: Record<RoomSide, WallView>; roommate?: RoommateView; party?: ReturnType<typeof makeCsaParty>; dormLighting?: ReturnType<typeof makeDormLighting>; cabinet?: ReturnType<typeof makeDormCabinetView> & { prop: PropView }; fans: ReturnType<typeof makeWuzuFanView>[] };
     const rooms = new Map<number, RoomView>();
     function setOpacity(material: MeshBasicMaterial, opacity: number) {
       material.opacity = opacity;
@@ -188,12 +190,21 @@ export default function JourneyWorld(props: Props) {
         !p.ball && !chapter.outdoor && p.solid === false && (p.y ?? 0) >= 7 ? roomSide(bounds, p.x, p.z, 4) ?? undefined : undefined;
       const props: PropView[] = [], reactive: ReactiveView[] = [], balls: BallView[] = [], itemPositions = new Map<string, Ball | Vector3>();
       const fans: RoomView["fans"] = [];
+      let cabinet: RoomView["cabinet"];
       const addProp = (p: Placement) => {
         const material = baseMaterial.clone(), holder = new Group();
         holder.position.set(p.x, p.y ?? 0, p.z);
         holder.rotation.y = (p.rot ?? 0) * Math.PI / 2;
-        if (p.model === "fan") fans.push(makeWuzuFanView(holder, material));
-        else holder.add(new Mesh(modelGeometry(p.model), material));
+        const drawers = p.model === "dorm-cabinet" ? makeDormCabinetView(p, holder, grid => {
+          const origin = modelFootprint(p.model).minZ - buildModel(p.model).bounds().minZ;
+          const geometry = gridGeometry(grid, [0, 0, origin]);
+          owned.push(geometry);
+          return new Mesh(geometry, material);
+        }) : undefined;
+        if (!drawers) {
+          if (p.model === "fan") fans.push(makeWuzuFanView(holder, material));
+          else holder.add(new Mesh(modelGeometry(p.model), material));
+        }
         const glass = modelHasGlass(p.model) ? glassMaterial.clone() : undefined;
         if (glass) holder.add(new Mesh(modelGeometry(p.model, true), glass));
         const bounds = new Box3().setFromObject(holder);
@@ -201,6 +212,7 @@ export default function JourneyWorld(props: Props) {
         dormLighting?.add(p.model, holder);
         const wall = wallFor(p);
         const prop = { holder, bounds, material, glass, wall, visibility: 1 };
+        if (drawers) cabinet = Object.assign(drawers, { prop });
         props.push(prop);
         (wall ? walls[wall].group : group).add(holder);
         if (p.bump) {
@@ -251,6 +263,7 @@ export default function JourneyWorld(props: Props) {
       }
       const field = balls.length ? buildBallField(index) : undefined;
       if (roommate) field?.blocks.push(roommate.ballBlock);
+      if (cabinet) field?.blocks.push(...cabinet.ballBlocks);
       const route = journeyArrows(index).map(({ x, z }, i, points) => {
         const arrow = new Mesh(arrowGeometry, arrowMaterial);
         arrow.position.set(x, 3.4, z);
@@ -273,7 +286,7 @@ export default function JourneyWorld(props: Props) {
         walls.front.group.add(party.stageWall);
         pickables.push(...party.djPickables);
       }
-      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party, dormLighting, fans };
+      const view = { group, items, props, reactive, balls, itemPositions, field, doors, route, pickables, walls, roommate, party, dormLighting, cabinet, fans };
       rooms.set(index, view);
       return view;
     }
@@ -576,7 +589,8 @@ export default function JourneyWorld(props: Props) {
       if (sleep) { sleep.waking = true; clearInput(); }
       else if (westernBed && canSleep()) {
         sleep = { start: { x: player.x, z: player.z }, progress: 0, waking: false };
-        face(Math.atan2(westernBed.x - player.x, westernBed.z + 9 - player.z));
+        const landing = sampleBedSleep(westernBed, player, 1, 0, true);
+        face(Math.atan2(landing.x - player.x, landing.z - player.z));
         clearInput();
       } else if (nearby) activateItem(nearby);
       else if (room(chapter).party?.nearDj(player)) openCsaDj();
@@ -601,7 +615,11 @@ export default function JourneyWorld(props: Props) {
 
     function getPush(npc: RoommateView | undefined) {
       return npc && !npc.push && !sleep && !volley && !pushGesture && jumpElapsed === null
-        ? planRoommatePush(npc.pose, player, 3.5 * AVATAR_SCALE, canRichardStep) : null;
+        ? planRoommatePush(npc.pose, player, 3.5 * AVATAR_SCALE, richardGroundClear) : null;
+    }
+
+    function richardGroundClear(point: Vec) {
+      return canRichardStep(point) && !room(chapter).cabinet?.blocks(point, ROOMMATE_RADIUS);
     }
 
     function pushRoommate() {
@@ -620,6 +638,7 @@ export default function JourneyWorld(props: Props) {
 
     function activateItem(id: string) {
       if (id === WESTERN_LIGHT_SWITCH_ID) toggleDormLamps();
+      else if (id === WESTERN_CABINET_ID) room(chapter).cabinet?.toggle();
       else live.current.onOpen(id);
     }
 
@@ -637,6 +656,7 @@ export default function JourneyWorld(props: Props) {
       interact,
       pushRoommate,
       toggleDormLamps,
+      toggleCabinet: () => activateItem(WESTERN_CABINET_ID),
       jump,
       volley: playVolley,
       goTo: index => { if (index < CHAPTERS.length && index !== chapter) startTransition(index, "jump"); },
@@ -789,8 +809,8 @@ export default function JourneyWorld(props: Props) {
       if (Math.abs(turn) > 0.05 && Math.abs(move) <= 0.05) player.phase += dt * 6;
       if (Math.hypot(player.vx, player.vz) > 0.02) {
         const radius = (height >= 29 ? 3.5 : 3) * AVATAR_SCALE;
-        const { roommate: npc, party } = room(chapter);
-        const collider = npc ? (from: Vec, to: Vec, r: number) => npc.blocks(from, to, r, npc.pose) : party?.blocks;
+        const { roommate: npc, party, cabinet } = room(chapter);
+        const collider = npc ? (from: Vec, to: Vec, r: number) => npc.blocks(from, to, r, npc.pose) || !!cabinet?.blocksMove(from, to, r) : party?.blocks;
         const result = step(chapter, player, player.vx * dt, player.vz * dt, radius, collider);
         const movement = { x: result.x - player.x, z: result.z - player.z };
         player.x = result.x; player.z = result.z;
@@ -849,8 +869,12 @@ export default function JourneyWorld(props: Props) {
       activeRoom.party?.update(!blockedNow && !transition ? dt : 0, motion.matches, player);
       for (const fan of activeRoom.fans) fan.update(time, motion.matches);
       if (!transition && !blockedNow) {
+        const { roommate: npc, cabinet } = activeRoom;
+        const npcCenter = cabinet && npc ? roommateCenter(npc.pose, npc.yaw) : undefined;
+        if (cabinet?.update(dt, motion.matches, player, 3.5 * AVATAR_SCALE, npcCenter, ROOMMATE_RADIUS, activeRoom.balls.map(({ state }) => state))) {
+          cabinet.prop.bounds.setFromObject(cabinet.prop.holder).expandByScalar(1);
+        }
         kickPose = Math.max(0, kickPose - dt);
-        const npc = activeRoom.roommate;
         pushGesture = Math.max(0, pushGesture - dt);
         // Keep a clear mount or dismount path clear until the transfer finishes.
         if (npc && (!sleep || sleep.progress === 0 || sleep.progress === 1)) {
@@ -861,7 +885,7 @@ export default function JourneyWorld(props: Props) {
             const previous = npc.pose;
             npc.time = time;
             if (npc.push) {
-              const next = stepRoommatePush(npc.push, dt, motion.matches, occupant, radius, canRichardStep);
+              const next = stepRoommatePush(npc.push, dt, motion.matches, occupant, radius, richardGroundClear);
               npc.push = next.state;
               npc.pose = next.pose;
             } else npc.pose = sampleRoommate(npc.routine, time);
@@ -893,7 +917,6 @@ export default function JourneyWorld(props: Props) {
         limbs.armL.rotation.z = -0.17 * pose.lie; limbs.armR.rotation.z = 0.24 * pose.lie;
         limbs.legL.rotation.x = -0.36 * pose.tuck; limbs.legR.rotation.x = -0.26 * pose.tuck;
         limbs.armR.rotation.x = -0.18 * pose.lie;
-        limbs.head.rotation.x = 0.08 * pose.lie;
       } else if (pushGesture && !motion.matches) {
         const u = 1 - pushGesture / PUSH_GESTURE_TIME;
         const reach = smooth(u / 0.28) * (1 - smooth((u - 0.48) / 0.52));
@@ -936,6 +959,9 @@ export default function JourneyWorld(props: Props) {
       // Nearby + hover highlights
       const npc = activeRoom.roommate;
       let nearList = transition || sleep ? [] : nearbyItems(chapter, player, undefined, undefined, activeRoom.itemPositions).map(item => item.id);
+      if (!transition && !sleep && activeRoom.cabinet?.near(player)) {
+        nearList = [WESTERN_CABINET_ID, ...nearList.filter(id => id !== WESTERN_CABINET_ID)].slice(0, 3);
+      }
       if (!transition && !sleep && npc && Math.hypot(player.x - npc.pose.x, player.z - npc.pose.z) <= 8) {
         nearList = [npc.id, ...nearList.filter(id => id !== npc.id)].slice(0, 3);
       }
@@ -969,8 +995,9 @@ export default function JourneyWorld(props: Props) {
       const dormLampsOn = activeRoom.dormLighting?.enabled;
       const bedAction = transition ? undefined : sleep ? "Wake up" : canSleep() ? "Sleep" : undefined;
       const canPush = !transition && !blockedNow && !!getPush(npc);
-      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}|${bedAction ?? ""}|${canPush}|${csaDjNearby ?? ""}|${dormLampsOn ?? ""}`;
-      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action, bedAction, canPush, csaDjNearby, dormLampsOn }); }
+      const cabinetOpen = activeRoom.cabinet?.open;
+      const status = `${chapter}|${player.age}|${nearList.join(",")}|${action ?? ""}|${bedAction ?? ""}|${canPush}|${csaDjNearby ?? ""}|${dormLampsOn ?? ""}|${cabinetOpen ?? ""}`;
+      if (status !== lastStatus) { lastStatus = status; live.current.onStatus({ chapter, age: player.age, nearby: nearList, volley: action, bedAction, canPush, csaDjNearby, dormLampsOn, cabinetOpen }); }
 
       renderer.render(scene, camera);
       // Show the avatar through foreground props without drawing it solidly in front of them.

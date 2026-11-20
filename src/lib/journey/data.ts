@@ -10,6 +10,7 @@ export type JourneyItem = Placement & {
   label: string;
   title: string;
   description?: string;
+  interactionAnchor?: Vec2;
   links?: JourneyLink[];
   video?: { src: string; label: string; captions?: string; poster: string };
 };
@@ -18,6 +19,7 @@ export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" |
 export type Roommate = { id: string; x: number; z: number; seatFacing: Rot; fridge: string; fridgeVia: readonly Vec2[]; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
 export const WESTERN_LIGHT_SWITCH_ID = "dorm-light-switch";
 export const WESTERN_BED_ID = "ohall-bed";
+export const WESTERN_CABINET_ID = "dorm-cabinet";
 const WESTERN_ENTRY_X = 36;
 const RICHARD_BED_X = -49;
 const RICHARD_SEAT = { x: RICHARD_BED_X + 8, z: 46 };
@@ -227,8 +229,8 @@ const ROOMS: Chapter[] = [
       { id: "wfn", model: "poster-wfn", x: -63, z: 14, y: 14, rot: 1, solid: false, label: "Western Founders Network poster", title: "Western Founders Network",
         description: "I’m a director on the Projects team.",
         links: [{ href: "https://linktr.ee/westernfoundersnetwork", label: "Western Founders Network" }, { href: "https://www.instagram.com/westernfoundersnetwork/", label: "@westernfoundersnetwork" }] },
-      { id: WESTERN_BED_ID, model: "bed-western", ...MY_BED, label: "Beige bed", title: "My bed in Ontario Hall",
-        description: "A beige duvet and my black Capco blanket. Press E beside the bed to sleep." },
+      { id: WESTERN_BED_ID, model: "bed-western", ...MY_BED, label: "Navy bed", title: "My bed in Ontario Hall",
+        description: "Navy sheets and pillow, with a black Capco throw at the foot. Press E by the bed to sleep." },
       { id: "richards-bed", model: "bed-roommate", x: RICHARD_BED_X, z: 53, rot: 1, label: "Richard’s bed", title: "Richard’s bed" },
       { id: "richard", model: "roommate-portrait", ...RICHARD_SEAT, solid: false, label: "Richard Su", title: "Richard Su",
         description: "My roommate in Ontario Hall.",
@@ -236,7 +238,7 @@ const ROOMS: Chapter[] = [
         links: [{ href: "https://www.linkedin.com/in/richard-su-7377542b9/", label: "Richard’s LinkedIn" }] },
       { id: "hockey-pad", model: "hockey-pad", x: -43, z: 5, solid: false, label: "Hockey practice pad", title: "Synthetic ice pad",
         description: "Richard uses it to practice stickhandling." },
-      { id: "jellycat", model: "jellycat-frog", x: MY_BED.x + 5.5, z: MY_BED.z + 3, y: 8.5, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog",
+      { id: "jellycat", model: "jellycat-frog", x: MY_BED.x + 5.5, z: MY_BED.z + 3, y: 7, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog",
         description: "My Jellycat frog." },
       { id: "standing-desk", model: "standing-desk", x: 55, z: -14, rot: 3, label: "My standing desk", title: "My standing desk",
         description: "I use it for coding and club work." },
@@ -253,9 +255,10 @@ const ROOMS: Chapter[] = [
         description: "My monitor with a light bar clipped to the top.",
         links: [{ href: LINKS.github, label: "See what I’m building" }] },
       { id: "desk-lamp", model: "desk-lamp", x: 57, z: -27, y: 18, rot: 3, solid: false, label: "Desk lamp", title: "Desk lamp" },
-      { id: "dorm-headphones", model: "dorm-headphones", x: 56, z: -2.5, y: 18, rot: 3, solid: false, label: "My headphones", title: "My headphones" },
+      { id: "dorm-headphones", model: "dorm-headphones", x: 53.5, z: -2.5, y: 18, rot: 3, solid: false, label: "My headphones", title: "My headphones" },
       { id: "dorm-backpack", model: "dorm-backpack", x: 50.25, z: -21, rot: 3, solid: false, label: "My backpack", title: "My backpack" },
-      { id: "smiskis", model: "smiskis", x: 52, z: -23, y: 18, rot: 3, solid: false, label: "My Smiskis", title: "My Smiskis" },
+      { id: "smiskis", model: "smiskis", x: 59.5, z: -10.5, y: 32, rot: 3, solid: false, interactionAnchor: { x: 51, z: -10.5 },
+        label: "My Smiskis", title: "My Smiskis" },
       { id: "buldak", model: "buldak-bowl", x: 52, z: 1, y: 18, rot: 3, solid: false, label: "Buldak noodles", title: "Buldak at 5 a.m.",
         video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m. (silent)", poster: "/videos/journey/buldak.webp" } },
       { id: "mini-fridge", model: "mini-fridge", ...WESTERN_FRIDGE, label: "Mini fridge", title: "Mini fridge",
@@ -263,11 +266,14 @@ const ROOMS: Chapter[] = [
       { id: "fragrances", model: "fragrances", ...WESTERN_FRIDGE, y: 13, solid: false, label: "Fragrances", title: "Fragrances",
         description: "I keep these on the mini fridge." },
       { id: "fan", model: "fan", x: 55, z: 10.5, y: 12, rot: 3, solid: false, label: "WOOZOO fan", title: "WOOZOO fan",
+        interactionAnchor: { x: 52, z: 10.5 },
         description: "An oscillating fan that blows a breeze across the dorm." },
       { id: "dorm-snacks", model: "dorm-snacks", x: 50, z: 8, y: 12, rot: 3, solid: false, label: "Dorm snacks", title: "Dorm snacks",
         description: "Chips, cookies, Pocky, and a cup of instant noodles." },
       { id: "closet", model: "closet", x: 55, z: 38, rot: 3, label: "Double closet", title: "Wooden double closet",
         description: "Hoodies, sweatpants, and snacks are put away inside." },
+      { id: WESTERN_CABINET_ID, model: "dorm-cabinet", x: 55, z: 9, rot: 3, label: "Clothes cabinet", title: "My clothes cabinet",
+        description: "Open the drawers in the room to see my folded clothes." },
       { id: "shoe-rack", model: "dorm-shoe-rack", ...WESTERN_SHOE_RACK, label: "Shoe rack", title: "Entry shoe rack" },
       { id: "pink-shoes", model: "pink-court-shoes", ...WESTERN_SHOE_RACK, z: WESTERN_SHOE_RACK.z - 0.5, y: 8, solid: false, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
       { id: "molten", model: "molten-volleyball", x: -24, z: 14, ball: "molten", label: "Molten volleyball", title: "Molten volleyball",
@@ -275,14 +281,13 @@ const ROOMS: Chapter[] = [
       { id: "laundry", model: "laundry-basket", x: -56, z: 17, rot: 1, label: "Laundry basket", title: "Laundry basket" },
     ],
     decor: [
-      { model: "western-bedding", x: MY_BED.x, z: MY_BED.z + 1, y: 3, solid: false },
-      { model: "capco-stitch", x: MY_BED.x + 5.5, z: MY_BED.z + 11.25, y: 9.5, solid: false },
+      { model: "capco-throw", x: MY_BED.x, z: MY_BED.z + 11, y: 4.5, solid: false },
+      { model: "capco-stitch", x: MY_BED.x + 4.5, z: MY_BED.z + 12.5, y: 9, solid: false },
       { model: "monitor-headlight", x: 55.75, z: -14, y: 31, rot: 3, solid: false },
       { model: "desk-divider", x: 9, z: -35, rot: 1 },
       { model: "monitor", x: -39, z: -38, y: 18, rot: 1, solid: false },
       { model: "desk-lamp", x: -40, z: -26, y: 18, rot: 1, solid: false },
       { model: "dorm-chair", x: 45, z: -26, rot: 3 }, { model: "dorm-chair", x: -27, z: -32, rot: 1 },
-      { model: "dorm-cabinet", x: 55, z: 9, rot: 3 },
       { model: "dorm-snacks", x: 59, z: -21, y: 32, rot: 3, solid: false },
       { model: "dorm-snacks", ...RICHARD_NIGHTSTAND, y: 10, solid: false },
     ],

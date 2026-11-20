@@ -12,6 +12,14 @@ export function makeDormLighting(geometry: (model: string) => BufferGeometry) {
   const poolGeometry = new PlaneGeometry(8, 7);
   const poolMaterial = new MeshBasicMaterial({ color: 0xffe3a1, map: texture, transparent: true, depthWrite: false });
   let enabled = false;
+  function addPool(holder: Group, y: number, z: number) {
+    const pool = new Mesh(poolGeometry, poolMaterial);
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.set(0, y, z);
+    pool.raycast = () => {};
+    holder.add(pool);
+    return pool;
+  }
   function apply() {
     for (const { mesh, on, off, pool } of fixtures) {
       mesh.geometry = enabled ? on : off;
@@ -21,15 +29,12 @@ export function makeDormLighting(geometry: (model: string) => BufferGeometry) {
   return {
     get enabled() { return enabled; },
     add(model: string, holder: Group) {
+      if (model === "monitor-headlight") { addPool(holder, -12.97, 4.15); return; }
       if (model !== "desk-lamp" && model !== "dorm-light-switch") return;
       const mesh = holder.children[0] as Mesh;
       if (model === "dorm-light-switch") fixtures.push({ mesh, on: geometry("dorm-light-switch-on"), off: mesh.geometry });
       else {
-        const pool = new Mesh(poolGeometry, poolMaterial);
-        pool.rotation.x = -Math.PI / 2;
-        pool.position.set(0, 0.03, 5.5);
-        pool.raycast = () => {};
-        holder.add(pool);
+        const pool = addPool(holder, 0.03, 5.5);
         fixtures.push({ mesh, on: mesh.geometry, off: geometry("desk-lamp-off"), pool });
       }
       apply();

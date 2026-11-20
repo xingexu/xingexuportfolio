@@ -24,6 +24,7 @@ const { CHAPTERS, ALL_ITEMS, CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_DJ_LINK, CSA
 const { buildModel, modelFootprint, modelHasGlass, modelVoxelSize, isGlass, MODEL_IDS } = load('src/lib/journey/models.ts');
 const { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, avatarHeight } = load('src/lib/journey/avatar.ts');
 const W = load('src/lib/journey/world.ts');
+const { bedsidePosition, sampleBedSleep } = load('src/lib/journey/bedSleep.ts');
 const V = load('src/lib/journey/volleyball.ts');
 const R = load('src/lib/journey/roommate.ts');
 const { makeRoommateView } = load('src/lib/journey/roommateView.ts');
@@ -709,11 +710,54 @@ function roommateScene() {
 test('Richard’s seated collider covers his knees on the open side of his bed', () => {
   const { view } = roommateScene(), pose = view.pose, radius = 2.38;
   const facing = { ...pose, rot: dorm.roommate.seatFacing };
-  const start = R.placementPoint(facing, 0, 8), end = R.placementPoint(facing, 0, 6.5);
+  const start = R.placementPoint(facing, 0, 12), end = R.placementPoint(facing, 0, 9);
   assert.ok(!W.blocked(WESTERN_INDEX, end.x, end.z, radius), 'the bed itself does not block the visitor');
   const movement = W.step(WESTERN_INDEX, start, end.x - start.x, end.z - start.z, radius, (from, to, r) => view.blocks(from, to, r, pose));
   assert.ok(Math.hypot(movement.x - end.x, movement.z - end.z) > 0.01, 'the visitor cannot walk through the seated avatar');
   assert.ok(!view.blocks(end, start, radius, pose), 'the visitor can back away');
+});
+
+test('at a head-on encounter Richard steps aside, keeps clear, and waits before returning', () => {
+  const radius = 3.5 * W.AVATAR_SCALE, gap = R.roommateGap(radius);
+  const beat = routine.beats.find(b => b.action === 'walk' && b.from.z === 29 && b.to.x === 38);
+  const at = (beat.start + beat.end) / 2, pose = R.sampleRoommate(routine, at);
+  const { view } = roommateScene();
+  view.apply(pose, pose.yaw);
+  const start = { x: pose.x + 12, z: pose.z };
+  const player = W.step(WESTERN_INDEX, start, -12, 0, radius, (from, to, r) => view.blocks(from, to, r, pose));
+  assert.ok(player.x - pose.x >= gap && player.x - pose.x <= gap + 0.5, 'body clearance stops a head-on approach');
+  assert.equal(R.advanceRoommate(routine, at, 0.05, player, radius), at, 'Richard yields to the player too');
+  const open = p => !W.blocked(WESTERN_INDEX, p.x, p.z, R.ROOMMATE_RADIUS);
+  let shove = R.planRoommatePush(pose, player, radius, open);
+  assert.ok(shove && Math.abs(shove.target.z - pose.z) > 2, 'Richard steps sideways as well as back');
+  const instant = R.stepRoommatePush(shove, 1 / 60, true, player, radius, open);
+  assert.deepEqual({ x: instant.pose.x, z: instant.pose.z, stride: instant.pose.stride }, { ...shove.target, stride: 0 });
+  assert.equal(R.planRoommatePush(pose, player, radius, () => false), null, 'no push into enclosed furniture');
+  assert.equal(R.planRoommatePush({ ...pose, action: 'sip' }, player, radius, open), null);
+  for (let i = 0; i < 30; i++) {
+    const moved = R.stepRoommatePush(shove, 1 / 60, false, player, radius, open);
+    assert.ok(open(moved.pose) && Math.hypot(moved.pose.x - player.x, moved.pose.z - player.z) >= gap);
+    shove = moved.state;
+  }
+  const dx = shove.target.x - pose.x, dz = shove.target.z - pose.z, distance = Math.hypot(dx, dz);
+  const inTheWay = { x: pose.x - dx / distance * 5, z: pose.z - dz / distance * 5 };
+  for (let i = 0; i < 75; i++) shove = R.stepRoommatePush(shove, 1 / 60, false, inTheWay, radius, open).state;
+  assert.equal(shove.progress, 1, 'Richard waits for the player to clear his return path');
+  const away = { x: 12, z: 51 };
+  let returned;
+  for (let i = 0; shove && i < 40; i++) {
+    returned = R.stepRoommatePush(shove, 1 / 60, false, away, radius, open);
+    shove = returned.state;
+  }
+  assert.equal(shove, null);
+  assert.deepEqual(returned.pose, pose, 'the route resumes at the same point');
+});
+
+test('actor collision is swept across the body, not just checked at the endpoint', () => {
+  const center = { x: 0, z: 0 }, gap = R.roommateGap(2.38);
+  assert.ok(R.overlapsOnMove({ x: -10, z: 0 }, { x: 10, z: 0 }, center, gap));
+  assert.ok(!R.overlapsOnMove({ x: -4, z: 0 }, { x: -5, z: 1 }, center, gap), 'existing overlap can resolve outward');
+  assert.ok(!R.overlapsOnMove({ x: -10, z: 8 }, { x: 10, z: 8 }, center, gap));
 });
 
 test('the volleyball bounces off Richard in both his seated and moving poses', () => {
@@ -797,7 +841,7 @@ test('the Western dorm keeps small props and signs proportional to the furniture
   for (const id of ['csa', 'wds', 'wfn', 'mustangs']) assert.ok(footprint(id).height < W.AVATAR_SCALE * avatarHeight(18));
 });
 
-test('Richard’s bed leaves room for the shoe rack along the entry wall', () => {
+test('Richard’s bed meets both corner walls and the shoe rack stays by the doorway', () => {
   const bed = dorm.items.find(item => item.id === 'richards-bed');
   const rack = dorm.items.find(item => item.id === 'shoe-rack'), shoes = dorm.items.find(item => item.id === 'pink-shoes');
   const rackBox = W.placementBox(rack), shoesBox = W.placementBox(shoes);
@@ -811,6 +855,7 @@ test('Richard’s bed leaves room for the shoe rack along the entry wall', () =>
   assert.equal(shoes.y, modelFootprint(rack.model).height);
   assert.ok(shoesBox.minX >= rackBox.minX && shoesBox.maxX <= rackBox.maxX && shoesBox.minZ >= rackBox.minZ && shoesBox.maxZ <= rackBox.maxZ);
   assert.equal(box.maxZ, bounds.maxZ);
+  assert.equal(box.minX, bounds.minX, 'the head of Richard’s bed also meets the side wall');
   assert.equal(head.z, foot.z, 'the length of the bed runs parallel with the door frame');
   assert.ok(head.x < foot.x - 25);
   const model = buildModel(bed.model), wallSide = model.bounds().minX;
@@ -844,11 +889,62 @@ test('my bed, nightstand and mini fridge line the far wall in order', () => {
   }
 });
 
-test('Richard’s nightstand sits on the desk side of his bed', () => {
+test('Richard’s nightstand is against the corner side wall next to his bed', () => {
   const item = id => dorm.items.find(p => p.id === id);
   const [desk, table, bed] = ['richards-desk', 'richards-nightstand', 'richards-bed'].map(id => W.placementBox(item(id)));
-  assert.ok(desk.maxZ < table.minZ && table.maxZ < bed.minZ);
-  assert.ok(table.maxX > bed.minX && bed.minZ - table.maxZ <= 4, 'the nightstand is next to the open bedside');
+  assert.ok(desk.maxZ < table.minZ && table.maxZ === bed.minZ);
+  assert.equal(table.minX, W.interior(dorm).minX);
+  assert.ok(table.maxX < bed.maxX, 'the nightstand leaves the foot of the bed clear');
+});
+
+test('sleep is reachable at the bedside and lies the avatar lengthwise above the duvet', () => {
+  const bed = dorm.items.find(item => item.id === 'ohall-bed'), box = W.placementBox(bed);
+  const start = { x: box.maxX + 4, z: bed.z + 2 };
+  assert.ok(reachable(WESTERN_INDEX, W.spawn(WESTERN_INDEX, 'start')).some(p => p.x === start.x && p.z === start.z));
+  assert.deepEqual(bedsidePosition(bed, start), start);
+  const atFoot = { x: bed.x, z: box.maxZ + 3 };
+  assert.deepEqual(bedsidePosition(bed, atFoot), atFoot);
+  assert.equal(bedsidePosition(bed, { x: box.maxX + 10, z: bed.z }), null);
+  const mount = sampleBedSleep(bed, start, 0, 0, false), sleep = sampleBedSleep(bed, start, 1, 0, true);
+  assert.deepEqual([mount.x, mount.y, mount.z, Math.abs(mount.pitch)], [start.x, 0, start.z, 0]);
+  assert.equal(sleep.pitch, -Math.PI / 2);
+  assert.equal(sleep.x, bed.x);
+  const headZ = sleep.z - avatarHeight(18) * W.AVATAR_SCALE;
+  assert.ok(headZ > box.minZ && headZ < bed.z - 6 && sleep.z < box.maxZ);
+  assert.ok(sleep.y - 2 > 9.5, 'the body rests above the cover');
+  assert.deepEqual(sampleBedSleep(bed, start, 1, 3, true), sleep);
+  assert.notEqual(sampleBedSleep(bed, start, 1, 3, false).y, sleep.y);
+});
+
+test('the textured beige bedding drapes to both sides under a black throw with a tiny top-facing Capco stitch', () => {
+  const bed = dorm.items.find(item => item.id === 'ohall-bed');
+  const blanket = dorm.decor.find(p => p.model === 'western-bedding'), stitch = dorm.decor.find(p => p.model === 'capco-stitch');
+  const bedBox = W.placementBox(bed), blanketBox = W.placementBox(blanket), logoBox = W.placementBox(stitch);
+  assert.deepEqual([blanketBox.minX, blanketBox.maxX, blanketBox.maxZ], [bedBox.minX, bedBox.maxX, bedBox.maxZ]);
+  assert.ok(blanketBox.minZ - bedBox.minZ <= 2, 'the duvet extends up beneath the pillows');
+  const grid = buildModel(blanket.model), swatches = new Set();
+  for (let x = -17; x < 17; x++) swatches.add(grid.get(x, 9, 8));
+  assert.ok(swatches.size > 5, 'the weave is not a flat color');
+  assert.ok(grid.get(-18, 3, 2) || grid.get(17, 3, 2), 'fabric hangs lower at the edges');
+  const ink = buildModel(stitch.model).bounds();
+  assert.equal(ink.minY, ink.maxY, 'the stitching is horizontal');
+  assert.ok(logoBox.minX > bed.x && logoBox.maxX < bedBox.maxX && logoBox.maxZ < bedBox.maxZ);
+  assert.ok(logoBox.maxX - logoBox.minX < 2.5, 'the wordmark is small');
+  for (let x = 8; x <= 13; x++) {
+    const top = grid.get(x, 12, 21);
+    assert.ok(top && top < 0x444444 && !grid.has(x, 13, 21), 'the stitching sits on the black fabric');
+  }
+});
+
+test('the headlight clips to the monitor and the backpack is tucked under the desk', () => {
+  const monitor = dorm.items.find(p => p.id === 'monitor'), headlight = dorm.decor.find(p => p.model === 'monitor-headlight');
+  const desk = W.placementBox(dorm.items.find(p => p.id === 'standing-desk'));
+  const backpack = dorm.items.find(p => p.id === 'dorm-backpack'), bag = W.placementBox(backpack);
+  const light = W.placementBox(headlight), screen = W.placementBox(monitor);
+  assert.equal(headlight.y, monitor.y + modelFootprint(monitor.model).height);
+  assert.equal(headlight.rot, monitor.rot);
+  assert.ok(light.minZ > screen.minZ && light.maxZ < screen.maxZ && light.maxX > screen.minX && light.minX < screen.maxX);
+  assert.ok(bag.minX >= desk.minX && bag.maxX <= desk.maxX && bag.minZ >= desk.minZ && bag.maxZ <= desk.maxZ);
 });
 
 test('charging outlets are wall-mounted, face into the room and do not block movement', () => {
@@ -871,7 +967,7 @@ test('charging outlets are wall-mounted, face into the room and do not block mov
   }
 });
 
-test('the Wuzu fan spins and sends airflow out its moving grille without capturing clicks', () => {
+test('the WOOZOO fan spins and sends airflow out its moving grille without capturing clicks', () => {
   const prop = dorm.items.find(p => p.id === 'fan');
   const cabinet = dorm.decor.find(p => p.model === 'dorm-cabinet');
   const holder = new Group(), material = new MeshBasicMaterial();
@@ -879,7 +975,7 @@ test('the Wuzu fan spins and sends airflow out its moving grille without capturi
   holder.rotation.y = prop.rot * Math.PI / 2;
   const fan = makeWuzuFanView(holder, material);
   try {
-    assert.equal(prop.label, 'Wuzu fan');
+    assert.equal(prop.label, 'WOOZOO fan');
     assert.equal(prop.title, prop.label);
     const placed = W.placementBox(prop), surface = W.placementBox(cabinet);
     assert.ok(placed.minX >= surface.minX && placed.maxX <= surface.maxX && placed.minZ >= surface.minZ && placed.maxZ <= surface.maxZ);
@@ -1027,7 +1123,7 @@ test('the dorm switch only changes the two desk lamps, light pools, and its own 
   const lighting = makeDormLighting(geometry);
   const room = CHAPTERS[WESTERN_INDEX], models = [...room.items, ...room.decor].map(p => p.model);
   const fixtures = ['dorm-light-switch', 'desk-lamp'];
-  const entries = [...fixtures.flatMap(model => models.filter(m => m === model)), 'standing-desk', 'monitor'].map(model => {
+  const entries = [...fixtures.flatMap(model => models.filter(m => m === model)), 'standing-desk', 'monitor', 'monitor-headlight'].map(model => {
     const holder = new Group(), mesh = new Mesh(geometry(model));
     holder.add(mesh);
     lighting.add(model, holder);
@@ -1040,10 +1136,11 @@ test('the dorm switch only changes the two desk lamps, light pools, and its own 
         model === 'dorm-light-switch' && enabled ? 'dorm-light-switch-on' : model), model);
       assert.equal(mesh.visible, true, 'fixture itself remains visible');
       if (model === 'desk-lamp') assert.equal(pool.visible, enabled);
+      else if (model === 'monitor-headlight') assert.equal(pool.visible, true, 'the monitor light is independent');
       else assert.equal(pool, undefined);
     }
   };
-  assert.equal(entries.filter(({ pool }) => pool).length, 2);
+  assert.equal(entries.filter(({ model, pool }) => model === 'desk-lamp' && pool).length, 2);
   check(false);
   lighting.toggle();
   check(true);

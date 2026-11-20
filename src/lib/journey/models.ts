@@ -114,7 +114,7 @@ const code = (seed: number): Painter => (i, j) => {
   return 0x1d1f27;
 };
 
-function bed(g: Grid, quilt: Color, accent: Color, frameColor: Color, pillow: Color, pattern: (x: number, z: number) => boolean, openFrame = false) {
+function bed(g: Grid, quilt: Color, accent: Color, frameColor: Color, pillow: Color, pattern: ((x: number, z: number) => boolean) | null, openFrame = false) {
   const w = 16, len = 28;
   if (openFrame) {
     g.box(-8, 3, -14, w, 1, len, frameColor);
@@ -125,11 +125,45 @@ function bed(g: Grid, quilt: Color, accent: Color, frameColor: Color, pillow: Co
   g.box(-headboard / 2, 0, -15, headboard, 13, 2, frameColor)
     .box(-headboard / 2, 13, -15, headboard, 1, 2, shade(frameColor, 1.15));
   for (const x of [-7, 1]) g.box(x, 6, -12, 6, 2, 5, shade(pillow, 0.85)).box(x + 1, 8, -11, 4, 1, 3, pillow);
+  if (!pattern) {
+    g.box(-8, 3, 14, w, 1, 1, frameColor);
+    return;
+  }
   g.box(-8, 6, -6, w, 1, 20, (x, _y, z) => pattern(x, z) ? accent : shade(quilt, (x + 8) % 4 === 0 || (z + 6) % 4 === 0 ? 0.9 : 1.04));
   g.box(-8, 7, -7, w, 1, 2, shade(accent, 0.9));
   for (const x of [-9, 8]) g.box(x, 3, -6, 1, 4, 20, (_x, y, z) => shade(quilt, y === 3 ? 0.72 : 0.85 + 0.16 * Math.abs(Math.sin(z * 1.2))));
   g.box(-8, 3, 14, w, 4, 1, quilt);
   g.box(-8, 0, 13, 1, 2, 1, frameColor);
+}
+
+function westernBedding(g: Grid) {
+  for (let x = -18; x < 18; x++) for (let z = -28; z < 28; z++) {
+    const edge = Math.min(17 - x, x + 18, 27 - z);
+    const seam = (z + 26) % 12 === 0 || (x + (z < 0 ? 18 : 12)) % 12 === 0;
+    const wave = Math.sin(z * 0.62 + x * 0.4), corner = x >= 7 && x <= 14 && z >= 19 && z <= 24;
+    const top = 10 + Number(edge > 1 && !seam) - Number(z < -16) - Number(edge === 0);
+    const bottom = Math.min(top, edge < 3 ? Math.max(0, 2 + Math.round(wave * 1.6)) : 7);
+    const beige = 0xd5b996, black = 0x26262a;
+    for (let y = bottom; y <= top; y++) {
+      const drape = edge < 3 ? wave * 0.08 + (y - top) * 0.021 : 0;
+      g.set(x, y, z, shade(beige, 0.97 + drape + hash3(x, y, z) * 0.072 - (seam ? 0.075 : 0)));
+    }
+    if (z < 13) continue;
+    const crest = corner ? 12 : Math.max(top + 1, 12 + Number(z === 13 || wave > 0.72) - Number(edge === 0));
+    const start = edge < 2 ? bottom + 1 : top + 1;
+    g.box(x, start, z, 1, crest - start + 1, 1, (_x, y) =>
+      shade(black, 1 + wave * 0.1 + hash3(x, y, z) * 0.12 - (y < top ? 0.13 : 0)));
+  }
+}
+
+function capcoStitch(g: Grid) {
+  const glyphs = [
+    [".##", "#..", "#..", "#..", ".##"], ["...", ".##", "#.#", ".##", "..."],
+    ["...", "##.", "#.#", "##.", "#.."], ["...", ".##", "#..", ".##", "..."],
+    ["...", ".#.", "#.#", ".#.", "..."],
+  ];
+  glyphs.forEach((rows, letter) => rows.forEach((row, z) =>
+    [...row].forEach((dot, x) => { if (dot === "#") g.set(letter * 4 + x, 0, z, 0xc6c1bb); })));
 }
 
 function shelfUnit(g: Grid, w: number, h: number, d: number, shelves: number[], color: Color) {
@@ -352,9 +386,11 @@ const GLASS = 0x9dd8e4;
 const DETAIL_VOXELS = new Set(["macbook", "csa-dj-macbook", "glass-trophy-third", "glass-trophy-first", "buldak-bowl", "pink-court-shoes", "molten-volleyball", "cs-ivey", "poster-csa", "poster-wds", "poster-wfn", "dorm-headphones", "dorm-snacks", "smiskis", "dorm-shoe-rack", "dorm-charging-ports"]);
 const HALF_VOXELS = new Set(["starwars-posters", "projects-board", "fblc-banner", "go-mustangs", "fragrances", "volleyball", "basketball", "jellycat-frog", "csa-stage-logo", "csa-boba-cup", "csa-soda-cup", "csa-water-bottle", "csa-speaker", "dorm-light-switch", "dorm-light-switch-on"]);
 export function modelVoxelSize(id: string) {
-  if (id === "chess-table") return 0.125;
+  if (id === "chess-table" || id === "capco-stitch") return 0.125;
   if (id === "mini-fridge") return FRIDGE_VOXEL_SIZE;
   if (id === "fan") return FAN_VOXEL_SIZE;
+  if (id === "western-bedding") return 0.5;
+  if (id === "monitor-headlight" || id === "dorm-backpack") return 0.25;
   if (DETAIL_VOXELS.has(id) || id.startsWith("plaque-")) return 0.25;
   return HALF_VOXELS.has(id) || id.startsWith("poster-") || id === "hockey-pad" || id === "roommate-portrait" ? 0.5 : 1;
 }
@@ -622,7 +658,9 @@ const MODELS: Record<string, (g: Grid) => void> = {
   },
   "bed-kid": g => bed(g, 0x5b8fd1, 0xf4d35e, 0xd9c3a0, WHITE, (x, z) => (x + z * 3) % 7 === 0),
   "bed-navy": g => bed(g, 0x2c3e66, 0x8fa3c7, WOOD_DARK, 0xe8eef6, (_x, z) => z % 5 === 0),
-  "bed-western": g => bed(g, 0x354f79, 0xd9c7a9, 0x363538, 0xe7dcc6, (_x, z) => z >= 9, true),
+  "bed-western": g => bed(g, 0, 0, 0x363538, 0xe7dcc6, null, true),
+  "western-bedding": westernBedding,
+  "capco-stitch": capcoStitch,
   "bed-roommate": g => bed(g, 0x777c83, 0xc2beb7, 0x363538, 0xeae7df, (_x, z) => z >= 9, true),
   "lego-shelf": g => {
     shelfUnit(g, 20, 14, 5, [6], WHITE);
@@ -950,6 +988,23 @@ const MODELS: Record<string, (g: Grid) => void> = {
     for (const x of [-4, 3]) g.box(x, 8, 0, 1, 4, 1, base).box(x, 11, -2, 1, 1, 4, base);
   },
   monitor: g => monitor(g, -7, 3, 0, 14, 10, code(17)),
+  "monitor-headlight": g => {
+    g.box(-3, 0, -4, 6, 4, 5, 0x303236).box(-20, 3, -2, 40, 3, 6, 0x43474d);
+    g.box(-18, 3, 3, 36, 1, 2, 0xffedc8).box(-19, 6, -1, 38, 1, 4, 0x636772);
+    g.set(17, 5, 4, 0xa5d984);
+  },
+  "dorm-backpack": g => {
+    const nylon = 0x343740, trim = 0x1f2228;
+    for (let y = 0; y < 26; y++) {
+      const inset = y < 2 ? 1 : Math.max(0, Math.floor((y - 18) / 2));
+      g.box(-9 + inset, y, -6, 18 - inset * 2, 1, 11 - Math.max(0, Math.floor((y - 18) / 3)), (x, r, z) =>
+        shade(nylon, 0.9 + hash3(x, r, z) * 0.13));
+    }
+    g.box(-7, 3, 5, 14, 9, 3, 0x3e424c).box(-7, 10, 8, 14, 1, 1, trim);
+    g.box(4, 9, 8, 2, 2, 1, 0xb5a48a).box(-2, 6, 8, 4, 2, 1, 0x908470);
+    for (const x of [-6, 4]) g.box(x, 2, -8, 2, 20, 2, trim).box(x, 19, -7, 2, 4, 2, nylon);
+    g.box(-4, 25, -3, 2, 4, 2, trim).box(2, 25, -3, 2, 4, 2, trim).box(-4, 28, -3, 8, 2, 2, trim);
+  },
   "desk-lamp": g => deskLamp(g, 0xffe5a3),
   "desk-lamp-off": g => deskLamp(g, 0x78736b),
   "dorm-light-switch": g => dormLightSwitch(g, false),

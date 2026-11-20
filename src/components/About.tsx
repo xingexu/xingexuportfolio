@@ -143,7 +143,7 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={JOURNEY_ROOMS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows through the center aisle to the far door, or use Objects to switch rooms without walking."} Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. {status.chapter === WESTERN_INDEX && "Press E near the lamp switch beside the entry to toggle both desk lamps. "}Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows through the center aisle to the far door, or use Objects to switch rooms without walking."} Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. {status.chapter === WESTERN_INDEX && "Press E by the entry switch for the desk lamps, or by your bed to sleep and wake up. When Richard blocks the way, press P or tap Push Richard. "}Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
@@ -163,20 +163,23 @@ export default function About() {
         <aside className="journey-keys" aria-label="Keyboard shortcuts">
           <span><kbd>W</kbd><kbd>S</kbd><kbd>↑</kbd><kbd>↓</kbd> Walk</span>
           <span><kbd>A</kbd><kbd>D</kbd><kbd>←</kbd><kbd>→</kbd> Turn</span>
-          <span><kbd>E</kbd> Inspect</span>
+          <span><kbd>E</kbd> Use / Inspect</span>
           <span><kbd>Space</kbd> Jump</span>
           {!moved && !inParty && <span>{roomHint}</span>}
         </aside>
         {!moved && !inParty && !near && !status.volley && <p className="journey-touch-note">Drag the scene or use the joystick. {roomHint}</p>}
       </>}
 
-      {!opened && !transition && (near || status.volley || inParty) && (
+      {!opened && !transition && (near || status.volley || status.bedAction || status.canPush || inParty) && (
         <div className="journey-prompts">
           {inParty && <button type="button" className="journey-prompt journey-csa-action" onClick={() => { controls.current?.leaveCsa(); controls.current?.focus(); }}>← Return to dorm</button>}
           {status.csaDjNearby && <a className="journey-prompt journey-csa-action" href={CSA_DJ_LINK.href} target="_blank" rel="noopener noreferrer" aria-keyshortcuts="E">
             <kbd aria-hidden="true">E</kbd><span>{CSA_DJ_LINK.label} ↗</span><span className="sr-only"> (opens in a new tab)</span>
           </a>}
-          {near && <button type="button" className="journey-prompt" onClick={() => {
+          {status.bedAction && <button type="button" className="journey-prompt" onClick={() => { controls.current?.interact(); controls.current?.focus(); }} aria-keyshortcuts="E">
+            <kbd aria-hidden="true">E</kbd><span>{status.bedAction}</span>
+          </button>}
+          {!status.bedAction && near && <button type="button" className="journey-prompt" onClick={() => {
             if (near.id === WESTERN_LIGHT_SWITCH_ID) controls.current?.toggleDormLamps();
             else openItem(near.id);
           }} aria-keyshortcuts="E">
@@ -184,6 +187,9 @@ export default function About() {
           </button>}
           {status.volley && <button type="button" className="journey-prompt journey-volley" onClick={() => controls.current?.volley()} aria-keyshortcuts="R">
             <kbd aria-hidden="true">R</kbd><span>{status.volley}</span>
+          </button>}
+          {status.canPush && <button type="button" className="journey-prompt" onClick={() => { controls.current?.pushRoommate(); controls.current?.focus(); }} aria-keyshortcuts="P">
+            <kbd aria-hidden="true">P</kbd><span>Push Richard</span>
           </button>}
         </div>
       )}

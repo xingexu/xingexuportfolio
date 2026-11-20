@@ -8,6 +8,7 @@ import { makeDormLighting } from "@/lib/journey/dormLighting";
 import { buildModel, GLASS_OPACITY, isGlass, modelFootprint, modelHasGlass, modelVoxelSize } from "@/lib/journey/models";
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarParts } from "@/lib/journey/avatar";
 import { gridGeometry } from "@/lib/journey/mesh";
+import { roomFromUrl, roomPath } from "@/lib/journey/navigation";
 import { advanceRoommate, sampleRoommate } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
 import { ageAt, buildBallField, buildCutawayShell, buildDoorLeaf, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, INTRO_END, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
@@ -29,7 +30,7 @@ export type JourneyControls = {
 };
 export type CameraMode = { front: boolean; tilt: boolean };
 export type JourneyStatus = { chapter: number; age: number; nearby: string[]; volley?: BallAction; csaDjNearby?: boolean; dormLampsOn?: boolean };
-export type TransitionInfo = { to: number; direction: "forward" | "back" | "jump" | "portal" };
+export type TransitionInfo = { to: number; direction: "forward" | "back" | "portal" };
 type Props = {
   controls: RefObject<JourneyControls | null>;
   blocked: boolean;
@@ -317,9 +318,10 @@ export default function JourneyWorld(props: Props) {
     }
 
     // State
-    let chapter = 0, transition: (TransitionInfo & { t: number; switched: boolean }) | null = null;
+    const initialRoom = roomFromUrl(window.location.href);
+    let chapter = initialRoom ?? 0, transition: (TransitionInfo & { t: number; switched: boolean }) | null = null;
     const player = { x: INTRO_END.x, z: INTRO_END.z, y: 0, yaw: Math.PI, vx: 0, vz: 0, spin: 0, phase: 0, age: 7 };
-    let intro: { t: number } | null = motion.matches ? null : { t: 0 };
+    let intro: { t: number } | null = initialRoom === null && !motion.matches ? { t: 0 } : null;
     const held = new Set<string>();
     const stick = { x: 0, y: 0 }, gesture = { x: 0, y: 0 };
     let nearby: string | null = null, hovered: string | null = null, lastStatus = "", moved = false, disposed = false, readySent = false;
@@ -330,6 +332,11 @@ export default function JourneyWorld(props: Props) {
     let frontBlend = 0, tiltBlend = 0;
     const pointer = new Vector2(), raycaster = new Raycaster();
     let pointerDirty = false, pointerInside = false;
+
+    function rememberRoom() {
+      const path = roomPath(window.location.href, chapter);
+      if (path) window.history.replaceState(null, "", path);
+    }
 
     function enterRoom(index: number, from: RoomArrival) {
       const previous = rooms.get(chapter);
@@ -349,6 +356,7 @@ export default function JourneyWorld(props: Props) {
       volley = null; kickPose = 0; jumpElapsed = null;
       snapCamera();
       updateDoors(1);
+      if (readySent) rememberRoom();
       const idle = (callback: () => void) => ("requestIdleCallback" in window ? window.requestIdleCallback(callback) : setTimeout(callback, 200));
       for (const neighbour of [index + 1, index - 1]) if (neighbour >= 0 && neighbour < CHAPTERS.length) idle(() => { if (!disposed) room(neighbour); });
     }
@@ -558,6 +566,7 @@ export default function JourneyWorld(props: Props) {
       intro = null;
       player.x = INTRO_END.x; player.z = INTRO_END.z; player.y = 0; player.yaw = Math.PI;
       snapCamera();
+      rememberRoom();
       live.current.onIntro(false);
     }
 
@@ -591,7 +600,12 @@ export default function JourneyWorld(props: Props) {
       toggleDormLamps,
       jump,
       volley: playVolley,
-      goTo: index => { if (index < CHAPTERS.length && (index !== chapter || intro)) startTransition(index, "jump"); },
+      goTo: index => {
+        if (transition || !JOURNEY_ROOMS[index]) return;
+        clearInput();
+        if (intro) finishIntro();
+        if (index !== chapter) enterRoom(index, "forward");
+      },
       visitCsa: () => { if (chapter !== CSA_ROOM_INDEX) startTransition(CSA_ROOM_INDEX, "portal"); },
       leaveCsa: () => { if (chapter === CSA_ROOM_INDEX) startTransition(WESTERN_INDEX, "portal"); },
       skip: () => { if (transition) finishTransition(); else if (intro) finishIntro(); },
@@ -702,7 +716,7 @@ export default function JourneyWorld(props: Props) {
     const observer = new ResizeObserver(resize);
     observer.observe(region);
     resize();
-    enterRoom(0, "start");
+    enterRoom(chapter, "start");
     if (intro) {
       player.x = -24; player.y = 8; player.yaw = Math.PI / 2;
       live.current.onIntro(true);
@@ -916,7 +930,12 @@ export default function JourneyWorld(props: Props) {
       avatarScene.overrideMaterial = null;
       renderer.render(avatarScene, camera);
       renderer.autoClear = true;
-      if (!readySent) { readySent = true; region.dataset.ready = "true"; window.dispatchEvent(new Event("about-room-ready")); }
+      if (!readySent) {
+        readySent = true;
+        if (!intro) rememberRoom();
+        region.dataset.ready = "true";
+        window.dispatchEvent(new Event("about-room-ready"));
+      }
     }
     frame = requestAnimationFrame(tick);
 

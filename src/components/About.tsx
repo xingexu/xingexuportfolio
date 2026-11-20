@@ -8,7 +8,7 @@ import JourneyWorld, { type CameraMode, type JourneyControls, type JourneyStatus
 import ObjectPreview from "./ObjectPreview";
 import { TransitionLink } from "./PageTransitions";
 
-type Opened = { kind: "item"; id: string } | { kind: "objects"; chapter: number } | { kind: "finale" | "party" } | null;
+type Opened = { kind: "item"; id: string } | { kind: "objects"; chapter: number } | { kind: "rooms"; includeCsa: boolean } | { kind: "finale" | "party" } | null;
 
 const FINAL_LINKS: JourneyLink[] = [
   { href: "/projects", label: "Projects" },
@@ -18,6 +18,7 @@ const FINAL_LINKS: JourneyLink[] = [
   { href: LINKS.email, label: "Email me" },
 ];
 const MUSIC_URL = process.env.NEXT_PUBLIC_JOURNEY_MUSIC_URL;
+const CSA_DISCOVERY_KEY = "journey:csa-discovered";
 
 function StoryLink({ link }: { link: JourneyLink }) {
   return link.href.startsWith("/")
@@ -97,6 +98,7 @@ function JourneyMusic({ src }: { src: string }) {
 
 export default function About() {
   const controls = useRef<JourneyControls | null>(null);
+  const discoveredCsa = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const [status, setStatus] = useState<JourneyStatus>({ chapter: 0, age: 7, nearby: [] });
@@ -116,6 +118,19 @@ export default function About() {
   }, []);
   const close = useCallback(() => setOpened(null), []);
   const browse = (chapter: number) => setOpened({ kind: "objects", chapter });
+  const teleport = (chapter: number) => { controls.current?.goTo(chapter); close(); };
+  const browseRooms = () => {
+    let includeCsa = discoveredCsa.current;
+    try { includeCsa ||= sessionStorage.getItem(CSA_DISCOVERY_KEY) === "true"; } catch { /* Storage can be unavailable. */ }
+    setOpened({ kind: "rooms", includeCsa });
+  };
+  const onStatus = useCallback((next: JourneyStatus) => {
+    if (next.chapter === CSA_ROOM_INDEX && !discoveredCsa.current) {
+      discoveredCsa.current = true;
+      try { sessionStorage.setItem(CSA_DISCOVERY_KEY, "true"); } catch { /* Keep the unlock in memory. */ }
+    }
+    setStatus(next);
+  }, []);
   const onFinale = useCallback(() => setOpened({ kind: "finale" }), []);
   const onMove = useCallback(() => setMoved(true), []);
 
@@ -143,9 +158,9 @@ export default function About() {
   return (
     <section className="about-page journey-page" aria-label="Xinge’s life in 3D, from age 7 to 18" data-chapter={JOURNEY_ROOMS[status.chapter].id}>
       <h1 className="sr-only">ZINGER: growing up, from age 7 to 18</h1>
-      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows through the center aisle to the far door, or use Objects to switch rooms without walking."} Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. {status.chapter === WESTERN_INDEX && "Press E near the lamp switch beside the entry to toggle both desk lamps. "}Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
+      <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows to the far door."} Use Rooms to teleport. Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. {status.chapter === WESTERN_INDEX && "Press E near the lamp switch beside the entry to toggle both desk lamps. "}Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
-        onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
+        onStatus={onStatus} onOpen={openItem} onTransition={setTransition} onIntro={setIntro} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
 
       {intro && <div className="journey-intro" role="status"><Typed text="Welcome to Canada." delay={300} /></div>}
 
@@ -198,10 +213,13 @@ export default function About() {
 
       {!intro && !transition && <Joystick controls={controls} />}
       {!intro && !transition && !opened && <button type="button" className="journey-jump" onClick={() => controls.current?.jump()} aria-keyshortcuts="Space">Jump <span aria-hidden="true">↑</span></button>}
-      {!intro && !transition && <div className="journey-tools" role="group" aria-label="Camera and objects">
-        <button type="button" onClick={() => controls.current?.toggleCamera("tilt")} aria-pressed={camera.tilt} aria-keyshortcuts="Q">Tilt up <kbd aria-hidden="true">Q</kbd></button>
-        <button type="button" title="See yourself from the front (F)" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
-        <button type="button" onClick={() => inParty ? setOpened({ kind: "party" }) : browse(status.chapter)} aria-haspopup="dialog">{inParty ? "Guests" : "Objects"}</button>
+      {!transition && <div className="journey-tools" role="group" aria-label="Journey controls">
+        {!intro && <>
+          <button type="button" onClick={() => controls.current?.toggleCamera("tilt")} aria-pressed={camera.tilt} aria-keyshortcuts="Q">Tilt up <kbd aria-hidden="true">Q</kbd></button>
+          <button type="button" title="See yourself from the front (F)" onClick={() => controls.current?.toggleCamera("front")} aria-pressed={camera.front} aria-keyshortcuts="F">Front view <kbd aria-hidden="true">F</kbd></button>
+          <button type="button" onClick={() => inParty ? setOpened({ kind: "party" }) : browse(status.chapter)} aria-haspopup="dialog">{inParty ? "Guests" : "Objects"}</button>
+        </>}
+        <button type="button" onClick={browseRooms} aria-haspopup="dialog">Rooms</button>
       </div>}
       {MUSIC_URL && <JourneyMusic src={MUSIC_URL} />}
       <TransitionLink href="/home" replace className="journey-back">Skip to portfolio <span aria-hidden="true">→</span></TransitionLink>
@@ -210,13 +228,26 @@ export default function About() {
         onCancel={(event) => { event.preventDefault(); close(); }}
         onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
         <button ref={closeButton} type="button" className="journey-dialog-close" onClick={close} aria-label="Close and keep walking">×</button>
+        {opened?.kind === "rooms" && <>
+          <h2 id="journey-dialog-title">Teleport to a room</h2>
+          <ul className="journey-index">
+            {(opened.includeCsa ? JOURNEY_ROOMS : CHAPTERS).map((room, index) => (
+              <li key={room.id} className="journey-index-head" aria-current={index === status.chapter ? "location" : undefined}>
+                <span aria-hidden="true">{room.number || "·"}</span>
+                <div><strong>{room.place}</strong>{room.stop !== room.place && <small>{room.stop}</small>}</div>
+                {index === status.chapter ? <small className="journey-index-current">You’re here</small>
+                  : <button type="button" aria-label={`Teleport to ${room.place}`} onClick={() => teleport(index)}>Teleport <span aria-hidden="true">↗</span></button>}
+              </li>
+            ))}
+          </ul>
+        </>}
         {opened?.kind === "objects" && <>
           <h2 id="journey-dialog-title">Room objects</h2>
           <div className="journey-room-picker">
             <label>Room <select value={opened.chapter} onChange={event => browse(Number(event.target.value))}>
               {CHAPTERS.map((room, index) => <option key={room.id} value={index}>{room.stop}</option>)}
             </select></label>
-            {opened.chapter !== status.chapter && <button type="button" onClick={() => { controls.current?.goTo(opened.chapter); close(); }}>Go to room</button>}
+            {opened.chapter !== status.chapter && <button type="button" onClick={() => teleport(opened.chapter)}>Go to room</button>}
           </div>
           <ul className="journey-object-list">
             {CHAPTERS[opened.chapter].items.map(entry => <li key={entry.id}>

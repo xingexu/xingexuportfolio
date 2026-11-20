@@ -64,8 +64,8 @@
 .journey-back:hover, .journey-skip:hover, .journey-jump:hover { border-color: #f2d24b; color: #f2d24b; }
 .journey-back:focus-visible, .journey-skip:focus-visible, .journey-jump:focus-visible { outline: 2px solid #f2d24b; outline-offset: 3px; }
 .journey-music { position: absolute; z-index: 7; top: max(12px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); min-height: 44px; padding: 0 12px; color: #eee; background: #0b0b0ee8; border: 1px solid #6b6b6b; font-size: 12px; cursor: pointer; }
-.journey-tools { position: absolute; z-index: 3; top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); display: flex; gap: 6px; }
-.journey-tools button { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; color: #eee; background: #0b0b0ee8; border: 1px solid #6b6b6b; font-size: 12px; cursor: pointer; }
+.journey-tools { position: absolute; z-index: 3; top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); left: max(16px, env(safe-area-inset-left)); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; pointer-events: none; }
+.journey-tools button { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; color: #eee; background: #0b0b0ee8; border: 1px solid #6b6b6b; font-size: 12px; cursor: pointer; pointer-events: auto; }
 .journey-tools kbd { min-width: 20px; height: 20px; font-size: 10px; }
 .journey-keys kbd, .journey-skip kbd { min-width: 21px; height: 21px; font-size: 10px; }
 .journey-stage[data-failed] ~ :is(.journey-tools, .journey-keys, .journey-touch-note, .journey-joystick, .journey-prompts, .journey-jump) { display: none; }
@@ -104,11 +104,12 @@ a.journey-csa-action { text-decoration: none; }
 .journey-index { list-style: none; display: flex; flex-direction: column; }
 .journey-index > li { padding: 16px 0; border-top: 1px solid #2c2c2c; }
 .journey-index-head { display: flex; align-items: center; gap: 14px; }
-.journey-index-head > span { font-family: var(--font-pixel), monospace; font-size: 12px; color: #777; }
+.journey-index-head > span { flex: 0 0 2ch; font-family: var(--font-pixel), monospace; font-size: 12px; color: #a4a4a4; }
 .journey-index-head strong { display: block; font-size: 14px; font-weight: 500; }
 .journey-index-head small { display: block; font-size: 10px; color: #8f8f8f; margin-top: 3px; }
-.journey-index-head button { margin-left: auto; background: none; border: 1px solid #3a3a3a; color: #ddd; padding: 6px 10px; font-size: 11px; cursor: pointer; white-space: nowrap; }
-.journey-index-head button:hover { border-color: #f2d24b; }
+.journey-index-head button { margin-left: auto; min-height: 44px; background: #1a1a20; border: 1px solid #4a4a4f; color: #eee; padding: 7px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.journey-index-head button:hover, .journey-index-head button:focus-visible { border-color: #f2d24b; }
+.journey-index-head .journey-index-current { margin-left: auto; color: #f2d24b; white-space: nowrap; }
 .journey-index > li > p { font-size: 12px; color: #a8a8a8; line-height: 1.7; margin: 8px 0 8px 30px; }
 .journey-index ul { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin-left: 30px; }
 .journey-index ul button { display: inline-flex; gap: 7px; align-items: center; background: #18181c; border: 1px solid #2f2f33; color: #ccc; padding: 6px 9px; font-size: 11px; cursor: pointer; text-align: left; }
@@ -132,6 +133,9 @@ a.journey-csa-action { text-decoration: none; }
 @media (pointer: coarse) {
   .journey-tools kbd, .journey-keys, .journey-skip kbd, .journey-prompts kbd { display: none; }
   .journey-touch-note { display: block; position: absolute; z-index: 3; left: max(18px, env(safe-area-inset-left)); bottom: calc(max(18px, env(safe-area-inset-bottom)) + var(--journey-stick-size) + 12px); max-width: calc(100% - 36px); padding: 8px 10px; color: #e7e7e7; background: #0b0b0eef; border: 1px solid #54545b; font-size: 11px; pointer-events: none; }
+}
+@media (max-width: 420px) {
+  .journey-tools kbd { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .journey-typed i, .journey-pass, .journey-route > span[data-progress="current"]::after { animation: none; }

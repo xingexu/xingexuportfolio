@@ -67,6 +67,13 @@ export function cutawayOpacity(room: Box, camera: Vec): Record<RoomSide, number>
     front: fade(camera.z - room.minZ), back: fade(room.maxZ - camera.z) };
 }
 
+export function foregroundPropOpacity(previous: number, obscuresAvatar: boolean, blend: number, resting: boolean) {
+  if (resting) return 1;
+  const target = obscuresAvatar ? 0.72 : 1;
+  const opacity = previous + (target - previous) * blend;
+  return Math.abs(opacity - target) < 0.01 ? target : opacity;
+}
+
 export function cameraLookAhead(room: Box, player: Vec, forward: Vec, lead: number) {
   const limit = (at: number, direction: number, min: number, max: number) =>
     direction > 0 ? (max - 2 - at) / direction : direction < 0 ? (min + 2 - at) / direction : Infinity;

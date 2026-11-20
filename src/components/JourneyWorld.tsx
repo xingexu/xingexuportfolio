@@ -12,7 +12,7 @@ import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar, type AvatarPart
 import { gridGeometry } from "@/lib/journey/mesh";
 import { advanceRoommate, overlapsOnMove, planRoommatePush, roommateCenter, roommateGap, sampleRoommate, stepRoommatePush, PUSH_GESTURE_TIME, ROOMMATE_RADIUS } from "@/lib/journey/roommate";
 import { makeRoommateView } from "@/lib/journey/roommateView";
-import { ageAt, blocked, buildBallField, buildCutawayShell, buildDoorLeaf, buildDormEntryDoor, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
+import { ageAt, blocked, buildBallField, buildCutawayShell, buildDoorLeaf, buildDormEntryDoor, buildGrassTile, buildJourneyArrow, bumpProp, cameraLookAhead, cameraOffsets, cutawayOpacity, doorwayOpening, foregroundPropOpacity, interior, journeyArrows, jumpHeight, nearbyItems, placementBox, renderPixelSize, roomSide, settleBump, spawn, step, walkSpeed, AVATAR_SCALE, DOOR_HALF, DOOR_VOXEL_SIZE, GRASS_TILE_SIZE, JUMP_DURATION, JUMP_HEIGHT, type BumpProp, type RoomArrival, type RoomSide, type Vec } from "@/lib/journey/world";
 import { advanceVolley, kickBall, makeBall, pushBallFromMovingBlock, startVolley, stepBall, volleyAction, volleyPose, type Ball, type BallAction, type BallField, type BallKind, type VolleySequence } from "@/lib/journey/volleyball";
 import { Grid, hash3 } from "@/lib/journey/voxel";
 import { makeWuzuFanView } from "@/lib/journey/wuzuFanView";
@@ -496,11 +496,10 @@ export default function JourneyWorld(props: Props) {
     const sightDistances = [0, 0, 0], hitPoint = new Vector3();
     function fadeForeground(dt: number, sleeping: boolean) {
       const height = (parts?.height ?? 20) * AVATAR_SCALE;
-      for (let i = 0; i < sightlines.length; i++) {
+      for (let i = 0; !sleeping && i < sightlines.length; i++) {
         const ray = sightlines[i];
         ray.origin.copy(camera.position);
-        if (sleeping) avatar.localToWorld(ray.direction.set(0, (parts?.height ?? 20) * (0.2 + 0.3 * i), 0));
-        else ray.direction.set(player.x, height * (0.1 + 0.4 * i), player.z);
+        ray.direction.set(avatar.position.x, avatar.position.y + height * (0.45 + 0.2 * i), avatar.position.z);
         ray.direction.sub(ray.origin);
         sightDistances[i] = ray.direction.lengthSq();
         ray.direction.normalize();
@@ -509,11 +508,9 @@ export default function JourneyWorld(props: Props) {
       const { props, walls } = room(chapter);
       for (const prop of props) {
         const { holder, bounds, material, glass, wall } = prop;
-        const obscures = !wall && (bounds.containsPoint(camera.position) ||
+        const obscures = !sleeping && !wall && (bounds.containsPoint(camera.position) ||
           sightlines.some((ray, i) => ray.intersectBox(bounds, hitPoint) && hitPoint.distanceToSquared(ray.origin) < sightDistances[i]));
-        const target = obscures ? 0 : 1;
-        const blended = prop.visibility + (target - prop.visibility) * ease;
-        prop.visibility = Math.abs(blended - target) < 0.01 ? target : blended;
+        prop.visibility = foregroundPropOpacity(prop.visibility, obscures, ease, sleeping);
         const opacity = prop.visibility * (wall ? walls[wall].material.opacity : 1);
         setOpacity(material, opacity);
         holder.visible = opacity > 0;

@@ -151,6 +151,16 @@ function westernBed(g: Grid) {
   bed(g, 0, 0, 0x363538, null, null, true);
   g.box(-8, 4, -13, 16, 3, 27, (x, y, z) => shade(0x1c2a4b, 0.87 + 0.08 * (y - 4) + 0.10 * hash3(x, y, z)));
   g.box(-8, 4, 14, 16, 2, 1, 0x192641);
+  for (let x = -9; x <= 8; x++) for (let z = -5; z <= 14; z++) {
+    const side = x === -9 || x === 8, edge = side || z === 14;
+    const fold = Math.sin(z * 0.8 + x * 0.45);
+    const seam = (x + 9) % 6 === 0 || (z + 5) % 5 === 0;
+    const top = 7 + Number(!edge && z < 7 && !seam && fold > -0.55);
+    const bottom = side ? 4 + Number(fold > 0.25) : edge ? 6 : 7;
+    g.box(x, bottom, z, 1, top - bottom + 1, 1, (_x, y) =>
+      shade(0xd8bb98, 0.96 + 0.10 * hash3(x, y, z) - (seam ? 0.07 : 0)
+        + (edge ? fold * 0.08 : 0) - 0.034 * (top - y)));
+  }
   const { x, y, z, width, depth, height } = WESTERN_PILLOW;
   puffedPillow(g, x, y, z, width, depth, height, 0x1c2c50);
 }

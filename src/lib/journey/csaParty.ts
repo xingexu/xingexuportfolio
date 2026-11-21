@@ -6,7 +6,7 @@ import { BOULDER_CYCLE, BOULDER_LANES, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, boulderS
 import { Grid, hash3, shade, type Color } from "./voxel";
 import { AVATAR_SCALE, type Vec } from "./world";
 
-type Hairstyle = "taper-fade" | "tousled" | "fluffy" | "straight" | "waves" | "side-part" | "cropped-fringe";
+type Hairstyle = "taper-fade" | "tousled" | "fluffy" | "straight" | "waves" | "side-part" | "cropped-fringe" | "curtains" | "long-waves";
 const ACTIVITY_LABELS = {
   greet: "Welcomes guests", direct: "Directs the floor", photo: "Takes photos", notes: "Checks a clipboard",
   drink: "Sips a drink", talk: "Chats", radio: "Checks in by radio", phone: "Posts updates", tablet: "Checks production cues",
@@ -14,7 +14,8 @@ const ACTIVITY_LABELS = {
 type Activity = keyof typeof ACTIVITY_LABELS;
 type Guest = Vec & {
   name: string; yaw: number; scale: number; dj?: boolean; hair?: Hairstyle; hairColor?: Color;
-  skin?: Color; chain?: boolean; shorts?: boolean; cut?: "client" | "barber"; walk?: readonly [number, number]; activity?: Activity;
+  skin?: Color; chain?: boolean; hoops?: boolean; shorts?: boolean; dyedEnds?: Color;
+  role?: "President" | "Senior advisor"; cut?: "client" | "barber"; walk?: readonly [number, number]; activity?: Activity;
   climb?: 0 | 1;
 };
 type Climber = Guest & { climb: NonNullable<Guest["climb"]> };
@@ -23,20 +24,23 @@ const floorGuest = (name: string, x: number, z: number, activity: Activity, hair
   walk: NonNullable<Guest["walk"]> = [3.2, 3.8], hairColor?: Color): Guest =>
   ({ name, x, z, yaw: 0, activity, hair, scale, walk, hairColor });
 
-// The Western CSA team list supplies the exec roster; the original After Hours guests remain.
+const seniorAdvisor = (name: string, x: number, z: number, activity: Activity, hair: Hairstyle, hairColor: Color): Guest =>
+  ({ ...floorGuest(name, x, z, activity, hair, 1, [3, 3.2], hairColor), role: "Senior advisor" });
+
+// The CSA team list and advisor portraits supplement the original After Hours guests.
 export const CSA_GUESTS: readonly Guest[] = [
   { name: "Jason Zhuang", ...CSA_BARBER_CHAIR, yaw: Math.PI / 2, scale: 1, hair: "taper-fade", hairColor: 0x302722, cut: "client" },
   { name: "Rain Li", x: 0, z: CSA_STAGE_Z - 8, yaw: 0, scale: 1, dj: true, hair: "fluffy", hairColor: 0x2d252c },
-  floorGuest("Amelie Hu", -36, 16, "phone", "waves", 0.82, [5, 5], 0x382821),
-  floorGuest("Lydia Zheng", 35, 12, "photo", "straight", 0.79, [5, 5], 0xb4643b),
+  { ...floorGuest("Amelie Hu", -36, 16, "phone", "waves", 0.82, [5, 5], 0x241f22), dyedEnds: 0x79543d },
+  floorGuest("Lydia Zheng", 35, 12, "photo", "straight", 0.79, [5, 5], 0x634938),
   { ...floorGuest("Daniel Su", 31, -23, "direct", "side-part", 1, [5, 5], 0x2b2420), skin: 0xefd2ba },
   { name: "Lucas Xue", x: CSA_BARBER_CHAIR.x + 3, z: CSA_BARBER_CHAIR.z + 9.5, yaw: -2.85, scale: 1.06, hair: "cropped-fringe", hairColor: 0x201e1e, skin: 0xe6c7ab, shorts: true, cut: "barber" },
   floorGuest("Jeffrey Ban", -15, 11, "talk", "cropped-fringe", 1, [4, 5]),
   { name: CLIMBER_NAMES[1], ...boulderStart(BOULDER_LANES[1]),
     yaw: Math.PI / 2, scale: 1, hair: "tousled", hairColor: 0x252020, chain: true, climb: 1 },
-  floorGuest("Kevin Li", 14, -43, "tablet", "side-part", 1, [4, 4], 0x32272a),
-  floorGuest("Selina Lim", -19, 28, "greet", "straight", 0.94),
-  floorGuest("Gloria Huang", 19, 25, "greet", "waves", 0.96, undefined, 0x493128),
+  floorGuest("Kevin Li", 14, -43, "tablet", "side-part", 1.14, [4, 4], 0x32272a),
+  { ...floorGuest("Selina Lim", -19, 28, "greet", "waves", 0.94, undefined, 0x262226), role: "President", hoops: true },
+  { ...floorGuest("Gloria Huang", 19, 25, "greet", "long-waves", 0.96, undefined, 0x4c362f), role: "President" },
   floorGuest("Cassidy Lee", 53, -21, "notes", "waves", 0.93),
   floorGuest("Jessica Zhang", 70, 10, "drink", "straight", 0.96),
   floorGuest("Callista Chan", -34, -22, "tablet", "straight", 0.94),
@@ -48,7 +52,14 @@ export const CSA_GUESTS: readonly Guest[] = [
   floorGuest("Ava Cheh", -62, 34, "photo", "waves", 0.95),
   floorGuest("Aleena Liu", 76, 58, "greet", "straight", 0.95),
   floorGuest("Kate Chen", -70, 57, "drink", "waves", 0.92),
-  floorGuest("Ray Shen", -34, -42, "radio", "cropped-fringe"),
+  floorGuest("Ray Shen", -34, -42, "radio", "cropped-fringe", 1, undefined, 0x634733),
+  seniorAdvisor("Luca Fukuyo", -53, -45, "greet", "straight", 0x2c2221),
+  seniorAdvisor("Vincent Zheng", 55, -42, "tablet", "curtains", 0x252021),
+  seniorAdvisor("Tony Zhang", 55, 0, "talk", "tousled", 0x292325),
+  seniorAdvisor("Jiayi Hong", -35, -3, "radio", "cropped-fringe", 0x342927),
+  seniorAdvisor("Austin Sun", 35, -43, "direct", "curtains", 0x2a2224),
+  seniorAdvisor("Tiffany Zhao", -55, 13, "notes", "long-waves", 0x6a4f3b),
+  seniorAdvisor("Zong Xie", 72, -43, "photo", "tousled", 0x49362d),
   { name: CLIMBER_NAMES[0], ...boulderStart(BOULDER_LANES[0]),
     yaw: Math.PI / 2, scale: 0.94, hair: "cropped-fringe", hairColor: 0x352933, climb: 0 },
 ];
@@ -61,12 +72,17 @@ export function csaActivityLabel(guest: Guest) {
 export function buildCsaGuest(guest: Guest) {
   const base = guest.hairColor ?? 0x242022;
   const skin = guest.skin ?? 0xf8e1d0;
+  const { dyedEnds } = guest;
   const parts = buildAvatar(18, "csa", { hair: base, skin: guest.skin, skinDark: guest.skin && shade(guest.skin, 0.91), shorts: guest.shorts ?? false });
   const { head, torso } = parts;
-  const strand = (x: number, y: number, z: number) => shade(base, 0.81 + hash3(x, y, z) * 0.21 + ((x + z) % 3 === 0 ? 0.2 : 0));
+  const strand = (x: number, y: number, z: number) => {
+    const tone = dyedEnds !== undefined && y < -1 - 8 * hash3(Math.floor(x / 2), 0, Math.floor(z / 2)) ? dyedEnds : base;
+    return shade(tone, 0.81 + hash3(x, y, z) * 0.21 + ((x + z) % 3 === 0 ? 0.2 : 0));
+  };
   const hair = guest.hair;
   if (hair) {
-    const long = hair === "straight" || hair === "waves";
+    const wavy = hair === "waves" || hair === "long-waves", long = hair === "straight" || wavy;
+    const curtains = hair === "curtains";
     const sidePart = hair === "side-part", cropped = hair === "cropped-fringe", fade = hair === "taper-fade", fluffy = hair === "fluffy";
     const fringeLengths = [0, 1, 1, 2, 4, 2, 0, 1, 0, 2, 4, 1, 0, 1, 3, 2, 1, 0];
     for (let x = -9; x < 9; x++) for (let z = -8; z <= 8; z++) {
@@ -77,6 +93,7 @@ export function buildCsaGuest(guest: Guest) {
       const part = hair !== "tousled" && !cropped && !fluffy && (sidePart ? x === 3 : x === -1 || x === 0) && z > -3;
       const top = (fluffy ? 17 : 14) + Math.round((1 - rim) * (long ? 3 : fluffy ? 6 : 4)) + tuft - (part ? 2 : 0);
       const bang = long ? (Math.abs(x + 0.5) < 4 ? 12 : 8)
+        : curtains ? 8 + Math.max(0, 5 - 2 * Math.abs(Math.abs(x + 0.5) - 1.5))
         : sidePart ? 8 + Math.max(0, 5 - Math.abs(x - 2))
         : cropped ? 9 + fringeLengths[x + 9]
         : fluffy ? 9 + Math.round(Math.cos(x * 1.15) * 1.5)
@@ -106,7 +123,7 @@ export function buildCsaGuest(guest: Guest) {
       head.box(-3, 0, 7, 6, 1, 1, 0xa75f53).set(-4, 1, 7, 0xa75f53).set(3, 1, 7, 0xa75f53);
     }
     if (long) {
-      const wavy = hair === "waves", length = wavy ? 16 : 20;
+      const length = hair === "long-waves" ? 24 : wavy ? 16 : 20;
       for (let y = -length; y < 13; y++) {
         const tip = y + length, wave = wavy ? Math.round(Math.sin(y * 0.34) * 1.3) : 0;
         const width = Math.min(15, 7 + tip * 2);
@@ -120,6 +137,9 @@ export function buildCsaGuest(guest: Guest) {
         }
       }
     }
+  }
+  if (guest.hoops) for (const x of [-10, 9]) {
+    head.set(x, 4, 4, 0xe0d2c9).set(x, 3, 5, 0xffefdc).set(x, 2, 4, 0xbfabb1);
   }
   if (guest.chain) {
     const high = (parts.shoulder - parts.hip) * 2;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { CHAPTERS, CSA_DJ_LINK, CSA_POSTER_ID, CSA_ROOM_INDEX, JOURNEY_ROOMS, JOURNEY_START_INDEX, WESTERN_CABINET_ID, WESTERN_INDEX, WESTERN_LIGHT_SWITCH_ID, ageLabel, chapterAccent, itemById, type JourneyLink } from "@/lib/journey/data";
 import { CSA_GUESTS, csaActivityLabel } from "@/lib/journey/csaParty";
 import { LINKS } from "@/app/data";
@@ -95,6 +96,13 @@ function JourneyMusic({ src }: { src: string }) {
   );
 }
 
+function DormWelcome() {
+  const search = useSearchParams();
+  return search.get("welcome") === "dorm"
+    ? <p className="journey-welcome" role="status">Welcome to my dorm!</p>
+    : null;
+}
+
 export default function About() {
   const controls = useRef<JourneyControls | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -147,6 +155,10 @@ export default function About() {
       <p className="sr-only" id="journey-help">W and S or the up and down arrows move. A and D or the left and right arrows turn. {inParty ? "Use Return to dorm to leave CSA After Hours." : "Follow the floating arrows through the center aisle to the far door, or use Objects to switch rooms without walking."} Press Space or tap Jump to jump. Press F to see yourself from the front or return to the rear view. Q tilts up. Press E to inspect an object. {status.chapter === WESTERN_INDEX && "Press E by the entry switch for the desk lamps, or by your bed to sleep and wake up. When Richard blocks the way, press P or tap Push Richard. "}Near a volleyball, press R or tap Spike for a jump spike or Set for three overhead sets. Walk into a volleyball to kick it. You can also drag to move or tap or click to inspect.</p>
       <JourneyWorld controls={controls} blocked={opened !== null} visited={visited}
         onStatus={setStatus} onOpen={openItem} onTransition={setTransition} onFinale={onFinale} onMove={onMove} onCameraChange={setCamera} />
+
+      {status.chapter === WESTERN_INDEX && !moved && !transition && (
+        <Suspense fallback={null}><DormWelcome /></Suspense>
+      )}
 
       {target && transition && transitionTitle && (
         <div className="journey-card" key={transition.to} style={{ "--journey-accent": `#${chapterAccent(transition.to).toString(16).padStart(6, "0")}` } as CSSProperties}>
@@ -210,7 +222,7 @@ export default function About() {
         <button type="button" onClick={() => inParty ? setOpened({ kind: "party" }) : browse(status.chapter)} aria-haspopup="dialog">{inParty ? "Guests" : "Objects"}</button>
       </div>}
       {MUSIC_URL && <JourneyMusic src={MUSIC_URL} />}
-      <TransitionLink href="/home" replace className="journey-back">Skip to portfolio <span aria-hidden="true">→</span></TransitionLink>
+      <TransitionLink href="/home" replace className="journey-back">Back to portfolio <span aria-hidden="true">→</span></TransitionLink>
 
       <dialog ref={dialog} className="journey-dialog" aria-labelledby="journey-dialog-title"
         onCancel={(event) => { event.preventDefault(); close(); }}

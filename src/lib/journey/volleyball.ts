@@ -82,6 +82,12 @@ export function launchBall(ball: Ball, velocity: Point) {
   ball.kickDelay = 0.35;
 }
 
+export function aimedBallVelocity(from: Point, to: Point, seconds: number): Point {
+  const travel = travelTime(seconds, AIR_DRAG);
+  return { x: (to.x - from.x) / travel, y: (to.y - from.y) / seconds + GRAVITY * seconds / 2,
+    z: (to.z - from.z) / travel };
+}
+
 export type VolleySequence = { action: BallAction; forward: Vec; start: Point; release: Point; strikeY: number; elapsed: number; contacts: number };
 
 export function startVolley(action: BallAction, ball: Ball, player: Vec, forward: Vec, shoulder: number, field: BallField): VolleySequence {

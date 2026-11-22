@@ -20,11 +20,28 @@
 .journey-fallback li { margin-bottom: 6px; }
 .journey-fallback a { color: #f2d24b; }
 .journey-tip { position: absolute; left: 0; top: 0; pointer-events: none; padding: 5px 8px; background: #0d0d10f2; border: 1px solid #6b6b6b; box-shadow: 2px 2px 0 #000; font-size: 11px; color: #f2f2f2; white-space: nowrap; z-index: 2; }
+.journey-welcome {
+  position: absolute;
+  z-index: 3;
+  top: calc(max(12px, env(safe-area-inset-top)) + 60px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  border: 1px solid #d9b7ff;
+  background: #221530;
+  color: #f3e7ff;
+  box-shadow: 4px 4px #0b0b0e;
+  font: clamp(14px, 2.5vw, 22px)/1.35 var(--font-pixel);
+  text-align: center;
+  pointer-events: none;
+}
+.journey-page:has(.journey-welcome) .journey-stage[data-failed] .journey-fallback { padding-top: 140px; }
 .journey-page kbd { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 4px; border: 1px solid #666; border-bottom-width: 3px; background: #19191c; color: #ddd; font-family: var(--font-mono), monospace; font-size: 11px; }
 
 .journey-typed i { font-style: normal; animation: journey-caret 900ms steps(1) infinite; margin-left: 2px; }
 @keyframes journey-caret { 50% { opacity: 0; } }
-.journey-intro { position: absolute; z-index: 3; left: 50%; top: 26%; transform: translateX(-50%); pointer-events: none; text-shadow: 3px 3px 0 #000; font-family: var(--font-pixel), monospace; font-size: clamp(22px, 5vw, 40px); white-space: nowrap; }
 .journey-card { position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; padding: 20px; pointer-events: none; }
 .journey-pass {
   pointer-events: auto; cursor: pointer; position: relative; isolation: isolate;
@@ -54,6 +71,8 @@
 .journey-prompts { position: absolute; z-index: 3; left: 50%; bottom: calc(max(24px, env(safe-area-inset-bottom)) + 40px); transform: translateX(-50%); display: flex; justify-content: center; gap: 8px; max-width: calc(100% - 32px); pointer-events: none; }
 .journey-prompt { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid #f2d24b; background: #111114f0; color: #f2d24b; box-shadow: 3px 3px 0 #000; font-size: 13px; cursor: pointer; white-space: nowrap; pointer-events: auto; }
 .journey-prompt span { overflow: hidden; text-overflow: ellipsis; }
+.journey-page[data-chapter="western"] .journey-tip { font-size: 10px; }
+.journey-page[data-chapter="western"] .journey-prompt { font-size: 12px; }
 .journey-volley { flex: none; color: #e4f9ff; background: #173744; border-color: #91e2f5; }
 .journey-csa-guests { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; margin-top: 20px; list-style: none; }
 .journey-csa-guests li { display: grid; align-content: start; gap: 4px; padding: 10px 12px; border: 1px solid #55445b; background: #261c2e; font-size: 13px; }
@@ -89,7 +108,6 @@
 .journey-object-list button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; }
 .journey-object-list button span { color: #f2d24b; }
 .journey-object-list button:hover, .journey-room-picker button:hover { border-color: #f2d24b; }
-.journey-intro-copy { font-size: 12px; color: #aaa; margin-bottom: 18px; line-height: 1.7; }
 .journey-links { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 24px; }
 .journey-link { display: inline-flex; gap: 14px; align-items: center; border-bottom: 1px solid #777; padding-bottom: 6px; color: #eee; font-size: 12px; text-decoration: none; }
 .journey-link:hover { border-color: #f2d24b; color: #f2d24b; }
@@ -120,6 +138,8 @@ a.journey-csa-action { text-decoration: none; }
 
 @media (pointer: coarse), (max-width: 640px) {
   .journey-page:has(.journey-music) .journey-tools { top: calc(max(12px, env(safe-area-inset-top)) + 50px); }
+  .journey-page:has(.journey-music, .journey-stage[data-failed]) .journey-welcome { top: calc(max(12px, env(safe-area-inset-top)) + 110px); }
+  .journey-page:has(.journey-welcome) .journey-stage[data-failed] .journey-fallback { padding-top: 190px; }
   .journey-tools { gap: 4px; }
   .journey-tools button { padding-inline: 8px; }
   .journey-page { --journey-stick-size: clamp(86px, 23vmin, 116px); }

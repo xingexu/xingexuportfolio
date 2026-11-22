@@ -651,6 +651,17 @@ function PlaneBanner() {
   );
 }
 
+function DormInvite({ className = "" }: { className?: string }) {
+  return (
+    <p className={`step-in-2 hero-subtitle hero-education font-pixel${className}`}>
+      <Link href="/about?welcome=dorm" className="hero-dorm-invite">
+        <span className="hero-dorm-education">western computer science + ivey aeo &apos;31</span>
+        <span className="hero-dorm-hint">Psst… Tour my dorm <span aria-hidden="true">→</span></span>
+      </Link>
+    </p>
+  );
+}
+
 // The twilight/sunrise variant of the hero — just the plane banner plus the
 // subtitle and CTA buttons underneath. Much simpler than DefaultHero since
 // all the fun animation logic lives inside PlaneBanner itself.
@@ -666,9 +677,7 @@ function SunriseHero() {
           <div className="hero-copy">
             <div className="hero-supporting-layout">
               <div className="hero-details">
-                <p className="step-in-2 hero-subtitle hero-education font-pixel">
-                  western computer science + ivey aeo &apos;31
-                </p>
+                <DormInvite />
 
                 <SocialLinks placement="hero" className="step-in-3" />
 
@@ -998,9 +1007,7 @@ function DefaultHero({ phase }: { phase: Exclude<SkyPhase, "twilight"> }) {
 
           <div className="hero-supporting-layout">
             <div className="hero-details">
-              <p className={`step-in-2 hero-subtitle hero-education font-pixel${midnightSupportingCopyClass}`}>
-                western computer science + ivey aeo &apos;31
-              </p>
+              <DormInvite className={midnightSupportingCopyClass} />
 
               <SocialLinks placement="hero" className={`step-in-3${midnightSupportingCopyClass}`} />
 

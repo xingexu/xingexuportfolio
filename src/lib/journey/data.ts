@@ -10,12 +10,23 @@ export type JourneyItem = Placement & {
   label: string;
   title: string;
   description?: string;
+  interactionAnchor?: Vec2;
   links?: JourneyLink[];
   video?: { src: string; label: string; captions?: string; poster: string };
 };
 export type Outfit = "kid" | "starwars" | "stussy" | "western" | "csa";
 export type Floor = "tarmac" | "wood" | "tile" | "carpet" | "gym" | "laminate" | "auditorium";
-export type Roommate = { id: string; x: number; z: number; fridge: string; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
+export type Roommate = { id: string; x: number; z: number; seatFacing: Rot; fridge: string; fridgeVia: readonly Vec2[]; pad: string; via: readonly [Vec2, Vec2, Vec2, Vec2] };
+export const WESTERN_LIGHT_SWITCH_ID = "dorm-light-switch";
+export const WESTERN_BED_ID = "ohall-bed";
+export const WESTERN_CABINET_ID = "dorm-cabinet";
+const WESTERN_ENTRY_X = 36;
+const RICHARD_BED_X = -49;
+const RICHARD_SEAT = { x: RICHARD_BED_X + 8, z: 46 };
+const MY_BED = { x: 24, z: -47 };
+const WESTERN_FRIDGE = { x: 58.25, z: -57, rot: 0 } as const;
+const RICHARD_NIGHTSTAND = { x: -60, z: 39, rot: 1 } as const;
+const WESTERN_SHOE_RACK = { x: WESTERN_ENTRY_X - 14, z: 58, rot: 2 } as const;
 type Vec2 = { x: number; z: number };
 export type Chapter = {
   id: string;
@@ -35,6 +46,7 @@ export type Chapter = {
   trim: number;
   background: number;
   outdoor?: boolean;
+  entryX?: number;
   doorLabel: string;
   /** Typed on the minimal transition screen. */
   stop: string;
@@ -198,12 +210,14 @@ const ROOMS: Chapter[] = [
     id: "western", stop: "University", number: "06", place: "Ontario Hall", location: "Western University · London, Ontario", heading: "Where I am now.",
     intro: "My first-year double room at Western.",
     ageFrom: 18, ageTo: 18, outfit: "western", outfitLabel: "Regular-fit black hoodie & sweatpants · black UGGs",
-    width: 132, depth: 128, floor: "laminate", wall: 0x3f3c4e, trim: 0x554463, background: 0x25334c, doorLabel: "NEXT",
+    width: 132, depth: 128, floor: "carpet", wall: 0xefeee8, trim: 0xb8b1a3, background: 0x575653, doorLabel: "NEXT", entryX: WESTERN_ENTRY_X,
     items: [
-      { id: "degree", model: "cs-ivey", x: 47, z: 61, y: 18, rot: 2, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey",
+      { id: WESTERN_LIGHT_SWITCH_ID, model: "dorm-light-switch", x: WESTERN_ENTRY_X - 9, z: 61, y: 14, rot: 2, solid: false,
+        label: "Lamp switch", title: "Dorm lamp switch", description: "Switches both desk lamps without changing the room lighting." },
+      { id: "degree", model: "cs-ivey", x: -10, z: 61, y: 20, rot: 2, solid: false, label: "CS + Ivey", title: "Computer Science + Ivey",
         description: "I study Computer Science at Western and have Ivey AEO status.",
         links: [{ href: "https://www.csd.uwo.ca", label: "Western Computer Science" }, { href: "https://www.ivey.uwo.ca/hba/", label: "Ivey HBA" }] },
-      { id: "mustangs", model: "go-mustangs", x: 28, z: 61, y: 14, rot: 2, solid: false, label: "Go Mustangs poster", title: "Go Mustangs",
+      { id: "mustangs", model: "go-mustangs", x: -20, z: 61, y: 14, rot: 2, solid: false, label: "Go Mustangs poster", title: "Go Mustangs",
         links: [{ href: "https://westernmustangs.ca/", label: "Western Mustangs" }] },
       { id: "csa", model: "poster-csa", x: -63, z: -20, y: 14, rot: 1, solid: false, label: "CSA poster", title: "Chinese Students’ Association",
         description: "I’m a Productions Executive at CSA.",
@@ -215,48 +229,77 @@ const ROOMS: Chapter[] = [
       { id: "wfn", model: "poster-wfn", x: -63, z: 14, y: 14, rot: 1, solid: false, label: "Western Founders Network poster", title: "Western Founders Network",
         description: "I’m a director on the Projects team.",
         links: [{ href: "https://linktr.ee/westernfoundersnetwork", label: "Western Founders Network" }, { href: "https://www.instagram.com/westernfoundersnetwork/", label: "@westernfoundersnetwork" }] },
-      { id: "ohall-bed", model: "bed-western", x: 24, z: 36, rot: 3, label: "Blue and beige bed", title: "My bed in Ontario Hall" },
-      { id: "richards-bed", model: "bed-roommate", x: 24, z: -43, rot: 2, label: "Richard’s bed", title: "Richard’s bed" },
-      { id: "richard", model: "roommate-portrait", x: 32, z: -41, solid: false, label: "Richard Su", title: "Richard Su",
+      { id: WESTERN_BED_ID, model: "bed-western", ...MY_BED, label: "My bed", title: "My bed in Ontario Hall",
+        description: "A beige blanket over navy sheets, a thick navy pillow, and a black Capco throw at the foot. Press E by the bed to sleep." },
+      { id: "richards-bed", model: "bed-roommate", x: RICHARD_BED_X, z: 53, rot: 1, label: "Richard’s bed", title: "Richard’s bed" },
+      { id: "richard", model: "roommate-portrait", ...RICHARD_SEAT, solid: false, label: "Richard Su", title: "Richard Su",
         description: "My roommate in Ontario Hall.",
         video: { src: "/videos/journey/richard.mp4", label: "Richard’s dorm routine: walking, getting milk, and practicing hockey (silent)", poster: "/videos/journey/richard.webp" },
         links: [{ href: "https://www.linkedin.com/in/richard-su-7377542b9/", label: "Richard’s LinkedIn" }] },
-      { id: "hockey-pad", model: "hockey-pad", x: -27, z: -34, solid: false, label: "Hockey practice pad", title: "Synthetic ice pad",
+      { id: "hockey-pad", model: "hockey-pad", x: -43, z: 5, solid: false, label: "Hockey practice pad", title: "Synthetic ice pad",
         description: "Richard uses it to practice stickhandling." },
-      { id: "jellycat", model: "jellycat-frog", x: 23, z: 40, y: 7, rot: 3, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog",
+      { id: "jellycat", model: "jellycat-frog", x: MY_BED.x + 5.5, z: MY_BED.z + 3, y: 7, solid: false, label: "Ricky the Rainfrog", title: "Ricky the Rainfrog",
         description: "My Jellycat frog." },
-      { id: "standing-desk", model: "standing-desk", x: 24, z: 10, label: "My standing desk", title: "My standing desk",
+      { id: "standing-desk", model: "standing-desk", x: 55, z: -14, rot: 3, label: "My standing desk", title: "My standing desk",
         description: "I use it for coding and club work." },
-      { id: "richards-desk", model: "standing-desk-roommate", x: 24, z: -10, rot: 2, label: "Richard’s standing desk", title: "Richard’s standing desk" },
-      { id: "monitor", model: "monitor", x: 24, z: 9, y: 17, solid: false, label: "Monitor", title: "Monitor",
+      { id: "richards-desk", model: "standing-desk-roommate", x: -38, z: -38, rot: 1, label: "Richard’s standing desk", title: "Richard’s standing desk" },
+      { id: "richards-nightstand", model: "dorm-nightstand", ...RICHARD_NIGHTSTAND, label: "Richard’s nightstand", title: "Richard’s nightstand" },
+      { id: "ohall-nightstand", model: "dorm-nightstand", x: 44, z: -58, label: "My nightstand", title: "My nightstand" },
+      { id: "desk-charging-ports", model: "dorm-charging-ports", x: 63.25, z: -39, y: 9, rot: 3, solid: false,
+        label: "Desk charging ports", title: "Desk charging ports", description: "A wall outlet with USB-A and USB-C ports." },
+      { id: "bedside-charging-ports", model: "dorm-charging-ports", x: 12, z: -61.25, y: 8, solid: false,
+        label: "My bedside charging ports", title: "My bedside charging ports", description: "A wall outlet with USB-A and USB-C ports." },
+      { id: "richards-charging-ports", model: "dorm-charging-ports", x: -25, z: 61.25, y: 8, rot: 2, solid: false,
+        label: "Richard’s charging ports", title: "Richard’s charging ports", description: "A wall outlet with USB-A and USB-C ports." },
+      { id: "monitor", model: "monitor", x: 56, z: -14, y: 18, rot: 3, solid: false, label: "Monitor", title: "Monitor",
+        description: "My monitor with a light bar clipped to the top.",
         links: [{ href: LINKS.github, label: "See what I’m building" }] },
-      { id: "desk-lamp", model: "desk-lamp", x: 36, z: 7, y: 18, solid: false, label: "Desk lamp", title: "Desk lamp" },
-      { id: "buldak", model: "buldak-bowl", x: 12, z: 12, y: 18, solid: false, label: "Buldak noodles", title: "Buldak at 5 a.m.",
+      { id: "desk-lamp", model: "desk-lamp", x: 57, z: -27, y: 18, rot: 3, solid: false, label: "Desk lamp", title: "Desk lamp" },
+      { id: "dorm-headphones", model: "dorm-headphones", x: 53.5, z: -2.5, y: 18, rot: 3, solid: false, label: "My headphones", title: "My headphones" },
+      { id: "dorm-backpack", model: "dorm-backpack", x: 50.25, z: -21, rot: 3, solid: false, label: "My backpack", title: "My backpack" },
+      { id: "smiskis", model: "smiskis", x: 59.5, z: -10.5, y: 32, rot: 3, solid: false, interactionAnchor: { x: 51, z: -10.5 },
+        label: "My Smiskis", title: "My Smiskis" },
+      { id: "buldak", model: "buldak-bowl", x: 52, z: 1, y: 18, rot: 3, solid: false, label: "Buldak noodles", title: "Buldak at 5 a.m.",
         video: { src: "/videos/journey/buldak.mp4", label: "Buldak at 5 a.m. (silent)", poster: "/videos/journey/buldak.webp" } },
-      { id: "mini-fridge", model: "mini-fridge", x: 53, z: 34, rot: 3, label: "Mini fridge", title: "Mini fridge",
-        description: "Snacks and drinks next to my bed." },
-      { id: "fragrances", model: "fragrances", x: 53, z: 34, y: 13, rot: 3, solid: false, label: "Fragrances", title: "Fragrances",
+      { id: "mini-fridge", model: "mini-fridge", ...WESTERN_FRIDGE, label: "Mini fridge", title: "Mini fridge",
+        description: "Snacks and drinks." },
+      { id: "fragrances", model: "fragrances", ...WESTERN_FRIDGE, y: 13, solid: false, label: "Fragrances", title: "Fragrances",
         description: "I keep these on the mini fridge." },
-      { id: "fan", model: "fan", x: 23, z: 51, y: 9, rot: 2, solid: false, label: "Table fan", title: "Table fan" },
-      { id: "closet", model: "closet", x: -14, z: 37, rot: 1, label: "Closet and snacks", title: "Closet and snacks",
-        description: "Hoodies and sweatpants on one side, snacks on the other." },
-      { id: "pink-shoes", model: "pink-court-shoes", x: -12, z: 10, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
-      { id: "molten", model: "molten-volleyball", x: -8, z: 5, ball: "molten", label: "Molten volleyball", title: "Molten volleyball",
+      { id: "fan", model: "fan", x: 55, z: 10.5, y: 12, rot: 3, solid: false, label: "WOOZOO fan", title: "WOOZOO fan",
+        interactionAnchor: { x: 52, z: 10.5 },
+        description: "An oscillating fan that blows a breeze across the dorm." },
+      { id: "dorm-snacks", model: "dorm-snacks", x: 50, z: 8, y: 12, rot: 3, solid: false, label: "Dorm snacks", title: "Dorm snacks",
+        description: "Chips, cookies, Pocky, and a cup of instant noodles." },
+      { id: "closet", model: "closet", x: 55, z: 38, rot: 3, label: "Double closet", title: "Wooden double closet",
+        description: "Hoodies, sweatpants, and snacks are put away inside." },
+      { id: WESTERN_CABINET_ID, model: "dorm-cabinet", x: 55, z: 9, rot: 3, label: "Clothes cabinet", title: "My clothes cabinet",
+        description: "Open the drawers in the room to see my folded clothes." },
+      { id: "shoe-rack", model: "dorm-shoe-rack", ...WESTERN_SHOE_RACK, label: "Shoe rack", title: "Entry shoe rack" },
+      { id: "pink-shoes", model: "pink-court-shoes", ...WESTERN_SHOE_RACK, z: WESTERN_SHOE_RACK.z - 0.5, y: 8, solid: false, label: "Pink volleyball shoes", title: "Pink volleyball shoes" },
+      { id: "molten", model: "molten-volleyball", x: -24, z: 14, ball: "molten", label: "Molten volleyball", title: "Molten volleyball",
         description: "Press R or tap Set near the ball." },
-      { id: "laundry", model: "laundry-basket", x: -28, z: 43, rot: 1, label: "Laundry basket", title: "Laundry basket" },
+      { id: "laundry", model: "laundry-basket", x: -56, z: 17, rot: 1, label: "Laundry basket", title: "Laundry basket" },
     ],
     decor: [
-      { model: "desk-divider", x: 24, z: 0 },
-      { model: "monitor", x: 24, z: -9, y: 17, rot: 2, solid: false },
-      { model: "rug-western", x: 24, z: 22, solid: false }, { model: "nightstand", x: 23, z: 51, rot: 2 },
+      { model: "capco-throw", x: MY_BED.x, z: MY_BED.z + 11, y: 4.5, solid: false },
+      { model: "capco-stitch", x: MY_BED.x + 4.5, z: MY_BED.z + 12.5, y: 9, solid: false },
+      { model: "monitor-headlight", x: 55.75, z: -14, y: 31, rot: 3, solid: false },
+      { model: "desk-divider", x: 9, z: -35, rot: 1 },
+      { model: "monitor", x: -39, z: -38, y: 18, rot: 1, solid: false },
+      { model: "desk-lamp", x: -40, z: -26, y: 18, rot: 1, solid: false },
+      { model: "dorm-chair", x: 45, z: -26, rot: 3 }, { model: "dorm-chair", x: -27, z: -32, rot: 1 },
+      { model: "dorm-snacks", x: 59, z: -21, y: 32, rot: 3, solid: false },
+      { model: "dorm-snacks", ...RICHARD_NIGHTSTAND, y: 10, solid: false },
     ],
-    roommate: { id: "richard", x: 32, z: -41, fridge: "mini-fridge", pad: "hockey-pad",
-      via: [{ x: 47, z: -41 }, { x: 47, z: 22 }, { x: 47, z: -22 }, { x: 5, z: -22 }] },
+    roommate: { id: "richard", ...RICHARD_SEAT, seatFacing: 2, fridge: "mini-fridge", pad: "hockey-pad",
+      fridgeVia: [{ x: 38, z: 29 }, { x: 38, z: -41 }, { x: WESTERN_FRIDGE.x - 2, z: -41 }],
+      via: [{ x: RICHARD_SEAT.x, z: 38 }, { x: RICHARD_SEAT.x, z: 29 }, { x: -22, z: 21 }, { x: -43, z: 19 }] },
   },
 ];
 
 export const CHAPTERS = ROOMS.map(chapter => chapter.outdoor || chapter.id === "western" ? chapter : expandRoom(chapter));
 export const WESTERN_INDEX = CHAPTERS.findIndex(chapter => chapter.id === "western");
+export const JOURNEY_START_INDEX = WESTERN_INDEX;
 export const CSA_POSTER_ID = "csa";
 export const CSA_ROOM_INDEX = CHAPTERS.length;
 export const CSA_STAGE_Z = -62;

@@ -230,6 +230,52 @@ body {
   margin-top: 0;
 }
 
+.hero-dorm-invite {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 44px;
+  max-width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+.hero-dorm-education {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 5px;
+}
+.hero-dorm-hint {
+  display: inline-block;
+  padding: 4px 7px;
+  border: 1px solid #d9b7ff;
+  background: #2b1841;
+  color: #f3e7ff;
+  box-shadow: 3px 3px 0 #1a0d28;
+  font-size: 11px;
+  line-height: 1.5;
+  text-shadow: none;
+}
+.hero-dorm-invite:is(:hover, :focus-visible) .hero-dorm-education {
+  text-decoration-style: solid;
+  text-decoration-thickness: 2px;
+}
+.hero-dorm-invite:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hero-dorm-hint {
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 140ms steps(3, end), transform 140ms steps(3, end);
+  }
+  .hero-dorm-invite:is(:hover, :focus-visible) .hero-dorm-hint {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .hero-section {
   position: relative;
   z-index: 10;
@@ -871,6 +917,11 @@ body {
   animation: midnightSupportingCopyReveal 600ms steps(6, end) both;
 }
 
+:root[data-sky-phase="night"] .hero-education:focus-within {
+  animation: none;
+  opacity: 1;
+}
+
 @keyframes midnightFinalFrameReveal {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1367,6 +1418,8 @@ body {
     display: block;
     width: 100%;
   }
+
+  .hero-dorm-invite { justify-content: center; }
 
   .hero-details > .hero-actions {
     max-width: 100%;

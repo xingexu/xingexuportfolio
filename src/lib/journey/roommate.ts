@@ -6,8 +6,11 @@ import type { Vec } from "./world";
 const FLEECE = 0xf2f1ed, RIBBING = 0xd6d7da, SKIN = 0xebc8ae;
 const CAP = 0x212227, CAP_EDGE = 0x323339, CAP_BRIM = 0x17171c;
 export const RANGERS_CREST_VOXEL_SIZE = 0.13;
-export const ROOMMATE_SEAT = 7;
+export const ROOMMATE_BED_LIFT = 4;
+export const ROOMMATE_SEAT = 7 + ROOMMATE_BED_LIFT;
 export const ROOMMATE_RADIUS = 2.65;
+const BODY_RADIUS = 3.6;
+export const roommateGap = (playerRadius: number) => Math.max(playerRadius, BODY_RADIUS) + BODY_RADIUS;
 export const FRIDGE_VOXEL_SIZE = 0.5;
 export const FRIDGE_HINGE = { x: 4.5, y: 0, z: 3.5 };
 export const FRIDGE_HANDLE = { x: -8.75, y: 11.6, z: 1.25 };
@@ -128,7 +131,7 @@ export function buildHockeyStick() {
 type Activity = "seat" | "rise" | "walk" | "open" | "take" | "close" | "sip" | "reopen" | "replace" | "shut" | "grab" | "practice" | "rack" | "sit";
 type Beat = { action: Activity; start: number; end: number; from: Vec; to: Vec; yaw: number };
 
-export function placementPoint(p: Placement, x: number, z: number): Vec {
+export function placementPoint(p: Vec & Pick<Placement, "rot">, x: number, z: number): Vec {
   const rot = p.rot ?? 0;
   return { x: p.x + [x, z, -x, -z][rot], z: p.z + [z, -x, -z, x][rot] };
 }
@@ -143,13 +146,12 @@ export function fridgeDoorDistance(fridge: Placement, open: number, p: Vec) {
 }
 
 export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Placement) {
-  const out = { x: spec.x + 5, z: spec.z };
+  const out = placementPoint({ ...spec, rot: spec.seatFacing }, 0, 5), seatYaw = spec.seatFacing * Math.PI / 2;
   const fridgeSpot = placementPoint(fridge, -2, 8.1), fridgeYaw = ((fridge.rot ?? 0) + 2) * Math.PI / 2;
   const padSpot = placementPoint(pad, 0, -4), padYaw = (pad.rot ?? 0) * Math.PI / 2;
-  const [east, south, north, crossing] = spec.via;
-  const approach = { x: fridgeSpot.x, z: south.z };
+  const [bedside, aisle, padAisle, padEntry] = spec.via;
   const beats: Beat[] = [];
-  let from: Vec = spec, yaw = Math.PI / 2, total = 0;
+  let from: Vec = spec, yaw = seatYaw, total = 0;
   const add = (action: Activity, duration: number, to = from, angle = yaw) => {
     beats.push({ action, start: total, end: total + duration, from, to, yaw: angle });
     total += duration; from = to; yaw = angle;
@@ -162,7 +164,7 @@ export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Pla
   };
   add("seat", 3.2);
   add("rise", 0.65, out);
-  walk(east, south, approach, fridgeSpot);
+  walk(bedside, aisle, ...spec.fridgeVia, fridgeSpot);
   add("open", 1.15, from, fridgeYaw);
   add("take", 0.85);
   add("close", 0.95);
@@ -170,17 +172,79 @@ export function buildRoommateRoutine(spec: Roommate, fridge: Placement, pad: Pla
   add("reopen", 0.85);
   add("replace", 0.85);
   add("shut", 0.95);
-  walk(approach, south, north, crossing, padSpot);
+  walk(...[...spec.fridgeVia].reverse(), aisle, padAisle, padEntry, padSpot);
   add("grab", 0.85, from, padYaw);
   add("practice", 5.4);
   add("rack", 0.8);
-  walk(crossing, north, east, out);
-  add("sit", 0.65, spec, Math.PI / 2);
+  walk(padEntry, padAisle, aisle, bedside, out);
+  add("sit", 0.65, spec, seatYaw);
   return { beats, total, fridge };
 }
 
 export type RoommateRoutine = ReturnType<typeof buildRoommateRoutine>;
 export type RoommatePose = ReturnType<typeof sampleRoommate>;
+
+export function roommateCenter(pose: Pick<RoommatePose, "x" | "z" | "yaw" | "sit">, yaw = pose.yaw) {
+  const offset = pose.sit * 2.4;
+  return { x: pose.x + offset * Math.sin(yaw), z: pose.z + offset * Math.cos(yaw) };
+}
+
+export function overlapsOnMove(from: Vec, to: Vec, center: Vec, limit: number) {
+  const x = from.x - center.x, z = from.z - center.z, dx = to.x - from.x, dz = to.z - from.z;
+  const travelSquared = dx * dx + dz * dz, dot = x * dx + z * dz;
+  if (!travelSquared || dot >= 0) return false;
+  const t = Math.min(1, -dot / travelSquared);
+  return Math.hypot(x + dx * t, z + dz * t) < limit;
+}
+
+type RoommatePush = { origin: RoommatePose; target: Vec; progress: number; hold: number; returning: boolean };
+type OpenGround = (point: Vec) => boolean;
+const SHOVE_TIME = 0.38, RETURN_TIME = 0.42;
+export const PUSH_GESTURE_TIME = 0.4;
+const between = (from: Vec, to: Vec, u: number) => ({ x: from.x + (to.x - from.x) * u, z: from.z + (to.z - from.z) * u });
+
+function pushPathClear(from: Vec, to: Vec, player: Vec, radius: number, open: OpenGround) {
+  if (overlapsOnMove(from, to, player, roommateGap(radius))) return false;
+  const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / 0.3));
+  for (let i = 1; i <= steps; i++) if (!open(between(from, to, i / steps))) return false;
+  return true;
+}
+
+export function planRoommatePush(pose: RoommatePose, player: Vec, radius: number, open: OpenGround): RoommatePush | null {
+  if (pose.action !== "walk") return null;
+  const dx = pose.x - player.x, dz = pose.z - player.z, gap = Math.hypot(dx, dz);
+  if (gap < 0.01 || gap > roommateGap(radius) + 1.15) return null;
+  for (const distance of [4.25, 3.2, 2.2]) for (const offset of [0.9, -0.9, 0, 1.3, -1.3]) {
+    const angle = Math.atan2(dz, dx) + offset;
+    const target = { x: pose.x + distance * Math.cos(angle), z: pose.z + distance * Math.sin(angle) };
+    if (pushPathClear(pose, target, player, radius, open)) return { origin: pose, target, progress: 0, hold: 0, returning: false };
+  }
+  return null;
+}
+
+export function stepRoommatePush(push: RoommatePush, dt: number, reduced: boolean, player: Vec, radius: number, open: OpenGround) {
+  const { origin, target, progress, hold, returning } = push;
+  const at = (p: number) => between(origin, target, easeRoommate(p));
+  let next = progress, holdFor = hold, backing = returning;
+  if (progress < 1 && !returning) next = Math.min(1, progress + (reduced ? 1 : dt / SHOVE_TIME));
+  else {
+    holdFor += dt;
+    if (returning || (holdFor >= 0.8 && pushPathClear(target, origin, player, radius, open))) {
+      backing = true;
+      next = Math.max(0, progress - (reduced ? 1 : dt / RETURN_TIME));
+    }
+  }
+  if (next !== progress && !pushPathClear(at(progress), at(next), player, radius, open)) {
+    if (!returning && progress < 1) {
+      return { state: { ...push, target: at(progress), progress: 1 }, pose: { ...origin, ...at(progress), stride: 0 } };
+    }
+    next = progress;
+  }
+  const done = backing && next === 0;
+  const stride = reduced || next === progress ? 0 : Math.sin(next * 2 * Math.PI) * 0.9 * (backing ? -1 : 1);
+  return { state: done ? null : { origin, target, progress: next, hold: holdFor, returning: backing },
+    pose: done ? origin : { ...origin, ...at(next), stride } };
+}
 
 export function sampleRoommate(routine: RoommateRoutine, time: number) {
   const t = time % routine.total;
@@ -200,8 +264,7 @@ export function sampleRoommate(routine: RoommateRoutine, time: number) {
 
 export function advanceRoommate(routine: RoommateRoutine, time: number, dt: number, player: Vec, radius: number) {
   const current = sampleRoommate(routine, time), next = sampleRoommate(routine, time + dt);
-  const distance = Math.hypot(next.x - player.x, next.z - player.z);
-  if (distance < radius + ROOMMATE_RADIUS && distance < Math.hypot(current.x - player.x, current.z - player.z)) return time;
+  if (overlapsOnMove(roommateCenter(current), roommateCenter(next), player, roommateGap(radius))) return time;
   if (next.door !== current.door) {
     const steps = Math.ceil(Math.abs(next.door - current.door) / 0.035);
     let distance = fridgeDoorDistance(routine.fridge, current.door, player);

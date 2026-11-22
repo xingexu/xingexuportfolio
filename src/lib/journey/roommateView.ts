@@ -4,7 +4,7 @@ import type { Placement, Roommate } from "./data";
 import {
   buildFridgeCabinet, buildFridgeDoor, buildHockeyStick, buildMilkCarton, buildRoommate, buildRoommateRoutine,
   easeRoommate, fridgeDoorDistance, FRIDGE_HANDLE, FRIDGE_HINGE, FRIDGE_MILK, FRIDGE_SWING, FRIDGE_VOXEL_SIZE,
-  RANGERS_CREST_VOXEL_SIZE, ROOMMATE_RADIUS, ROOMMATE_SEAT, sampleRoommate, type RoommatePose,
+  overlapsOnMove, roommateCenter, roommateGap, RANGERS_CREST_VOXEL_SIZE, ROOMMATE_SEAT, sampleRoommate, type RoommatePose,
 } from "./roommate";
 import { AVATAR_SCALE, type Vec } from "./world";
 import type { BallBlock } from "./volleyball";
@@ -167,10 +167,7 @@ export function makeRoommateView(spec: Roommate, fridge: Placement, pad: Placeme
   }
 
   function blocks(from: Vec, to: Vec, radius: number, pose: RoommatePose) {
-    const centerX = holder.position.x + pose.sit * 2.4, centerZ = holder.position.z;
-    const distance = (pos: Vec) => Math.hypot(pos.x - centerX, pos.z - centerZ);
-    const nextDistance = distance(to);
-    if (nextDistance < radius + ROOMMATE_RADIUS && nextDistance < distance(from)) return true;
+    if (overlapsOnMove(from, to, roommateCenter(pose, holder.rotation.y), roommateGap(radius))) return true;
     if (pose.door <= 0) return false;
     const nextDoor = fridgeDoorDistance(fridge, pose.door, to);
     return nextDoor < radius && nextDoor < fridgeDoorDistance(fridge, pose.door, from);

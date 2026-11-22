@@ -1,10 +1,13 @@
 import { CanvasTexture, Group, Mesh, NearestFilter, Sprite, SpriteMaterial, Vector3, type MeshBasicMaterial, type BufferGeometry, type Object3D } from "three";
 import { AVATAR_VOXEL_SIZE, SHIRT_PRINT_VOXEL_SIZE, buildAvatar } from "./avatar";
-import { CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_STAGE_Z } from "./data";
+import { CSA_BARBER_CHAIR, CSA_BARBER_SEAT, CSA_ROOM_INDEX, CSA_STAGE_Z } from "./data";
+import { buildModel, modelVoxelSize } from "./models";
 import { gridGeometry } from "./mesh";
 import { BOULDER_CYCLE, BOULDER_LANES, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, boulderStart, buildBoulderingWall, sampleBouldering } from "./csaClimb";
+import { makeCsaVolley } from "./csaVolley";
+import { SPIKE, volleyPose } from "./volleyball";
 import { Grid, hash3, shade, type Color } from "./voxel";
-import { AVATAR_SCALE, type Vec } from "./world";
+import { AVATAR_SCALE, buildBallField, type Vec } from "./world";
 
 type Hairstyle = "taper-fade" | "tousled" | "fluffy" | "straight" | "waves" | "side-part" | "cropped-fringe";
 const ACTIVITY_LABELS = {
@@ -15,7 +18,7 @@ type Activity = keyof typeof ACTIVITY_LABELS;
 type Guest = Vec & {
   name: string; yaw: number; scale: number; dj?: boolean; hair?: Hairstyle; hairColor?: Color;
   skin?: Color; chain?: boolean; shorts?: boolean; cut?: "client" | "barber"; walk?: readonly [number, number]; activity?: Activity;
-  climb?: 0 | 1;
+  climb?: 0 | 1; volley?: boolean;
 };
 type Climber = Guest & { climb: NonNullable<Guest["climb"]> };
 
@@ -51,11 +54,12 @@ export const CSA_GUESTS: readonly Guest[] = [
   floorGuest("Ray Shen", -34, -42, "radio", "cropped-fringe"),
   { name: CLIMBER_NAMES[0], ...boulderStart(BOULDER_LANES[0]),
     yaw: Math.PI / 2, scale: 0.94, hair: "cropped-fringe", hairColor: 0x352933, climb: 0 },
+  { name: "Zoie Mao", x: -14, z: -4, yaw: 0.65, scale: 0.92, hair: "waves", volley: true },
 ];
 
 export function csaActivityLabel(guest: Guest) {
   return guest.dj ? "DJ" : guest.cut === "barber" ? "Cuts Jason’s hair" : guest.cut === "client" ? "Gets a haircut" :
-    guest.climb !== undefined ? "Boulders" : guest.activity ? ACTIVITY_LABELS[guest.activity] : "";
+    guest.climb !== undefined ? "Boulders" : guest.volley ? "Spikes multiplying volleyballs" : guest.activity ? ACTIVITY_LABELS[guest.activity] : "";
 }
 
 export function buildCsaGuest(guest: Guest) {
@@ -413,7 +417,7 @@ function makeClimber(guest: Climber, mesh: (grid: Grid, size?: number) => Mesh, 
   };
 }
 
-export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial, random = Math.random) {
+export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasicMaterial, random = Math.random, volleyRandom = Math.random) {
   const group = new Group(), stageWall = new Group(), geometries: BufferGeometry[] = [];
   const mesh = (grid: Grid, size = 1, paint = material) => {
     const geometry = gridGeometry(grid, [0, 0, 0], 0.02, size);
@@ -472,6 +476,16 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
     const head = part(parts.head, 0, parts.shoulder + 2);
     head.name = "Head";
     const arm = (grid: Grid, side: -1 | 1, articulated: boolean) => {
+      if (guest.volley) {
+        const low = grid.bounds().minY, hinge = Math.round(low * 0.5), { upper, lower } = splitLimb(grid, hinge, side * 2);
+        const shoulder = part(upper, side * (parts.shoulderX + 1), parts.shoulder + 1);
+        const elbow = mesh(lower, AVATAR_VOXEL_SIZE);
+        elbow.name = side < 0 ? "Left forearm" : "Right forearm";
+        elbow.position.y = hinge * AVATAR_VOXEL_SIZE;
+        shoulder.add(elbow);
+        const tip = new Vector3(0, (low - hinge + 1) * AVATAR_VOXEL_SIZE, 0);
+        return { upper: shoulder, elbow, tip };
+      }
       if (!articulated) return { upper: part(grid, side * parts.shoulderX, parts.shoulder + 1) };
       const low = grid.bounds().minY, hinge = Math.round(low * 0.5), { upper, lower } = splitLimb(grid, hinge, side * 2);
       const shoulder = part(upper, side * (parts.shoulderX + 1), parts.shoulder + 1), elbow = part(lower, 0, 0);
@@ -516,8 +530,55 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
         djPickables.push(object);
       }
     });
-    return [{ guest, index, holder, body, head, left, right, legL, legR, tag, gear, seatOffset, clock: 0 }];
+    return [{ guest, index, holder, body, head, left, right, legL, legR, tag, gear, seatOffset, clock: 0, flinch: 0 }];
   });
+  const server = guests.find(({ guest }) => guest.volley);
+  const ballGroup = new Group();
+  ballGroup.name = "Zoie’s volleyballs";
+  group.add(ballGroup);
+  const ballShape = mesh(buildModel("volleyball"), modelVoxelSize("volleyball")).geometry;
+  ballShape.center();
+  ballShape.computeBoundingBox();
+  const ballRadius = (ballShape.boundingBox!.max.y - ballShape.boundingBox!.min.y) / 2;
+  const volley = server && makeCsaVolley(buildBallField(CSA_ROOM_INDEX), server.guest, ballRadius, volleyRandom);
+  const balls = volley?.balls.map(({ state }, i) => {
+    const ball = new Mesh(ballShape, material);
+    ball.name = `Volleyball ${i + 1}`;
+    ball.visible = i === 0;
+    ball.position.set(state.x, state.y, state.z);
+    ballGroup.add(ball);
+    return ball;
+  }) ?? [];
+  const volleyTargets = guests.filter(({ guest }) => guest.walk && guest.z + guest.walk[1] < 34 && guest.x > -50)
+    .map(view => ({ position: view.holder.position, chest: view.head.position.y * view.body.scale.y * 0.85, react: () => { view.flinch = 0.36; } }));
+  const ballAxis = new Vector3();
+  function updateVolleyballs(dt: number, reduced: boolean) {
+    if (!server || !volley) return;
+    const { holder, body, left, right, legL, legR, head } = server;
+    volley.update(dt, reduced, volleyTargets, (phase, target) => {
+      if (target && !reduced && phase <= SPIKE.contact) holder.rotation.y = Math.atan2(target.x - holder.position.x, target.z - holder.position.z);
+      const pose = volleyPose("Spike", phase, reduced);
+      body.position.y = pose.lift;
+      body.rotation.y = pose.twist;
+      left.upper.rotation.set(pose.left, 0, pose.leftRoll);
+      right.upper.rotation.set(pose.right, 0, pose.rightRoll);
+      left.elbow!.rotation.x = pose.leftElbow;
+      right.elbow!.rotation.x = pose.rightElbow;
+      legL.rotation.x = legR.rotation.x = pose.legs;
+      head.rotation.x = pose.head;
+      const hand = right.elbow!.localToWorld(right.tip!.clone());
+      hand.y += ballRadius * 0.75;
+      return hand;
+    });
+    balls.forEach((mesh, i) => {
+      mesh.visible = i < volley.count;
+      if (!mesh.visible) return;
+      const { x, y, z } = volley.balls[i].state;
+      const dx = x - mesh.position.x, dz = z - mesh.position.z, travel = Math.hypot(dx, dz);
+      if (!reduced && dt && travel > 0) mesh.rotateOnWorldAxis(ballAxis.set(dz, 0, -dx).normalize(), Math.min(travel / ballRadius, dt * 18));
+      mesh.position.set(x, y, z);
+    });
+  }
   const clipper = mesh(new Grid().box(-2, 0, -1, 4, 5, 3, 0x292831)
     .box(-1, 1, 2, 2, 3, 1, 0x685870).set(0, 2, 3, 0x9fefd1)
     .box(-2, 5, -1, 4, 2, 3, 0xa6a3ad).box(-3, 7, -1, 6, 1, 2, 0xe9dde2), 0.24);
@@ -552,6 +613,16 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
   let time = 0;
   return {
     group, stageWall, djPickables,
+    resetVolleyballs() {
+      volley?.reset();
+      if (server) server.holder.rotation.y = server.guest.yaw;
+      guests.forEach(view => { view.flinch = 0; });
+      balls.forEach((ball, i) => { ball.visible = i === 0; ball.rotation.set(0, 0, 0); });
+      if (volley) {
+        const { x, y, z } = volley.balls[0].state;
+        balls[0].position.set(x, y, z);
+      }
+    },
     nearDj(player: Vec) {
       return Math.hypot(player.x, player.z - (CSA_STAGE_Z - 8)) <= 23;
     },
@@ -578,6 +649,12 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
         const { guest, index, holder, body, head, left, right, legL, legR, tag, gear, seatOffset } = view;
         const pose = sampleCsaGuest(guest, index, guest.walk ? view.clock + dt : time, reduced);
         const gap = Math.hypot(player.x - holder.position.x, player.z - holder.position.z);
+        if (guest.volley) {
+          if (tag) tag.sprite.visible = gap < 36;
+          continue;
+        }
+        view.flinch = Math.max(0, view.flinch - dt);
+        const recoil = reduced ? 0 : Math.sin(Math.PI * view.flinch / 0.36);
         const nextGap = Math.hypot(player.x - pose.x, player.z - pose.z);
         const waiting = !!guest.walk && !reduced && nextGap < 5.1 && nextGap < gap;
         if (!waiting) {
@@ -586,15 +663,15 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
           if (!reduced) view.clock += dt;
         }
         body.position.y = seatOffset + (waiting ? 0 : pose.lift);
-        body.rotation.z = waiting ? 0 : pose.roll;
+        body.rotation.z = (waiting ? 0 : pose.roll) + recoil * 0.13;
         const step = waiting ? 0 : pose.step;
         legL.rotation.x = guest.cut === "client" ? -Math.PI / 2 : step;
         legR.rotation.x = guest.cut === "client" ? -Math.PI / 2 : -step;
-        head.rotation.x = pose.nod;
+        head.rotation.x = pose.nod + recoil * 0.22;
         if (guest.dj) {
           left.aim?.(dj.left); right.aim?.(dj.right);
         } else {
-          left.upper.rotation.set(waiting ? 0 : pose.left, 0, -0.12);
+          left.upper.rotation.set((waiting ? 0 : pose.left) - recoil * 1.4, 0, -0.12 - recoil * 0.15);
           if (guest.cut === "barber") {
             const hand = right.aim?.(cut.wrist);
             if (hand) {
@@ -609,6 +686,7 @@ export function makeCsaParty(material: MeshBasicMaterial, wallMaterial: MeshBasi
         }
         if (tag) tag.sprite.visible = gap < (guest.dj ? 65 : 21);
       }
+      updateVolleyballs(dt, reduced);
       records.forEach((vinyl, i) => { vinyl.rotation.y = dj.vinyl * (i ? 1 : -0.67); });
       pads.forEach((pad, i) => { pad.visible = i === dj.pad; });
       bars.forEach((bar, i) => { bar.scale.y = (reduced ? 2 : 2 + Math.sin(time * 8.4 + i * 1.47)) + i % 3; });

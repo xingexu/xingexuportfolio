@@ -33,6 +33,7 @@ const { makeDormCabinetView } = load('src/lib/journey/dormCabinetView.ts');
 const { makeWuzuFanView } = load('src/lib/journey/wuzuFanView.ts');
 const { CSA_GUESTS, buildCsaDiscoBall, buildCsaGuest, csaActivityLabel, makeCsaParty, sampleCsaCut, sampleCsaDj, sampleCsaGuest } = load('src/lib/journey/csaParty.ts');
 const { BOULDER_CYCLE, BOULDER_LANES, BOULDER_TOP_TIME, CLIMBER_NAMES, MAT_VOXEL_HEIGHT, buildBoulderingWall, sampleBouldering } = load('src/lib/journey/csaClimb.ts');
+const { CSA_VOLLEY_INTERVAL, makeCsaVolley } = load('src/lib/journey/csaVolley.ts');
 const { Grid } = load('src/lib/journey/voxel.ts');
 const { gridGeometry } = load('src/lib/journey/mesh.ts');
 const { Box3, Group, Mesh, MeshBasicMaterial, Raycaster, Vector3 } = require('three');
@@ -1454,7 +1455,7 @@ test('the original guests and all listed execs have activities and clear one ano
   assert.deepEqual(CSA_GUESTS.map(guest => guest.name), [
     'Jason Zhuang', 'Rain Li', 'Amelie Hu', 'Lydia Zheng', 'Daniel Su', 'Lucas Xue', 'Jeffrey Ban', 'William Wang',
     'Kevin Li', 'Selina Lim', 'Gloria Huang', 'Cassidy Lee', 'Jessica Zhang', 'Callista Chan', 'Michael Tan',
-    'Harry Yang', 'Sarah Gao', 'Melissa Zhang', 'Tanya Mai', 'Ava Cheh', 'Aleena Liu', 'Kate Chen', 'Ray Shen', 'Nuo Zhang',
+    'Harry Yang', 'Sarah Gao', 'Melissa Zhang', 'Tanya Mai', 'Ava Cheh', 'Aleena Liu', 'Kate Chen', 'Ray Shen', 'Nuo Zhang', 'Zoie Mao',
   ]);
   assert.ok(CSA_GUESTS.find(guest => guest.name === 'Amelie Hu').scale < 0.85);
   assert.ok(CSA_GUESTS.find(guest => guest.name === 'Lydia Zheng').scale < 0.82);
@@ -1487,6 +1488,79 @@ test('the original guests and all listed execs have activities and clear one ano
     }
     assert.ok(walks && works, guest.name + ' stops to perform a gesture');
   }
+});
+
+test('the CSA volleyball show picks different guests, doubles each strike, and stops at 32', () => {
+  const field = { minX: -50, maxX: 50, minZ: -50, maxZ: 50, ceiling: 38, blocks: [] };
+  const counts = [], hit = new Set();
+  let draws = 0;
+  const show = makeCsaVolley(field, { x: 0, z: 0 }, 1.75, () => ([0.18, 0.77, 0.4][draws++ % 3]));
+  const guests = [-22, -12, 12, 22].map(x => ({
+    position: { x, z: 13 }, chest: 13, react: () => hit.add(x),
+  }));
+  const dt = 1 / 120, hand = () => ({ x: 0, y: 25, z: 2 });
+  const until = (seconds, reduced = false) => {
+    for (let i = 0; i < Math.round(seconds / dt); i++) show.update(dt, reduced, guests, hand);
+  };
+  until(4, true);
+  assert.equal(draws, 0);
+  assert.equal(show.count, 1);
+  for (let wave = 0; wave < 6; wave++) {
+    until(CSA_VOLLEY_INTERVAL);
+    counts.push(show.count);
+  }
+  assert.deepEqual(counts, [1, 2, 4, 8, 16, 32]);
+  assert.equal(draws, 63, 'exactly one target selection per launch');
+  assert.deepEqual([...hit].sort((a, b) => a - b), [-22, -12, 12, 22]);
+  until(8);
+  assert.equal(show.count, 32);
+  assert.equal(draws, 63, 'no extra launches after the final wave');
+  assert.ok(show.balls.every(({ state }) => state.grounded && state.y >= state.radius));
+  show.reset();
+  assert.equal(show.count, 1);
+  until(CSA_VOLLEY_INTERVAL * 2);
+  assert.equal(show.count, 2, 're-entry can replay the show');
+});
+
+test('Zoie’s visible toss meets her jumping hand and the final 32 balls stay inside CSA', t => {
+  const document = globalThis.document;
+  globalThis.document = { createElement: () => ({ getContext: () => null }) };
+  t.after(() => { if (document) globalThis.document = document; else delete globalThis.document; });
+  const material = new MeshBasicMaterial({ vertexColors: true });
+  const party = makeCsaParty(material, material, () => 0, () => 0.3);
+  t.after(() => { party.dispose(); material.dispose(); });
+  const zoie = CSA_GUESTS.find(guest => guest.name === 'Zoie Mao');
+  assert.equal(csaActivityLabel(zoie), 'Spikes multiplying volleyballs');
+  assert.ok(!W.blocked(CSA_ROOM_INDEX, zoie.x, zoie.z, 2.5));
+  for (const guest of CSA_GUESTS.filter(guest => guest.walk)) {
+    const x = Math.max(0, Math.abs(zoie.x - guest.x) - guest.walk[0]);
+    const z = Math.max(0, Math.abs(zoie.z - guest.z) - guest.walk[1]);
+    assert.ok(Math.hypot(x, z) > 5, guest.name + ' clears the spike spot');
+  }
+  const avatar = party.group.getObjectByName(zoie.name);
+  const hand = avatar.getObjectByName('Right forearm');
+  const balls = party.group.getObjectByName('Zoie’s volleyballs').children;
+  const viewer = W.spawn(CSA_ROOM_INDEX, 'portal');
+  party.update(V.SPIKE.contact - 0.01, false, viewer);
+  const toss = balls[0].position.clone();
+  party.resetVolleyballs();
+  party.update(V.SPIKE.contact, false, viewer);
+  assert.ok(avatar.children[0].position.y > 5, 'Zoie jumps to strike');
+  hand.geometry.computeBoundingBox();
+  const palm = hand.localToWorld(new Vector3(0, hand.geometry.boundingBox.min.y + AVATAR_VOXEL_SIZE, 0));
+  assert.ok(balls[0].position.distanceTo(palm) < 2, 'the ball launches at her palm');
+  assert.ok(balls[0].position.distanceTo(toss) < 1, 'the toss and launch do not jump apart');
+  const field = W.buildBallField(CSA_ROOM_INDEX);
+  for (let frame = 0; frame < 20 * 60; frame++) party.update(1 / 60, false, viewer);
+  assert.equal(balls.filter(ball => ball.visible).length, 32);
+  for (const ball of balls) {
+    const { x, y, z } = ball.position;
+    assert.ok(x > field.minX && x < field.maxX && z > field.minZ && z < field.maxZ && y > 0 && y < field.ceiling);
+  }
+  party.resetVolleyballs();
+  party.update(8, true, viewer);
+  assert.equal(balls.filter(ball => ball.visible).length, 1);
+  assert.equal(avatar.children[0].position.y, 0, 'reduced motion does not jump');
 });
 
 test('the black CSA tee has only a small chest wordmark and larger cat artwork on the back', () => {

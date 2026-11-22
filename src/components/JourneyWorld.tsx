@@ -365,6 +365,7 @@ export default function JourneyWorld(props: Props) {
       if (previous) scene.remove(previous.group);
       chapter = index;
       const next = room(index);
+      next.party?.resetVolleyballs();
       scene.add(next.group);
       const current = JOURNEY_ROOMS[index];
       scene.background = new Color(current.background);
